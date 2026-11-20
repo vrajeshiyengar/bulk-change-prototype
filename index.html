@@ -542,6 +542,43 @@ input[data-mixed]{accent-color:var(--label);opacity:.6}
 .rwhere{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .rules-h{font-size:12.5px;color:var(--label);padding:2px 2px 4px}
 .ddi em+i{margin-left:6px}.ddi>em{margin-left:auto;padding-left:10px}
+
+/* v9 */
+.tbtn.pri{background:var(--ink,#111);color:#fff;border-color:var(--ink,#111)}.tbtn.pri.on{outline:2px solid var(--blue);outline-offset:1px}
+.pvline{font-size:13.5px}.aibox2 .box{font-size:13.5px}
+.actlog{border:1px solid var(--rule);border-radius:8px;background:var(--card);padding:6px 12px}.actlog.flat{border:0;padding:0}
+.actlog-h{display:flex;gap:10px;align-items:baseline;padding:4px 0 6px;font-size:13px}.actlog-h .lnk{margin-left:auto}
+.logr{display:grid;grid-template-columns:20px minmax(0,1fr) auto auto;gap:12px;align-items:baseline;padding:6px 0;border-top:1px solid var(--rule);font-size:13px}
+.logi{color:var(--label);text-align:center}.logt{min-width:0}
+.hchg{font-size:12px;font-weight:500}
+.navbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--rule);border-radius:6px;padding:8px 12px;background:var(--nav)}.navgo{display:inline-flex;gap:8px;align-items:center;margin-left:auto}
+.seg2 button.qerr{color:var(--err)}.seg2 button.qwarn{color:#9A6400}.seg2 button.on.qerr,.seg2 button.on.qwarn{color:#fff}
+.g tr.navcur td{box-shadow:inset 0 2px 0 var(--blue),inset 0 -2px 0 var(--blue)}
+.kvb{border:0;background:none;text-align:left;cursor:pointer;font:inherit;color:inherit;border-radius:6px}.kvb:hover{background:var(--nav)}.kvb b{text-decoration:underline dotted;text-underline-offset:3px}
+.nlink{border:0;background:none;padding:0;color:var(--blue);font:inherit;font-weight:600;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}.nlink:hover{text-decoration-style:solid}
+button.sumchip{cursor:pointer;font:inherit}
+.modal.wide{max-width:1180px}.modal.wide .modal-b{padding:14px 18px}
+.hmenu{z-index:85!important}.dd{z-index:90!important}
+.icard-h{flex-direction:column;align-items:stretch}
+.icard-a{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-top:1px solid var(--rule);background:var(--nav);border-radius:0 0 6px 6px}
+.ia-l,.ia-r{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.ia-r{gap:16px}
+.remed{padding:0 14px 10px 44px;font-size:13px;display:flex;flex-direction:column;gap:4px}.remed ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+.selbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #F3C9C9;background:#FFF7F7;border-radius:6px;padding:8px 12px}
+.g tr.selrow td{background:#FFF7F7}
+/* impact flow */
+.flow{display:grid;grid-template-columns:250px minmax(0,1fr);gap:40px;align-items:center}
+.fsrc{position:relative;border:2px solid var(--plum);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:4px;background:var(--plum-t)}
+.fsrc::after{content:'';position:absolute;right:-42px;top:50%;width:40px;border-top:2px solid var(--plum)}
+.fbus{position:relative;border-left:2px solid var(--plum);padding-left:26px;display:flex;flex-direction:column;gap:8px}
+.fgl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--label);font-weight:600;padding-top:6px}
+.fnode{position:relative;display:flex;flex-direction:column;gap:3px;border:1px solid var(--rule);border-left:3px solid #3A6BEA;border-radius:8px;padding:8px 12px;background:var(--card);color:inherit;text-decoration:none}
+.fnode::before{content:'';position:absolute;left:-28px;top:20px;width:26px;border-top:2px solid var(--plum)}
+.fnode.on:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}.fnode.dec{border-left-color:#C98A1B}
+.fnode .fn-top{display:flex;justify-content:space-between;gap:10px}.fn-n{font-size:12.5px;color:var(--label)}.fnode small{color:var(--label);font-size:12.5px;line-height:1.45}
+.fnode.off{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px;border:1px dashed var(--rule2);border-left:1px dashed var(--rule2);background:transparent}.fnode.off::before{border-top:2px dashed var(--rule2)}
+.offchip{font-size:12.5px;color:var(--label);border:1px solid var(--rule);border-radius:999px;padding:1px 9px;background:var(--card)}
+@media (max-width:960px){.flow{grid-template-columns:minmax(0,1fr);gap:18px}.fsrc::after{display:none}}
+.fnode .badge{align-self:flex-start}
 </style>
 </head>
 <body>
