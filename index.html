@@ -517,6 +517,21 @@ input[data-mixed]{accent-color:var(--label);opacity:.6}
 .fhd{display:inline-flex;gap:8px;align-items:center}.ddt.hmode{font-size:12px;padding:1px 20px 1px 6px;color:var(--label);font-weight:400;background-position:right 6px center}
 .sameit{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 @media (max-width:960px){.fpick{grid-template-columns:minmax(0,1fr)}.fsel{position:static}}
+
+/* v7 field usage */
+.fi{align-items:flex-start}.fi input{margin-top:3px}
+.fi .fn{font-weight:500}.fdesc{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;max-width:620px}
+.fside{display:flex;align-items:center;gap:12px;white-space:nowrap;padding-top:1px}.fside .fmeta{min-width:52px;justify-content:flex-end}
+.use{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500}
+.use i{width:7px;height:7px;border-radius:50%;flex:none}
+.u-new{color:#16794C}.u-new i{background:#1FA463;box-shadow:0 0 0 0 rgba(31,164,99,.55);animation:upulse 1.8s ease-out infinite}
+.u-mid{color:#2F5BD3}.u-mid i{background:#3A6BEA}
+.u-old{color:var(--label);font-weight:400}.u-old i{background:#B5B5BA}
+.u-never{color:var(--ghost,#A3A3A8);font-weight:400}
+@keyframes upulse{0%{box-shadow:0 0 0 0 rgba(31,164,99,.55)}70%{box-shadow:0 0 0 6px rgba(31,164,99,0)}100%{box-shadow:0 0 0 0 rgba(31,164,99,0)}}
+@media (prefers-reduced-motion:reduce){.u-new i{animation:none}}
+.flegend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:6px 12px;border-bottom:1px solid var(--rule);font-size:12px;color:var(--label)}
+.si .use{font-size:11.5px}
 </style>
 </head>
 <body>
