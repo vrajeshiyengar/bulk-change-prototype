@@ -414,12 +414,12 @@ let DRAFTN=2041;
 const STEPS=[{k:'setup',t:'Details',h:'Change details'},{k:'who',t:'Segments',h:'Target segments'},{k:'what',t:'Fields',h:'Fields to update'},{k:'values',t:'Values',h:'Enter values'},{k:'review',t:'Review & confirm',h:'Review and confirm'},{k:'impact',t:'Impact & approvals',h:'Impact & approvals'},{k:'status',t:'Submit & track',h:'Submission status'}];
 function blankDraft(){return{id:'BC-'+(DRAFTN++),name:'',reason:'',date:null,dateKind:null,template:null,
   who:{groups:[{mode:'all',conds:[]}],incLeave:true,incTerm:false,incContract:false,cnt:null,prev:null,paste:'',pasteOpen:false},
-  fields:[],modes:{},same:{},sameCur:{},manual:{},csv:{},csvHits:new Set(),rules:[],moved:new Set(),exceptions:new Set(),applyMode:'together',ack:{},ackNote:{},
+  seq:10,mseq:{},cseq:{},hist:{u:[],r:[]},fields:[],modes:{},same:{},sameCur:{},manual:{},csv:{},csvHits:new Set(),rules:[],moved:new Set(),exceptions:new Set(),applyMode:'together',ack:{},ackNote:{},
   grid:{changed:false,group:null,dept:'',issue:null,collapsed:new Set(),tool:null,scroll:0},show:{},
   cutoff:{choice:'next',confirmed:false},appSync:'effective',digest:true,notifyEmp:false,notifyMgr:true,accessAck:false,run:null,visited:new Set(['setup']),rejected:new Map()}}
 function demoDraft(){const d=blankDraft();d.name='FY26 annual review';d.reason='Outcomes of the FY26 performance review cycle';d.date=NEXTP;d.dateKind='next';d.template='comp';
   d.who.groups=[{mode:'all',conds:[{f:'empid',op:'inseg',v:['SEG-101']}]}];d.fields=['compensation','title','level'];d.fields.forEach(f=>d.modes[f]='diff');
-  d.rules=[{field:'compensation',kind:'pct',pct:8,where:{f:'rating',op:'anyof',v:['Exceeds']},cap:'max',ai:false,accepted:true},{field:'compensation',kind:'pct',pct:4,where:{f:'rating',op:'anyof',v:['Meets']},cap:'max',ai:false,accepted:true}];
+  d.rules=[{field:'compensation',kind:'pct',pct:8,where:{f:'rating',op:'anyof',v:['Exceeds']},cap:'max',ai:false,accepted:true},{field:'compensation',kind:'pct',pct:4,where:{f:'rating',op:'anyof',v:['Meets']},cap:'max',ai:false,accepted:true}].map(normRule);d.rules.forEach((r,i)=>r.seq=i+1);
   seedPromos(d);['setup','who','what','values'].forEach(k=>d.visited.add(k));return d}
 function extraDrafts(){const v=x=>['setup','who','what','values'].forEach(k=>x.visited.add(k));
   const c=blankDraft();c.name='Q4 launch bonus · Platform team';c.reason='Thank-you bonus for the Q4 platform launch';c.date=D(2026,11,15);c.dateKind='custom';
@@ -443,17 +443,43 @@ function cohort(d){const g=d.who.groups;const list=[],why=new Map(),auto={leave:
     list.push(e);why.set(e.id,named?'Named by Employee ID':sc?'In '+segName(sc.v[0]):g.length>1?`Matches group ${gi+1}`:'Matches the conditions')}
   return{list,why,auto}}
 function rowsOf(d){let base;if(d.run&&d.run.frozen)base=d.run.frozen.map(id=>EMPI[id]).filter(Boolean);else base=cohort(d).list;return base.filter(e=>!d.moved.has(e.id))}
-function ruleHit(d,e,f){for(let i=d.rules.length-1;i>=0;i--){const r=d.rules[i];if(r.field!==f)continue;if(r.where&&complete(r.where)&&!testCond(r.where,e))continue;return r}return null}
-function ruleVal(d,e,f,r){if(!r)return undefined;const k=r.kind||'pct';const cur=curCode(e);
+const TYL={money:'Amount',int:'Number',select:'List',team:'List',text:'Text',date:'Date',person:'Person'};
+function ropsFor(f){const F=FIELDS[f];if(!F)return[];const t=F.type;let o;
+  if(t==='money')o=[['pct','Change by a percentage'],['add','Change by an amount'],['set','Set to an amount'],...(f!=='compensation'?[['pctbase','Set to a % of base pay']]:[])];
+  else if(t==='int')o=[['add','Change by'],['pct','Change by a percentage'],['set','Set to']];
+  else if(t==='select')o=[['set','Set to'],['map','Replace one value with another'],...(f==='level'?[['step','Move up or down levels']]:[])];
+  else if(t==='team')o=[['set','Set to'],['map','Replace one team with another'],['first','First team in the new department']];
+  else if(t==='date')o=[['set','Set to a date'],['shift','Move by a number of days'],['eff','Set to the effective date']];
+  else if(t==='person')o=[['set','Set to'],['map','Replace one manager with another'],['skip',"Move to their manager's manager"]];
+  else o=[['set','Set to'],['replace','Find and replace'],['prefix','Add a prefix'],['suffix','Add a suffix'],...(f==='title'?[['ladder','Use the standard title for the level']]:[])];
+  return o}
+function normRule(r){if(!r)return r;if(r.op)return r;const k=r.kind||'pct';let op=k;if(k==='pct'&&r.field!=='compensation'&&MONEY.has(r.field))op='pctbase';
+  return{field:r.field,op,a:(k==='pct'?r.pct:r.amt),cur:r.cur||'USD',cap:r.cap||null,where:r.where?(Array.isArray(r.where)?r.where:[{mode:'all',conds:[r.where]}]):[],ai:!!r.ai,accepted:r.accepted!==false,seq:r.seq}}
+const ruleWhere=r=>(r.where||[]).filter(g=>g.conds.some(complete));
+const rseq=(d,r)=>r.seq??d.rules.indexOf(r);
+function ruleHitV(d,e,f,lim=Infinity){for(let i=d.rules.length-1;i>=0;i--){const r=d.rules[i];if(r.field!==f||rseq(d,r)>=lim)continue;const w=ruleWhere(r);if(w.length&&evalGroups(w,e)<0)continue;const v=ruleVal(d,e,f,r);if(v!==undefined&&v!==null&&v!=='')return[r,v]}return[null,undefined]}
+function ruleHit(d,e,f){return ruleHitV(d,e,f)[0]}
+function ruleVal(d,e,f,r){if(!r)return undefined;const F=FIELDS[f];const o=r.op,a=r.a,b=r.b;const pv=pick(d,e,f,rseq(d,r)).v;const cur=(pv===undefined||pv===null||pv==='')?e[f]:pv;const cc=curCode(e);
   if(f==='compensation'){const per=nv(d,e,'per');if(per!==e.per)return undefined;const div=per==='Hourly'?2080:1;
-    let x=k==='pct'?e.compensation*(1+r.pct/100):k==='add'?e.compensation+conv(r.amt,r.cur,cur)/div:conv(r.amt,r.cur,cur)/div;
-    if(r.cap&&k!=='set'){const b=band(e,nv(d,e,'level'),per,nv(d,e,'department'),nv(d,e,'location'));const cap=r.cap==='max'?b.max:b.mid;if(x>cap)x=Math.max(e.compensation,cap)}return roundComp(x,per)}
-  if(f==='bonus'||f==='spotBonus'){if(k==='pct'){const sal=annual(nv(d,e,'compensation'),nv(d,e,'per'));return r100(sal*r.pct/100)}return Math.round(conv(r.amt,r.cur,cur)/10)*10}return undefined}
-function val(d,e,f){const m=d.manual[e.id];if(m&&f in m)return m[f];const c=d.csv[e.id];if(c&&f in c)return c[f];
-  if(d.modes[f]==='same'&&d.same[f]!==undefined&&d.same[f]!==''){const v=d.same[f];if(MONEY.has(f)){const from=(d.sameCur||{})[f]||'USD';const x=conv(+v,from,curCode(e));return f==='compensation'?roundComp(e.per==='Hourly'?x/2080:x,e.per):Math.round(x/10)*10}return v}
-  return ruleVal(d,e,f,ruleHit(d,e,f))}
-function src(d,e,f){const m=d.manual[e.id];if(m&&f in m)return m[f]===''?null:'m';const c=d.csv[e.id];if(c&&f in c)return'c';
-  if(d.modes[f]==='same'&&d.same[f]!==undefined&&d.same[f]!=='')return's';const r=ruleHit(d,e,f);if(r&&ruleVal(d,e,f,r)!==undefined)return r.ai&&!r.accepted?'ai':'r';return null}
+    const b0=+cur||e.compensation;let x=o==='pct'?b0*(1+(+a)/100):o==='add'?b0+conv(+a,r.cur,cc)/div:o==='set'?conv(+a,r.cur,cc)/div:undefined;if(x===undefined||!isFinite(x))return undefined;
+    if(r.cap&&o!=='set'){const bd=band(e,nv(d,e,'level'),per,nv(d,e,'department'),nv(d,e,'location'));const cap=r.cap==='max'?bd.max:bd.mid;if(x>cap)x=Math.max(e.compensation,cap)}return roundComp(x,per)}
+  switch(F.type){
+    case'money':{const c0=+cur||0;const v=o==='pct'?c0*(1+(+a)/100):o==='add'?c0+conv(+a,r.cur,cc):o==='set'?conv(+a,r.cur,cc):o==='pctbase'?annual(nv(d,e,'compensation'),nv(d,e,'per'))*(+a)/100:NaN;return isFinite(v)?Math.max(0,Math.round(v/10)*10):undefined}
+    case'int':{const c0=+cur||0;const v=o==='add'?c0+(+a):o==='pct'?c0*(1+(+a)/100):o==='set'?+a:NaN;return isFinite(v)?Math.max(0,Math.round(v)):undefined}
+    case'select':if(o==='set')return a;if(o==='map')return String(cur)===String(a)?b:undefined;if(o==='step'){const i=LEVELS.indexOf(cur);if(i<0)return undefined;return LEVELS[Math.max(0,Math.min(LEVELS.length-1,i+(+a||0)))]}return undefined;
+    case'team':if(o==='set')return a;if(o==='map')return cur===a?b:undefined;if(o==='first')return TEAMS[nv(d,e,'department')]?.[0];return undefined;
+    case'date':if(o==='set')return a;if(o==='eff')return d.date?iso(d.date):undefined;if(o==='shift'){const x=fromIso(cur);return x?iso(addDays(x,+a||0)):undefined}return undefined;
+    case'person':if(o==='set')return a;if(o==='map')return cur===a?b:undefined;if(o==='skip')return EMPI[cur]?.manager||undefined;return undefined;
+    default:{const c0=String(cur??'');if(o==='set')return a;if(o==='replace')return a&&c0.includes(a)?c0.split(a).join(b??''):undefined;if(o==='prefix')return a&&!c0.startsWith(a)?a+c0:undefined;if(o==='suffix')return a&&!c0.endsWith(a)?c0+a:undefined;
+      if(o==='ladder')return ladder(nv(d,e,'department'),nv(d,e,'level'));return undefined}}}
+function pick(d,e,f,lim=Infinity){if(d.modes[f]==='same'){if(d.same[f]===undefined||d.same[f]==='')return{v:undefined,s:null};const v=d.same[f];
+    if(MONEY.has(f)){const from=(d.sameCur||{})[f]||'USD';const x=conv(+v,from,curCode(e));return{v:f==='compensation'?roundComp(e.per==='Hourly'?x/2080:x,e.per):Math.round(x/10)*10,s:'s'}}return{v,s:'s'}}
+  const k=e.id+'|'+f;let best=null,bs=-1;const m=d.manual[e.id];if(m&&f in m){const q=(d.mseq||{})[k]??5;if(q<lim){bs=q;best={v:m[f],s:m[f]===''?null:'m'}}}
+  const c=d.csv[e.id];if(c&&f in c){const q=(d.cseq||{})[k]??4;if(q<lim&&q>bs){bs=q;best={v:c[f],s:'c'}}}
+  const[r,v]=ruleHitV(d,e,f,lim);if(r){const q=rseq(d,r);if(q>bs){best={v,s:r.ai&&!r.accepted?'ai':'r',r}}}
+  return best||{v:undefined,s:null}}
+function val(d,e,f){return pick(d,e,f).v}
+function src(d,e,f){return pick(d,e,f).s}
 function nv(d,e,f){if(!d.fields.includes(f))return e[f];const v=val(d,e,f);return(v===undefined||v===''||v===null)?e[f]:v}
 function changed(d,e,f){if(!d.fields.includes(f))return false;const v=val(d,e,f);if(v===undefined||v===''||v===null)return false;return String(v)!==String(e[f])}
 
@@ -670,7 +696,7 @@ function setupView(d){const pi=d.date?payInfo(d.date):null;
 const TPL={blank:{f:[],m:{}},comp:{f:['compensation','title','level'],m:{}},reorg:{f:['department','team','manager'],m:{department:'same',team:'same',manager:'same'}},office:{f:['location','manager'],m:{location:'same'}}};
 
 /* ================= condition builder (shared) ================= */
-const groupsOf=ctx=>ctx==='d'?S.d.who.groups:ctx==='rule'?[S.rt.wg]:S.se.groups;
+const groupsOf=ctx=>ctx==='d'?S.d.who.groups:ctx==='rule'?S.rt.groups:ctx==='gf'?S.d.grid.fg:S.se.groups;
 function builder(ctx,groups){return groups.map((g,gi)=>{const m=g.mode||'all';const quant=['atleast','atmost','exactly'].includes(m);const lbl={all:'all',any:'any',atleast:'at least',atmost:'at most',exactly:'exactly'}[m];
   return`<div class="grp ${g.ai?'aig':''}">${g.ai?`<div class="aiflag"><span class="badge b-ai">✦ Drafted by AI · review before continuing</span><button class="lnk" data-act="aiok" data-ctx="${ctx}" data-g="${gi}">Looks right</button></div>`:''}<div class="grp-h"><span>${gi===0?'Employees where':'Or employees where'}</span>${ddBtn(`bm:${ctx}:${gi}`,lbl,'','mini')}${quant?`<input class="nin" type="number" min="1" max="${Math.max(1,g.conds.length)}" data-in="bgn" data-ctx="${ctx}" data-g="${gi}" value="${g.n||1}" aria-label="How many conditions">`:''}<span>of these ${g.conds.length===1?'is':'are'} true</span>
     ${quant&&(g.n||1)>g.conds.length?`<span class="warn-t">This group has only ${pl(g.conds.length,'condition')}</span>`:''}${gi>0?`<button class="x" data-act="bdelgroup" data-ctx="${ctx}" data-g="${gi}" aria-label="Remove group" style="margin-left:auto">×</button>`:''}</div>
@@ -943,49 +969,67 @@ function whatView(d){catalog();d.fields.forEach(ensureField);const q=(S.whatQ||'
     <p class="note">You decide how values are set on the next step: one value for everyone, a rule, or each person.</p></aside></div>`}
 const RH=48;const G={items:[],cols:[],ncol:0,raf:0};
 function gridCols(d){const F=d.fields.slice().sort((a,b)=>fo(a)-fo(b));const cols=[{appr:true}];
-  if(!F.includes('department')&&!d.grid.group)cols.push({ctx:'department',label:'Department'});if(!F.includes('rating')&&F.some(f=>MONEY.has(f)||f==='level'))cols.push({ctx:'rating',label:'Rating'});
+  (d.grid.ctx||[]).forEach(k=>{if(CF[k]&&!d.fields.includes(k))cols.push({ctx:k,label:CF[k].label})});
   if(F.some(f=>MONEY.has(f)))cols.push({ctx:'cur',label:'Currency'});
   F.forEach(f=>{cols.push({f});if((f==='compensation'&&!F.includes('per'))||(f==='per'))if(F.includes('compensation'))cols.push({pct:true})});return cols}
-function gridItems(d){const A=analyze(d);const g=d.grid;let rows=A.rows;
-  if(g.dept)rows=rows.filter(e=>e.department===g.dept);if(g.changed)rows=rows.filter(e=>A.rowChanged.has(e.id));if(g.issue)rows=rows.filter(e=>(A.rowIss.get(e.id)||[]).includes(g.issue));
+function ctxVal(e,k){if(k==='cur')return curCode(e);const C2=CF[k];if(!C2)return'';const v=C2.get(e);if(C2.type==='person')return EMPI[v]?.name||'';if(C2.type==='date')return fmtIso(v);if(Array.isArray(v))return v.join(', ');return v??''}
+function groupVal(d,e,k){if(d.fields.includes(k))return fmtVal(e,k,e[k])||'(blank)';return String(ctxVal(e,k))||'(blank)'}
+function gridItems(d){const A=analyze(d);const g=d.grid;let rows=A.rows;const fg=(g.fg||[]).filter(x=>x.conds.some(complete));
+  if(fg.length)rows=rows.filter(e=>evalGroups(fg,e)>=0);if(g.changed)rows=rows.filter(e=>A.rowChanged.has(e.id));if(g.issue)rows=rows.filter(e=>(A.rowIss.get(e.id)||[]).includes(g.issue));
   if(g.appr==='need')rows=rows.filter(e=>A.rowAppr.has(e.id));else if(g.appr==='none')rows=rows.filter(e=>A.rowChanged.has(e.id)&&!A.rowAppr.has(e.id));
-  if(!g.group)return rows.map(e=>({e}));const by={};rows.forEach(e=>(by[e.department]=by[e.department]||[]).push(e));const items=[];
-  Object.keys(by).sort().forEach(dp=>{items.push({h:dp,n:by[dp].length,ch:by[dp].filter(e=>A.rowChanged.has(e.id)).length});if(!g.collapsed.has(dp))by[dp].forEach(e=>items.push({e}))});return items}
-function valuesView(d){const A=analyze(d);const g=d.grid;if(g.group===null)g.group=A.rows.length>300;
+  if(!g.group||!g.groupBy)return rows.map(e=>({e}));const by={};const k=g.groupBy;rows.forEach(e=>{const v=groupVal(d,e,k);(by[v]=by[v]||[]).push(e)});const items=[];
+  const keys=Object.keys(by);const lab=(FIELDS[k]||CF[k]||{}).label||k;const ordK=k==='level'?(a,b)=>lvlN(a)-lvlN(b):(a,b)=>a.localeCompare(b,undefined,{numeric:true});
+  keys.sort(ordK).forEach(v=>{items.push({h:v,lab,n:by[v].length,ch:by[v].filter(e=>A.rowChanged.has(e.id)).length});if(!g.collapsed.has(v))by[v].forEach(e=>items.push({e}))});return items}
+function valuesView(d){const A=analyze(d);const g=d.grid;if(g.group===null){const lf=d.fields.find(f=>['select','team','person'].includes(FIELDS[f].type));g.groupBy=g.groupBy||lf||'';g.group=!!(lf&&A.rows.length>300)}if(!g.ctx)g.ctx=d.fields.some(f=>MONEY.has(f)||f==='level')&&!d.fields.includes('rating')?['rating']:[];if(!g.fg)g.fg=[{mode:'all',conds:[]}];
   G.cols=gridCols(d);G.items=gridItems(d);G.ncol=1+G.cols.reduce((s,c)=>s+(c.f?2:1),0);
   const diffF=d.fields.filter(f=>d.modes[f]!=='same');const ruleOk=['compensation','bonus','spotBonus'].some(f=>d.fields.includes(f));
-  const tb=(k,l,dis)=>`<button class="tbtn ${g.tool===k?'on':''}" data-act="tool" data-k="${k}" ${dis?'disabled title="Rules work on Base pay, Target annual bonus and One-time bonus"':''}>${l}</button>`;
+  const tb=(k,l,dis)=>`<button class="tbtn ${g.tool===k?'on':''}" data-act="tool" data-k="${k}" ${dis?'disabled':''}>${l}</button>`;const nf=g.fg.flatMap(x=>x.conds).filter(complete).length;const H=d.hist||{u:[],r:[]};
   const sameF=d.fields.filter(f=>d.modes[f]==='same');
   const samebar=sameF.length?`<div class="samebar"><b>One value for everyone</b>${sameF.map(f=>`<div class="sameit"><span class="tg">${esc(FIELDS[f].label)}</span>${editorSame(d,f)}${ddBtn('fmode:'+f,'One value for everyone','','mini')}</div>`).join('')}</div>`:'';
-  const rules=d.rules.length?`<div class="rules">${d.rules.map((r,i)=>{const n=A.rows.filter(e=>src(d,e,r.field)&&ruleHit(d,e,r.field)===r&&!(d.manual[e.id]&&r.field in d.manual[e.id])&&!(d.csv[e.id]&&r.field in d.csv[e.id])).length;
-    return`<div class="rule ${r.ai&&!r.accepted?'ai':''}"><b>Rule ${i+1}</b><span>${ruleTxt(r)}</span><span class="muted num">· ${pl(n,'row')}</span>${r.ai&&!r.accepted?`<span class="badge b-ai">✦ AI-drafted · not accepted</span><button class="btn sm" data-act="acceptai" data-i="${i}">Accept ${fmtN(n)} cells</button>`:''}<button class="txt" data-act="rmrule" data-i="${i}">Remove</button></div>`}).join('')}</div>`:'';
+  const rules=d.rules.length?`<div class="rules"><div class="rules-h">Rules, in the order applied. A later rule, upload or cell edit wins for the same cell.</div>${d.rules.map((r,i)=>{const n=A.rows.filter(e=>pick(d,e,r.field).r===r).length;
+    return`<div class="rule ${r.ai&&!r.accepted?'ai':''}"><b>Rule ${i+1}</b><span>${ruleTxt(r)}</span><span class="muted num">· ${pl(n,'cell')}</span>${r.ai&&!r.accepted?`<span class="badge b-ai">✦ AI-drafted · not accepted</span><button class="btn sm" data-act="acceptai" data-i="${i}">Accept ${fmtN(n)} cells</button>`:''}<button class="txt" data-act="rmrule" data-i="${i}">Remove</button></div>`}).join('')}</div>`:'';
   const head1=`<tr><th class="c-emp" rowspan="2">Employee</th>${G.cols.map(c=>c.appr?`<th rowspan="2">Approval</th>`:c.f?`<th class="grp-th" colspan="2"><span class="fhd"><span>${esc(FIELDS[c.f].label)}</span>${ddBtn('fmode:'+c.f,d.modes[c.f]==='same'?'One value for everyone':'Each person','','mini hmode')}</span></th>`:c.pct?`<th rowspan="2">% change</th>`:`<th rowspan="2" class="c-ctx">${esc(c.label)}</th>`).join('')}</tr>`;
   const head2=`<tr>${G.cols.filter(c=>c.f).map(()=>`<th style="border-left:1px solid var(--rule)">Current</th><th>New</th>`).join('')}</tr>`;
-  return`<div class="toolbar">${tb('set','Set value')}${tb('rule','Apply rule',!ruleOk)}${tb('template','Download template')}${tb('upload','Upload CSV')}${tb('ai','✦ Describe a change')}<span class="sp"></span>
-    <select class="sel" data-in="gdept" aria-label="Filter by department"><option value="">All departments</option>${DEPTS.map(x=>`<option ${g.dept===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
-    <label class="tg"><input type="checkbox" data-act="gchanged" ${g.changed?'checked':''}> Show changed only</label><label class="tg"><input type="checkbox" data-act="ggroup" ${g.group?'checked':''}> Group by department</label></div>
+  return`<div class="toolbar">${tb('set','Set value')}${tb('rule','Apply rule',!d.fields.length)}${tb('template','Download template')}${tb('upload','Upload CSV')}${tb('ai','✦ Describe a change')}<span class="sp"></span>
+    <span class="undo"><button class="tbtn icon" data-act="undo" ${H.u.length?'':'disabled'} title="${H.u.length?esc('Undo: '+H.u[H.u.length-1].label)+' (⌘Z)':'Nothing to undo'}" aria-label="Undo">↶ Undo</button><button class="tbtn icon" data-act="redo" ${H.r.length?'':'disabled'} title="${H.r.length?esc('Redo: '+H.r[H.r.length-1].label)+' (⇧⌘Z)':'Nothing to redo'}" aria-label="Redo">↷ Redo</button></span></div>
+  <div class="toolbar2">${tb('filter',nf?`Filter rows (${nf})`:'Filter rows')}<label class="tg"><input type="checkbox" data-act="ggroup" ${g.group?'checked':''}> Group by</label><span style="min-width:180px">${ddBtn('gby',g.groupBy?(FIELDS[g.groupBy]||CF[g.groupBy]||{}).label:'','Choose a field','sm')}</span>
+    ${ddBtn('gctx',g.ctx.length?`Columns (${g.ctx.length})`:'','Add columns','btnlike sm')}<label class="tg"><input type="checkbox" data-act="gchanged" ${g.changed?'checked':''}> Show changed only</label></div>
   ${toolPanel(d,diffF)}${rules}${samebar}
   <div class="apbar"><span><b>${fmtN(A.noAppr)}</b> ${A.noAppr===1?'person is':'people are'} inside your limits and need no approval · <b>${fmtN(A.needAppr)}</b> need approval${A.needAppr?` (${Object.entries(A.apCount).filter(([,n])=>n).map(([k,n])=>`${APPROVERS[k].short} ${fmtN(n)}`).join(', ')})`:''}</span>
     <span class="seg2">${[['','All rows'],['need','Needs approval'],['none','No approval']].map(([k,l])=>`<button class="${(g.appr||'')===k?'on':''}" data-act="gappr" data-k="${k}">${l}</button>`).join('')}</span><button class="lnk" data-act="policy" data-k="approvals">Approval thresholds</button></div>
   ${g.issue?`<div class="issuebar"><span class="sev ${ISS[g.issue].sev}">!</span>Showing only: <b>${esc(ISS[g.issue].label)}</b> (${fmtN((A.issues[g.issue]||[]).length)})<button class="lnk" data-act="clearissue">Show all rows</button></div>`:''}
   <div class="gwrap" id="gwrap"><table class="g"><thead class="two2">${head1}${head2}</thead><tbody id="gbody"></tbody></table></div>
   <div class="legend"><span>Empty cell = no change (grey text is today's value)</span><span><i style="background:var(--chg);border:1px solid #D6E0FB"></i>Changed</span><span><i style="background:var(--err)"></i>Error</span><span><i style="background:#E0A43A"></i>Warning</span><span>✦ AI-drafted, needs accepting</span><span>↑ From your last upload</span><span class="num">${fmtN(G.items.filter(x=>x.e).length)} rows in view</span></div>`}
-function ruleTxt(r){const F=FIELDS[r.field].label;const w=r.where&&complete(r.where)?` where ${condTxt(r.where)}`:' for everyone';const k=r.kind||'pct';const cap=r.cap?`, capped at band ${r.cap==='max'?'maximum':'midpoint'}`:'';
-  if(r.field==='compensation')return k==='pct'?`${F} +${r.pct}%${w}${cap}`:k==='add'?`${F} + ${fmtN(r.amt)} ${r.cur} a year, in each person's currency${w}${cap}`:`${F} = ${fmtN(r.amt)} ${r.cur} a year, in each person's currency${w}`;
-  return k==='pct'?`${F} = ${r.pct}% of base pay${w}`:`${F} = ${fmtN(r.amt)} ${r.cur}, in each person's currency${w}`}
-const RKINDS={compensation:[['pct','Raise by a percentage'],['add','Raise by a fixed amount'],['set','Set to a fixed amount']],bonus:[['pct','Set to % of base pay'],['set','Set to a fixed amount']],spotBonus:[['set','Set to a fixed amount'],['pct','Set to % of base pay']]};
-function rtInit(d){const f=['compensation','bonus','spotBonus'].find(x=>d.fields.includes(x))||'compensation';S.rt={field:f,kind:RKINDS[f][0][0],val:f==='compensation'?'6':'1000',cur:'USD',cap:'max',wg:{mode:'all',conds:[{f:'rating',op:'anyof',v:['Exceeds']}]}}}
+function ruleTxt(r){const F=FIELDS[r.field];if(!F)return'';const L=F.label;const w=ruleWhere(r);const wt=w.length?` where ${groupsTxt(w)}`:' for everyone';const a=r.a,b=r.b;const sg=x=>(+x>=0?'+':'')+x;
+  const pv=x=>F.type==='person'?(EMPI[x]?.name||x):F.type==='date'?fmtIso(x):x;let t;
+  switch(r.op){case'pct':t=`${L} ${sg(a)}%`;break;case'add':t=F.type==='money'?`${L} ${sg(fmtN(+a))} ${r.cur}${r.field==='compensation'?' a year':''}, in each person's currency`:`${L} ${sg(a)}`;break;
+    case'set':t=F.type==='money'?`${L} = ${fmtN(+a)} ${r.cur}, in each person's currency`:`${L} = ${F.type==='text'?'"'+a+'"':pv(a)}`;break;case'pctbase':t=`${L} = ${a}% of base pay`;break;
+    case'map':t=`${L}: ${pv(a)} → ${pv(b)}`;break;case'step':t=`${L} ${+a>0?'up':'down'} ${pl(Math.abs(+a),'level')}`;break;case'first':t=`${L} = first team in the new department`;break;
+    case'shift':t=`${L} moved by ${pl(+a,'day')}`;break;case'eff':t=`${L} = the effective date`;break;case'skip':t=`${L} = their manager's manager`;break;
+    case'replace':t=`${L}: replace "${a}" with "${b||''}"`;break;case'prefix':t=`${L}: add "${a}" before`;break;case'suffix':t=`${L}: add "${a}" after`;break;case'ladder':t=`${L} = the standard title for the level`;break;default:t=L}
+  return t+wt+(r.cap?`, capped at band ${r.cap==='max'?'maximum':'midpoint'}`:'')}
+function rtInit(d){const f=d.fields.find(x=>d.modes[x]!=='same')||d.fields[0];S.rt={field:f,op:ropsFor(f)[0][0],a:'',b:'',cur:'USD',cap:f==='compensation'?'max':'',groups:[{mode:'all',conds:[]}]}}
+function rtArg(R,which){const F=FIELDS[R.field];const v=R[which]??'';const ph=which==='b'?'New value':'Value';
+  if(F.type==='select'||F.type==='team')return`<span style="min-width:180px">${ddBtn('rtv:'+which,v,which==='b'?'Choose the new value':R.op==='map'?'Choose the old value':'Choose a value')}</span>`;
+  if(F.type==='person')return`<input class="box" list="dl-mgr" data-in="rt${which}" value="${esc(v&&EMPI[v]?EMPI[v].name+' · '+v:v)}" placeholder="Type a name" style="max-width:220px">`;
+  if(F.type==='date'&&R.op==='set')return`<input class="box" type="date" data-in="rt${which}" value="${esc(v)}">`;
+  const num=['pct','add','pctbase','step','shift'].includes(R.op)||(R.op==='set'&&(F.type==='money'||F.type==='int'));
+  return`<input class="box" data-in="rt${which}" value="${esc(v)}" ${num?'inputmode="decimal" style="max-width:110px"':'style="max-width:200px"'} placeholder="${num?(R.op==='step'?'+1 or -1':R.op==='shift'?'Days':'Amount'):ph}" aria-label="${ph}">`}
 function toolPanel(d,diffF){const g=d.grid;
-  if(g.tool==='set'){const f=S.setF&&diffF.includes(S.setF)?S.setF:diffF[0];if(!f)return`<div class="tool">Every field is set to "Same for all". Use the bar below.</div>`;S.setF=f;const F=FIELDS[f];
+  if(g.tool==='set'){const f=S.setF&&diffF.includes(S.setF)?S.setF:diffF[0];if(!f)return`<div class="tool">Every field has one value for everyone. Change that from a column header.</div>`;S.setF=f;const F=FIELDS[f];
     const vin=F.type==='select'||F.type==='team'?`<span style="min-width:200px">${ddBtn('setv',S.setV||'','Choose a value')}</span>`:F.type==='person'?`<input class="box" id="setv" list="dl-mgr" placeholder="Type a manager's name" style="max-width:240px">`:F.type==='date'?`<input class="box" id="setv" type="date">`:`<input class="box" id="setv" ${F.type!=='text'?'inputmode="decimal"':''} style="max-width:160px">`;
     return`<div class="tool"><span>Set</span><span style="min-width:180px">${ddBtn('setf',F.label,'Field')}</span><span>to</span>${vin}${MONEY.has(f)?ddBtn('setcur',S.setCur&&S.setCur!=='local'?S.setCur:"Each person's currency",'','mini'):''}<span>for the <b class="num">${fmtN(G.items.filter(x=>x.e).length)}</b> rows in view</span><button class="btn sm" data-act="applyset">Apply</button>
-      ${MONEY.has(f)?`<span class="note">An amount in another currency is converted to each person's pay currency at ${esc(FX_NOTE)}.</span>`:`<span class="note">Narrow the rows first with the department filter or "Show changed only".</span>`}</div>`}
-  if(g.tool==='rule'){if(!S.rt||!d.fields.includes(S.rt.field))rtInit(d);const R=S.rt;const kinds=RKINDS[R.field];const kl=(kinds.find(x=>x[0]===R.kind)||kinds[0])[1];const amt=R.kind!=='pct';
-    return`<div class="tool rtool"><span>For</span><span style="min-width:170px">${ddBtn('rtf',FIELDS[R.field].label,'Field')}</span><span style="min-width:200px">${ddBtn('rtk',kl,'')}</span>
-      <input class="box" data-in="rtv" value="${esc(R.val)}" inputmode="decimal" style="max-width:110px" aria-label="Amount">${amt?ddBtn('rtc',R.cur,'','mini'):'<span>%</span>'}<span>where</span>
-      <div class="rtw">${R.wg.conds.length?condRow('rule',R.wg.conds[0],0,0):`<span>everyone</span> <button class="lnk" data-act="rtaddw">add a condition</button>`}</div>
-      ${R.field==='compensation'&&R.kind!=='set'?`<span>cap at</span>${ddBtn('rtcap',{max:'band maximum',mid:'band midpoint','':'no cap'}[R.cap],'','mini')}`:''}<button class="btn sm" data-act="addrule">Add rule</button>
-      <span class="note">Rules write visible values into the grid. ${amt?'Fixed amounts are converted to each person\'s currency. ':''}You can still edit any cell; your edit wins.</span></div>`}
+      <span class="note">${MONEY.has(f)?`Amounts in another currency are converted to each person's pay currency. `:''}Narrow the rows first with Filter rows.</span></div>`}
+  if(g.tool==='rule'){if(!S.rt||!d.fields.includes(S.rt.field))rtInit(d);const R=S.rt;const F=FIELDS[R.field];const ops=ropsFor(R.field);if(!ops.find(o=>o[0]===R.op))R.op=ops[0][0];const ol=ops.find(o=>o[0]===R.op)[1];
+    const noArg=['first','eff','skip','ladder'].includes(R.op);const two=R.op==='map'||R.op==='replace';
+    const args=noArg?'':two?`${rtArg(R,'a')}<span>${R.op==='replace'?'with':'→'}</span>${rtArg(R,'b')}`:rtArg(R,'a')+(R.op==='pct'||R.op==='pctbase'?'<span>%</span>':'');
+    const cur=F.type==='money'&&(R.op==='add'||R.op==='set')?ddBtn('rtc',R.cur,'','mini'):'';const cap=R.field==='compensation'&&R.op!=='set'?`<span>cap at</span>${ddBtn('rtcap',{max:'band maximum',mid:'band midpoint','':'no cap'}[R.cap||''],'','mini')}`:'';
+    const w=ruleWhere({where:R.groups});const A=analyze(d);const hit=w.length?A.rows.filter(e=>evalGroups(w,e)>=0).length:A.rows.length;
+    return`<div class="tool rtool"><div class="rrow"><span class="rl">Change</span><span style="min-width:200px">${ddBtn('rtf',F.label,'Field')}</span><span style="min-width:220px">${ddBtn('rtk',ol,'')}</span>${args}${cur}${cap}</div>
+      <div class="rrow top"><span class="rl">Where</span><div class="rwhere">${builder('rule',R.groups)}${w.length?'':'<span class="muted" style="font-size:13px">No conditions: the rule applies to every row in this change.</span>'}</div></div>
+      <div class="rrow"><span class="muted" style="font-size:13px">Matches <b class="num">${fmtN(hit)}</b> of ${pl(A.rows.length,'row')}. The rule is applied straight away; anything you do after it wins for the same cell. Undo with ⌘Z.</span><span style="margin-left:auto;display:flex;gap:10px"><button class="btn2 sm" data-act="tool" data-k="rule">Cancel</button><button class="btn sm" data-act="addrule">Apply rule</button></span></div></div>`}
+  if(g.tool==='filter'){if(!g.fg)g.fg=[{mode:'all',conds:[]}];return`<div class="tool rtool"><div class="rrow top"><span class="rl">Show rows where</span><div class="rwhere">${builder('gf',g.fg)}</div></div>
+      <div class="rrow"><span class="muted" style="font-size:13px">Set value and row selection act on the rows in view.</span><span style="margin-left:auto;display:flex;gap:10px"><button class="btn2 sm" data-act="gfclear">Clear filter</button><button class="btn sm" data-act="tool" data-k="filter">Done</button></span></div></div>`}
   if(g.tool==='ai')return`<div class="tool" style="flex-direction:column;align-items:stretch"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="badge b-ai">✦ Draft only</span><span class="note">Turns a sentence into a rule in this grid. Drafted cells stay marked until you accept them. It never submits.</span></div>
       <textarea class="ta" id="ai-ta" style="min-height:64px;font-family:var(--font);font-size:14px" placeholder="Describe the change, for example: 1,000 USD one-time bonus for the Platform team">${esc(S.aiText||'')}</textarea>
       <div><button class="btn sm" data-act="aigo">Draft into the grid</button></div></div>`;
@@ -1003,17 +1047,17 @@ function editorSame(d,f){const F=FIELDS[f];const v=d.same[f]??'';
 function renderGridRows(){const wrap=$('#gwrap');if(!wrap||!S.d)return;const d=S.d;const A=analyze(d);const items=G.items;const h=wrap.clientHeight||560;
   const st=Math.max(0,Math.floor(wrap.scrollTop/RH)-6),en=Math.min(items.length,st+Math.ceil(h/RH)+14);
   let html=st?`<tr class="spacer"><td colspan="${G.ncol}" style="height:${st*RH}px"></td></tr>`:'';
-  for(let i=st;i<en;i++){const it=items[i];html+=it.h!==undefined?`<tr class="ghead"><td class="c-emp" style="background:var(--nav)"><button class="lnk" data-act="gcol" data-dept="${esc(it.h)}">${d.grid.collapsed.has(it.h)?'▸':'▾'} ${esc(it.h)}</button></td><td colspan="${G.ncol-1}"><span class="muted">${fmtN(it.n)} people · ${fmtN(it.ch)} with changes</span></td></tr>`:rowHtml(d,it.e,A.rowIss.get(it.e.id)||[])}
+  for(let i=st;i<en;i++){const it=items[i];html+=it.h!==undefined?`<tr class="ghead"><td class="c-emp" style="background:var(--nav)"><button class="lnk" data-act="gcol" data-dept="${esc(it.h)}">${d.grid.collapsed.has(it.h)?'▸':'▾'} <span class="muted">${esc(it.lab)}:</span> ${esc(it.h)}</button></td><td colspan="${G.ncol-1}"><span class="muted">${fmtN(it.n)} people · ${fmtN(it.ch)} with changes</span></td></tr>`:rowHtml(d,it.e,A.rowIss.get(it.e.id)||[])}
   if(items.length>en)html+=`<tr class="spacer"><td colspan="${G.ncol}" style="height:${(items.length-en)*RH}px"></td></tr>`;
   if(!items.length)html=`<tr><td colspan="${G.ncol}" style="padding:24px;text-align:center" class="muted">No rows match. Clear the filters above.</td></tr>`;
   $('#gbody').innerHTML=html}
 function rowHtml(d,e,iss){const A=analyze(d);let h=`<tr><td class="c-emp"><button class="lnk" data-act="profile" data-id="${e.id}"><span class="av">${initials(e.name)}</span><span><b>${esc(e.name)}</b><small>${esc(e.title)}</small></span></button></td>`;
   for(const c of G.cols){if(c.appr){const ap=A.rowAppr.get(e.id);h+=`<td>${!A.rowChanged.has(e.id)?'':ap?`<span class="badge b-warn" title="${esc(ap.map(x=>APPROVERS[x.k].who+': '+x.why.join('; ')).join('\n'))}">${ap.map(x=>APPROVERS[x.k].short).join(' · ')}</span>`:'<span class="badge b-ok">No approval</span>'}</td>`;continue}
-    if(c.ctx){h+=`<td class="c-ctx">${esc(c.ctx==='cur'?curCode(e):e[c.ctx])}</td>`;continue}if(c.pct){h+=pctCell(d,e);continue}
+    if(c.ctx){h+=`<td class="c-ctx">${esc(ctxVal(e,c.ctx))}</td>`;continue}if(c.pct){h+=pctCell(d,e);continue}
     const f=c.f,s2=src(d,e,f),chg=changed(d,e,f);const fi=iss.filter(k=>ISS[k].f===f);const sev=fi.find(k=>ISS[k].sev==='e')?'e':fi.find(k=>ISS[k].sev==='w')?'w':fi.length?'i':'';
     const tip=fi.map(k=>`${ISS[k].label}: ${whyIssue(k,d,e)}`);
     if(f==='compensation'){const b=band(e,nv(d,e,'level'),nv(d,e,'per'),nv(d,e,'department'),nv(d,e,'location'));const cu=curOf(e);tip.push(`Band ${nv(d,e,'level')}: ${cu}${fmtN(b.min)} · ${cu}${fmtN(b.mid)} · ${cu}${fmtN(b.max)}${nv(d,e,'per')==='Hourly'?' per hour':''}`)}
-    if(MONEY.has(f)&&chg){let from=null,amt=null;if(s2==='s'){from=(d.sameCur||{})[f]||'USD';amt=d.same[f]}else if(s2==='r'||s2==='ai'){const r=ruleHit(d,e,f);if(r&&r.kind&&r.kind!=='pct'){from=r.cur;amt=r.amt}}if(from&&from!==curCode(e))tip.push(`Converted from ${fmtN(amt)} ${from} at ${FX_NOTE}`)}
+    if(MONEY.has(f)&&chg){let from=null,amt=null;if(s2==='s'){from=(d.sameCur||{})[f]||'USD';amt=d.same[f]}else if(s2==='r'||s2==='ai'){const r=pick(d,e,f).r;if(r&&(r.op==='add'||r.op==='set')){from=r.cur;amt=r.a}}if(from&&from!==curCode(e))tip.push(`Converted from ${fmtN(amt)} ${from} at ${FX_NOTE}`)}
     const cls=['c-new','f-'+f,chg?'chg':'',sev==='i'?'':sev,s2==='ai'?'ai':'',d.csvHits.has(e.id+'|'+f)?'up':''].join(' ');
     h+=`<td class="c-cur">${esc(fmtVal(e,f,e[f]))}</td><td class="${cls}" title="${esc(tip.join('\n'))}">${editor(d,e,f)}${fi.length?`<button class="whyb ${sev}" data-act="why" data-id="${e.id}" data-f="${f}" aria-label="Why is this flagged?">${sev==='i'?'i':'!'}</button>`:''}</td>`}return h+'</tr>'}
 function pctCell(d,e){if(!changed(d,e,'compensation')&&!changed(d,e,'per'))return`<td class="pct"></td>`;const np=nv(d,e,'per'),v=+nv(d,e,'compensation');if(!(v>0))return`<td class="pct">—</td>`;
@@ -1030,7 +1074,7 @@ function editor(d,e,f){const F=FIELDS[f];const key=e.id+'|'+f;
 /* deterministic change list: the record of what will be submitted */
 function changeList(d,A){const L=[];const rows=A.rows;const R=rows.filter(e=>A.rowChanged.has(e.id));const pct=x=>(x>=0?'+':'')+x.toFixed(1)+'%';
   const med=a=>{if(!a.length)return 0;const b=a.slice().sort((x,y)=>x-y);return b[Math.floor(b.length/2)]};
-  const srcTxt=(f,ch)=>{const c={};ch.forEach(e=>{let k=src(d,e,f);if(k==='r'||k==='ai'){const r=ruleHit(d,e,f);const i=d.rules.indexOf(r);k=r&&r.ai&&!r.accepted?'AI draft':'Rule '+(i+1)}else k={m:'edited by hand',c:'CSV upload',s:'same for all'}[k]||'other';c[k]=(c[k]||0)+1});return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} ${fmtN(n)}`).join(' · ')};
+  const srcTxt=(f,ch)=>{const c={};ch.forEach(e=>{let k=src(d,e,f);if(k==='r'||k==='ai'){const r=pick(d,e,f).r;const i=d.rules.indexOf(r);k=r&&r.ai&&!r.accepted?'AI draft':'Rule '+(i+1)}else k={m:'edited by hand',c:'CSV upload',s:'same for all'}[k]||'other';c[k]=(c[k]||0)+1});return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} ${fmtN(n)}`).join(' · ')};
   const trans=(f,ch,lab)=>{const m={};ch.forEach(e=>{const k=`${lab(e,e[f])} → ${lab(e,nv(d,e,f))}`;m[k]=(m[k]||0)+1});const t=Object.entries(m).sort((a,b)=>b[1]-a[1]);return{top:t.slice(0,4),more:t.length-4}};
   const F=d.fields.slice().sort((a,b)=>fo(a)-fo(b));
   for(const f of F){const ch=R.filter(e=>changed(d,e,f));if(!ch.length)continue;const lab=FIELDS[f].label;let detail='',totals='';
@@ -1261,7 +1305,7 @@ const NOTES={
   who:[['Summary card with the count; breakdown in a side panel','Progressive disclosure; cognitive load','The builder stays in view; detail is one click away and scrolls on its own.'],['Group quantifiers: all, any, at least / at most / exactly N','Mental-model match','Eligibility policies are often "meets at least 2 of these 3"; all and any stay first because they are the common case.'],['Searchable, tiered dropdowns with Select all / Clear all',"Hick's law; recognition over recall",'Long value lists are searched, grouped (teams by department) and bulk-selected instead of scrolled.'],['"+ Create new segment" pinned to the bottom of the segment picker','Task continuity','The missing segment is created without losing the draft, then selected in place.'],['Targeting is one condition builder','Mental-model match','Segments, named people and attributes are all just conditions, so there is one thing to learn.'],["Employee ID belongs to / doesn't belong to segment",'Recognition over recall; reuse','A vetted segment is referenced, not rebuilt from memory.'],['Insert saved segment shows type and size','Recognition over recall','The admin picks by name and sees how big it is before adding it.'],['Create segment in a side sheet','Context preservation','The draft stays open behind it, so nothing has to be held in working memory.'],['Paste employee IDs, emails or names',"Postel's law",'Lists arrive from spreadsheets in any shape; be liberal in what you accept.'],['Operators match the data type','Error prevention','Only comparisons that make sense for a field are offered.'],['Live count with delta','Doherty threshold; feedback','They test one condition at a time against the number they already hold.'],['Sample with "why included"','Trust calibration','Explains a surprising inclusion, e.g. "In FY26 promotion nominees".'],['On leave, terminations, contractors shown','Norman: mistakes',"Hidden system rules create errors the admin can't see."]],
   what:[['Field descriptions and "last used" on every row','Recognition over recall; information scent','Two similar names are told apart by what the field does and whether colleagues use it.'],['Green pulsing dot for use in the last 30 days, blue for 6 months, grey for older','Pre-attentive processing; von Restorff','Colour and motion are seen before reading, so the field the team actually uses stands out among look-alikes. Only the most recent tier moves, so motion stays meaningful.'],['One job on this screen: pick fields','Progressive disclosure; cognitive load','How values are set (one value, a rule, each person) is decided on Values, where the admin can see the rows.'],['Search across 1,000+ fields, with categories collapsed by default',"Hick's law; recognition over recall",'Admins search by name; the tree is for browsing when they don\'t know the name.'],['Selected list on the right','Visibility of system status; working-memory relief','What will change is always in view, however deep the browsing goes.'],['Group checkboxes and Selected only','Efficiency of use','Pick a whole category at once, then prune.'],['AI field picker, marked ✦','Automation with oversight','It drafts the selection; the admin removes what they don\'t need.'],['Read-only and locked fields shown, not hidden','Mental-model match; error prevention','The admin learns why a field can\'t be changed instead of thinking it is missing.'],['Department auto-adds Team','Forcing function',"A new department with an old team isn't a valid record."]],
   review:[['AI summary that cites numbered lines of the change list','Trust calibration; verifiability','The admin reads plain English but can check every claim against the deterministic record in one click.'],['Deterministic change list: per field, people, totals, transitions, value sources','Recognition over recall; error prevention','A wrong rule shows up as an odd total or transition before anyone is paid.'],['Spot check of five people across the list','Representativeness','Seeing real names before and after catches mistakes an aggregate hides.'],['Required "I\'ve reviewed" checkbox, cleared when the change list changes','Commitment and consistency; forcing function','Confirming is a deliberate act, and it always refers to the current numbers.']],
-  values:[['How values are set is chosen per field, in its column header','Progressive disclosure; proximity','Each person is the default; one value for everyone and rules are one click away, next to the data they affect.'],['Approval column and summary: which rows need approval and why','Feedforward; visibility of system status','The admin sees before submitting which rows clear on their own and which wait for Finance or People.'],['"!" on a flagged cell opens the reason, the rule and its owner','Recognition over recall; error recovery','Every error says what broke, who set the rule, and the fixes that work for this row.'],['Amounts entered in USD or CAD, converted per person','Mental-model match','Finance thinks in one budget currency; each employee is still paid in their own.'],["Cells use the profile's own controls","Jakob's law","Nothing new to learn: the profile's Edit mode, multiplied across rows."],["Empty New cell, today's value as grey text",'Default effect; von Restorff',"A filled cell is an edit and an empty one isn't."],['Current and New side by side',"Gestalt proximity; anchoring on today's value",'Reviewers judge the delta against what the person earns now.'],['% change, annualised when the unit switches','Norman: slips','Order-of-magnitude typos become obvious.'],['Rules write visible values','Trust calibration',"Admins don't trust results they can't see per row."],['AI drafts stay marked until accepted','Automation bias countermeasure','It never submits; approvers can see what a person checked.']],
+  values:[['Rules for every field type, with operators that fit the type','Mental-model match; consistency','A list gets Set to and Replace, text gets Find and replace, dates get Move by days; the same Where builder as targeting.'],['Every action applies at once, with Undo and Redo','User control and freedom; reversibility','Admins experiment freely because any step can be taken back; the latest action wins, like a spreadsheet.'],['Group by any field, filter rows with the targeting builder','Consistency; flexibility','No attribute is special. Grouping and filtering use the same controls as everywhere else.'],['How values are set is chosen per field, in its column header','Progressive disclosure; proximity','Each person is the default; one value for everyone and rules are one click away, next to the data they affect.'],['Approval column and summary: which rows need approval and why','Feedforward; visibility of system status','The admin sees before submitting which rows clear on their own and which wait for Finance or People.'],['"!" on a flagged cell opens the reason, the rule and its owner','Recognition over recall; error recovery','Every error says what broke, who set the rule, and the fixes that work for this row.'],['Amounts entered in USD or CAD, converted per person','Mental-model match','Finance thinks in one budget currency; each employee is still paid in their own.'],["Cells use the profile's own controls","Jakob's law","Nothing new to learn: the profile's Edit mode, multiplied across rows."],["Empty New cell, today's value as grey text",'Default effect; von Restorff',"A filled cell is an edit and an empty one isn't."],['Current and New side by side',"Gestalt proximity; anchoring on today's value",'Reviewers judge the delta against what the person earns now.'],['% change, annualised when the unit switches','Norman: slips','Order-of-magnitude typos become obvious.'],['Rules write visible values','Trust calibration',"Admins don't trust results they can't see per row."],['AI drafts stay marked until accepted','Automation bias countermeasure','It never submits; approvers can see what a person checked.']],
   review:[["Error = can't commit a valid, permitted record",'Forcing function','One predictable rule: an invalid record never reaches payroll.'],['Warning = valid but unusual, acknowledged per group','Habituation / alarm fatigue','300 per-row confirmations train blind clicking.'],['Move error rows to a new draft','Loss aversion; Zeigarnik',"Nobody drops rows they'd lose; the open draft keeps them visible."]],
   impact:[['Inside Rippling vs Integrated Apps',"Gestalt common region; Jakob's law","Uses the profile's own term and sets up “these behave differently”."],['Payroll card first','Serial position (primacy)','The highest stakes go first.'],['Late-approval choice pre-selected, must be confirmed','Forcing function + default effect','Payroll timing is settled at the decision point.'],['Losses written as losses','Framing; loss aversion',"Removals phrased neutrally get underweighted, and they're hardest to undo."],['Employee letters off by default','Default effect; irreversibility',"A wrong comp letter can't be unsent."]],
   status:[['Rippling record band on top','Mental-model match; common region','The record is done and payroll reads from it, whatever Slack does.'],['No "Retry now" while auto-retries run','Illusion of control','Avoids pointless clicks and false confidence.'],['End state names what worked and who owns the rest','Peak-end rule','The memory of the last run decides whether they use bulk change next year.']],
@@ -1283,11 +1327,14 @@ function setSize(n){S.size=n;build(n);makeSeeds();clearInterval(S.timer);S.d=dem
   toast(`Acme Corp now has ${fmtN(EMP.length)} employees. Same flow, same screens.`);render()}
 function next(){const d=S.d;const i=STEPS.findIndex(s=>s.k===S.step);const k=STEPS[i+1].k;if(k==='status')return;d.visited.add(k);S.step=k;S.menu=false;S.pop=null;render();window.scrollTo(0,0)}
 function back(){const i=STEPS.findIndex(s=>s.k===S.step);if(i>0){S.step=STEPS[i-1].k;render();window.scrollTo(0,0)}}
-function setCell(id,f,v){const d=S.d;d.manual[id]=d.manual[id]||{};d.manual[id][f]=v;d.csvHits.delete(id+'|'+f);if(f==='department'&&d.fields.includes('team')){const t=nv(d,EMPI[id],'team');if(!TEAMS[v]?.includes(t)&&v)d.manual[id].team=TEAMS[v][0]}}
+function snapD(d){return structuredClone({manual:d.manual,mseq:d.mseq,csv:d.csv,cseq:d.cseq,csvHits:d.csvHits,rules:d.rules,same:d.same,sameCur:d.sameCur,modes:d.modes,exceptions:d.exceptions,moved:d.moved,seq:d.seq})}
+function rec(label){const d=S.d;if(!d)return;d.hist=d.hist||{u:[],r:[]};d.hist.u.push({label,snap:snapD(d)});if(d.hist.u.length>60)d.hist.u.shift();d.hist.r=[]}
+function undoRedo(w){const d=S.d;if(!d||!d.hist)return;const from=w==='u'?d.hist.u:d.hist.r,to=w==='u'?d.hist.r:d.hist.u;const h=from.pop();if(!h)return;to.push({label:h.label,snap:snapD(d)});Object.assign(d,h.snap);S.followups=d.moved.size;dirty();render();toast(`${w==='u'?'Undid':'Redid'}: ${h.label}`,'info')}
+function setCell(id,f,v){const d=S.d;d.manual[id]=d.manual[id]||{};d.manual[id][f]=v;d.mseq=d.mseq||{};d.mseq[id+'|'+f]=++d.seq;d.csvHits.delete(id+'|'+f);if(f==='department'&&d.fields.includes('team')){const t=nv(d,EMPI[id],'team');if(!TEAMS[v]?.includes(t)&&v)d.manual[id].team=TEAMS[v][0]}}
 function refreshGrid(){dirty();G.items=gridItems(S.d);renderGridRows();const sm=$('#summary');if(sm)sm.outerHTML=summary(S.d)}
 function afterRender(){document.querySelectorAll('input[data-mixed]').forEach(i=>i.indeterminate=true);const w=$('#gwrap');if(w&&S.d){w.scrollTop=S.d.grid.scroll||0;renderGridRows();w.addEventListener('scroll',()=>{S.d.grid.scroll=w.scrollTop;if(!G.raf)G.raf=requestAnimationFrame(()=>{G.raf=0;renderGridRows()})},{passive:true})}
   if(S.focus){const el=document.getElementById(S.focus);if(el){el.focus();if(el.setSelectionRange&&el.type!=='date'&&el.type!=='number')try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}S.focus=null}}
-function applyFix(k,fx,only){const d=S.d;const A=analyze(d);const ids=only||A.issues[k]||[];
+function applyFix(k,fx,only){const d=S.d;const A=analyze(d);const ids=only||A.issues[k]||[];rec(`Fix: ${(ISS[k]||{}).label||k} (${pl(ids.length,'row')})`);
   ids.forEach(id=>{const e=EMPI[id];if(fx==='capmax'){const b=band(e,nv(d,e,'level'),nv(d,e,'per'),nv(d,e,'department'),nv(d,e,'location'));setCell(id,'compensation',b.max)}
     else if(fx==='clearcomp')setCell(id,'compensation','');else if(fx==='fixteam')setCell(id,'team',TEAMS[nv(d,e,'department')][0]);else if(fx==='clearmgr')setCell(id,'manager','');
     else if(fx==='laddertitle')setCell(id,'title',ladder(nv(d,e,'department'),nv(d,e,'level')));else if(fx==='move')d.moved.add(id);else if(fx==='exception')d.exceptions.add(id);else if(fx==='ptokeep')setCell(id,'timeOff','')});
@@ -1438,16 +1485,22 @@ function act(k,a){const d=S.d;switch(k){
       text:[csvLine(['Employee ID','Name','Work email',...fs.flatMap(f=>[FIELDS[f].label+' (current)',FIELDS[f].label+' (new)'])])].concat(A.rows.map(e=>csvLine([e.id,e.name,e.email,...fs.flatMap(f=>[fmtVal(e,f,e[f]),''])]))).join('\n')};renderOverlay();break}
     if(t==='upload'){S.ov={type:'upload',text:'',preview:null};renderOverlay();break}d.grid.tool=d.grid.tool===t?null:t;if(t==='ai')S.focus='ai-ta';render();break}
   case'gchanged':d.grid.changed=a.checked;d.grid.scroll=0;render();break;
-  case'ggroup':d.grid.group=a.checked;d.grid.scroll=0;render();break;
+  case'ggroup':d.grid.group=a.checked;if(a.checked&&!d.grid.groupBy)d.grid.groupBy=d.fields[0]||'department';d.grid.collapsed=new Set();d.grid.scroll=0;render();break;
   case'gcol':{const dp=a.dataset.dept;d.grid.collapsed.has(dp)?d.grid.collapsed.delete(dp):d.grid.collapsed.add(dp);refreshGrid();break}
   case'clearissue':d.grid.issue=null;render();break;
   case'applyset':{const f=S.setF;const F=FIELDS[f];const el=$('#setv');let v=F.type==='select'||F.type==='team'?(S.setV||''):(el?el.value:'');if(F.type==='money'||F.type==='int'){v=parseMoney(v);if(!isFinite(v)){toast('Enter an amount.');break}}if(F.type==='person'){v=parsePerson(v);if(!v){toast('Pick a manager from the list.');break}}if(v===''){toast('Enter a value.');break}
-    const rows=G.items.filter(x=>x.e).map(x=>x.e);const cur=S.setCur||'local';let nconv=0;rows.forEach(e=>{let x=v;if(MONEY.has(f)&&cur!=='local'&&cur!==curCode(e)){x=conv(+v,cur,curCode(e));nconv++}setCell(e.id,f,f==='compensation'?roundComp(+x,nv(d,e,'per')):MONEY.has(f)?Math.round(+x/10)*10:x)});
+    const rows=G.items.filter(x=>x.e).map(x=>x.e);rec(`Set ${FIELDS[f].label} for ${pl(rows.length,'row')}`);const cur=S.setCur||'local';let nconv=0;rows.forEach(e=>{let x=v;if(MONEY.has(f)&&cur!=='local'&&cur!==curCode(e)){x=conv(+v,cur,curCode(e));nconv++}setCell(e.id,f,f==='compensation'?roundComp(+x,nv(d,e,'per')):MONEY.has(f)?Math.round(+x/10)*10:x)});
     toast(`Set ${FIELDS[f].label} for ${pl(rows.length,'row')}.${nconv?` ${pl(nconv,'amount')} converted to local currency.`:''}`);render();break}
-  case'addrule':{const R=S.rt;const n=parseMoney(R.val);if(!isFinite(n)){toast(R.kind==='pct'?'Enter a percentage.':'Enter an amount.');break}const w=R.wg.conds[0];
-    if(w&&!complete(w)){toast('Fill in the condition, or remove it to apply to everyone.');break}
-    d.rules.push({field:R.field,kind:R.kind,pct:R.kind==='pct'?n:undefined,amt:R.kind!=='pct'?n:undefined,cur:R.cur,where:w?clone(w):null,cap:R.field==='compensation'&&R.kind!=='set'&&R.cap?R.cap:null,ai:false,accepted:true});d.grid.tool=null;toast('Rule added. Values are in the grid.');render();break}
-  case'rtaddw':S.rt.wg.conds=[{f:'rating',op:'anyof',v:[]}];render();break;
+  case'addrule':{const R=S.rt;const F=FIELDS[R.field];const o=R.op;const noArg=['first','eff','skip','ladder'].includes(o);let a=R.a,b=R.b;
+    if(!noArg){if(['pct','add','pctbase','step','shift'].includes(o)||(o==='set'&&(F.type==='money'||F.type==='int'))){a=parseMoney(a);if(!isFinite(a)){toast('Enter a number for the rule.');break}}
+      else if(F.type==='person'){a=parsePerson(a);if(!a){toast('Pick a person from the list.');break}if(o==='map'){b=parsePerson(b);if(!b){toast('Pick the new manager from the list.');break}}}
+      else if(a===''||a==null){toast('Fill in the value for the rule.');break}if(o==='map'&&(b===''||b==null)){toast('Choose the new value.');break}}
+    const bad=R.groups.flatMap(g=>g.conds).filter(c=>!complete(c));if(bad.length){toast('Finish or remove the empty conditions under Where.');break}
+    const r={field:R.field,op:o,a,b,cur:R.cur,cap:R.field==='compensation'&&o!=='set'&&R.cap?R.cap:null,where:clone(R.groups.filter(g=>g.conds.length)),ai:false,accepted:true};
+    rec(`Applied rule: ${ruleTxt(r)}`);r.seq=++d.seq;if(d.modes[R.field]==='same')d.modes[R.field]='diff';d.rules.push(r);dirty();const A=analyze(d);const n=A.rows.filter(e=>pick(d,e,R.field).r===r).length;
+    d.grid.tool=null;S.rt=null;toast(`Rule applied to ${pl(n,'cell')}.${n?'':' No row matched, or the values were already the same.'}`,n?'success':'warning');render();break}
+  case'undo':undoRedo('u');break;case'redo':undoRedo('r');break;
+  case'gfclear':d.grid.fg=[{mode:'all',conds:[]}];d.grid.scroll=0;render();break;
   case'gappr':d.grid.appr=a.dataset.k;d.grid.scroll=0;render();break;
   case'apm':d.applyMode=a.value;render();break;
   case'confirmchg':{const A=analyze(d);d.confirmed=a.checked?confirmSig(d,A):null;render();break}
@@ -1463,11 +1516,11 @@ function act(k,a){const d=S.d;switch(k){
   case'aiwho':{const ctx=a.dataset.ctx;const txt=(S.aiWho||{})[ctx]||'';const gs=aiTargeting(txt);if(!gs){toast("Couldn't turn that into conditions. Name a department, location, level, team, segment or date, for example: Engineering in the US at L5 and above.",'warning');break}
     const G2=groupsOf(ctx);const n=gs.reduce((s2,g)=>s2+g.conds.length,0);if(G2.length===1&&!G2[0].conds.length)G2.splice(0,1,...gs);else G2.push(...gs);toast(`Drafted ${pl(n,'condition')}. Review them before you continue.`,'info');render();break}
   case'aiok':{const g=groupsOf(a.dataset.ctx)[+a.dataset.g];if(g)delete g.ai;render();break}
-  case'rmrule':d.rules.splice(+a.dataset.i,1);render();break;
-  case'acceptai':d.rules[+a.dataset.i].accepted=true;toast('Accepted. Those cells are now yours.');render();break;
+  case'rmrule':rec(`Removed rule ${+a.dataset.i+1}`);d.rules.splice(+a.dataset.i,1);render();break;
+  case'acceptai':rec('Accepted the AI draft');d.rules[+a.dataset.i].accepted=true;toast('Accepted. Those cells are now yours.');render();break;
   case'aiex':S.aiText=a.dataset.t;render();break;
   case'aigo':{const t=($('#ai-ta')||{}).value||'';S.aiText=t;const r=parseAI(t);if(!r){toast('Try a sentence with a percentage, e.g. "5% raise for Meets".');break}
-    if(!d.fields.includes(r.field)){d.fields.push(r.field);d.modes[r.field]='diff';toast(`Added ${FIELDS[r.field].label} to this change.`)}d.rules.push(r);d.grid.tool=null;render();break}
+    rec('AI draft: '+t.slice(0,60));if(!d.fields.includes(r.field)){d.fields.push(r.field);d.modes[r.field]='diff';toast(`Added ${FIELDS[r.field].label} to this change.`)}const nr=normRule(r);nr.ai=true;nr.accepted=false;nr.seq=++d.seq;d.rules.push(nr);d.grid.tool=null;render();break}
   case'fix':applyFix(a.dataset.issue,a.dataset.fix);break;
   case'showrows':d.show[a.dataset.issue]=!d.show[a.dataset.issue];render();break;
   case'ack':d.ack[a.dataset.issue]=true;render();break;
@@ -1493,7 +1546,7 @@ function act(k,a){const d=S.d;switch(k){
   case'reversal':toast('A reversal draft with the old values is ready under Bulk change (not built in this prototype).');break;
   case'upsample':S.ov.text=d.fields.includes('spotBonus')?SAMPLES['q4-launch-bonus.csv']():d.fields.includes('laptop')?SAMPLES['laptop-refresh-q1-2027.csv']():sampleCompChanges();S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
   case'uppreview':S.ov.text=($('#up-ta')||{}).value||'';S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
-  case'upapply':{const p=S.ov.preview;d.csvHits=new Set();p.writes.forEach(([id,f,v])=>{d.csv[id]=d.csv[id]||{};d.csv[id][f]=v;d.csvHits.add(id+'|'+f);if(d.manual[id])delete d.manual[id][f]});S.ov=null;toast(`Wrote ${pl(p.cells,'value')} into the grid. They're marked ↑.`);render();break}
+  case'upapply':{const p=S.ov.preview;rec(`Uploaded a CSV (${pl(p.cells,'value')})`);const sq=++d.seq;d.cseq=d.cseq||{};d.csvHits=new Set();p.writes.forEach(([id,f,v])=>{d.csv[id]=d.csv[id]||{};d.csv[id][f]=v;d.cseq[id+'|'+f]=sq;d.csvHits.add(id+'|'+f);if(d.manual[id])delete d.manual[id][f]});S.ov=null;toast(`Wrote ${pl(p.cells,'value')} into the grid. They're marked ↑.`);render();break}
   case'copy':{const ta=$('#ov-ta');const txt=ta.value;const fb=()=>{ta.focus();ta.select();toast('Selected. Press Ctrl+C or ⌘C to copy.')};try{navigator.clipboard.writeText(txt).then(()=>toast('Copied.'),fb)}catch(_){fb()}break}
 }}
 function aiTargeting(text){const parts=String(text||'').split(/\s+or\s+/i);const groups=[];
@@ -1539,7 +1592,7 @@ function ddSpec(key){const p=key.split(':');const t=p[0];
   if(t==='bcur'){const cond=condAt(p[1],p[2],p[3]);if(!cond)return null;return{kind:'single',search:false,w:140,groups:[{label:'',items:Object.keys(FX).map(x=>({v:x,label:x}))}],value:cond.cur||'USD',apply:v=>{cond.cur=v}}}
   if(['bf','bo','bv','bseg','bppl','bpp1','brel','bvl'].includes(t)){const[,ctx,g,c,i]=p;const cond=condAt(ctx,g,c);if(!cond)return null;const F=fieldOf(cond);
     switch(t){
-      case'bf':{const by={};Object.entries(CF).forEach(([k,x])=>(by[x.grp]=by[x.grp]||[]).push({v:k,label:x.label,sub:TYPE_LABEL[x.type]+(x.src?' · from '+x.src:'')+(x.agg?' · computed from current data':'')+(x.money?' · compared in the currency you pick':'')}));return{kind:'single',ph:'Search fields',groups:Object.entries(by).map(([l,items])=>({label:l,items})),value:cond.f,apply:v=>{cond.f=v;const ty=CF[v].type;cond.op=ty==='id'?'inseg':OPS[ty][0][0];cond.v=[]}}}
+      case'bf':{const by={};Object.entries(CF).forEach(([k,x])=>(by[x.grp]=by[x.grp]||[]).push({v:k,label:x.label,meta:TYPE_LABEL[x.type],sub:(x.src?'From '+x.src:'')+(x.agg?'Computed from current data':'')+(x.money?'Compared in the currency you pick':'')}));return{kind:'single',ph:'Search fields',groups:Object.entries(by).map(([l,items])=>({label:l,items})),value:cond.f,apply:v=>{cond.f=v;const ty=CF[v].type;cond.op=ty==='id'?'inseg':OPS[ty][0][0];cond.v=[]}}}
       case'bo':return{kind:'single',search:false,groups:[{label:'',items:OPS[F.type].map(([o,l])=>({v:o,label:l}))}],value:cond.op,apply:v=>{cond.op=v;cond.v=[]}};
       case'bv':{const counts={};EMP.forEach(e=>{const x=F.get(e);(Array.isArray(x)?x:[x]).forEach(y=>counts[y]=(counts[y]||0)+1)});let groups;
         if(cond.f==='team')groups=Object.entries(TEAMS).map(([d2,ts])=>({label:d2,items:ts.map(x=>({v:x,label:x,count:counts[x]||0}))}));
@@ -1566,8 +1619,13 @@ function ddSpec(key){const p=key.split(':');const t=p[0];
   if(t==='keycol'){const f=S.se&&S.se.file;if(!f)return null;return{kind:'single',search:false,groups:[{label:'',items:f.header.map((h,i)=>({v:String(i),label:h||'Column '+(i+1)}))}],value:String(f.keyCol),apply:v=>{f.keyCol=+v;if(f.raw)reparse(S.se)}}}
   if(t==='ctype'){const f=S.se&&S.se.file;if(!f)return null;const col=f.cols.find(x=>x.key===p[1]);return{kind:'single',search:false,w:160,groups:[{label:'',items:['text','num','date','bool','pick'].map(x=>({v:x,label:TYPE_LABEL[x]}))}],value:col.type,
     apply:v=>{f.types[col.key]=v;if(f.raw)reparse(S.se);else col.type=v;delete S.se.tf[col.key]}}}
-  if(t==='rtf'){const d=S.d;return{kind:'single',search:false,groups:[{label:'',items:['compensation','bonus','spotBonus'].filter(x=>d.fields.includes(x)).map(x=>({v:x,label:FIELDS[x].label}))}],value:S.rt.field,apply:v=>{S.rt.field=v;S.rt.kind=RKINDS[v][0][0]}}}
-  if(t==='rtk')return{kind:'single',search:false,w:240,groups:[{label:'',items:RKINDS[S.rt.field].map(([v,l])=>({v,label:l}))}],value:S.rt.kind,apply:v=>{S.rt.kind=v}};
+  if(t==='rtf'){const d=S.d;return{kind:'single',ph:'Search fields',w:300,groups:[{label:'Fields in this change',items:d.fields.map(x=>({v:x,label:FIELDS[x].label,meta:TYL[FIELDS[x].type]||'Text',sub:d.modes[x]==='same'?'Now one value for everyone; a rule switches it to each person':''}))}],value:S.rt.field,apply:v=>{S.rt.field=v;S.rt.op=ropsFor(v)[0][0];S.rt.a='';S.rt.b='';S.rt.cap=v==='compensation'?'max':''}}}
+  if(t==='rtk')return{kind:'single',search:false,w:280,groups:[{label:'For '+(TYL[FIELDS[S.rt.field].type]||'Text').toLowerCase()+' fields',items:ropsFor(S.rt.field).map(([v,l])=>({v,label:l}))}],value:S.rt.op,apply:v=>{S.rt.op=v;S.rt.a='';S.rt.b=''}};
+  if(t==='rtv'){const F=FIELDS[S.rt.field];const w=p[1];const d=S.d;let groups;if(F.type==='team')groups=Object.entries(TEAMS).map(([dp,ts])=>({label:dp,items:ts.map(x=>({v:x,label:x}))}));else{const cnt={};analyze(d).rows.forEach(e=>{cnt[e[S.rt.field]]=(cnt[e[S.rt.field]]||0)+1});groups=[{label:'',items:F.opts().map(x=>({v:x,label:x,count:w==='a'&&S.rt.op==='map'?cnt[x]||0:undefined}))}]}
+    return{kind:'single',ph:'Search values',groups,value:S.rt[w],apply:v=>{S.rt[w]=v}}}
+  if(t==='gby'){const d=S.d;const other=['department','team','location','level','rating','manager','etype','status','per','timeOff','benefits','costCenter'].filter(k=>!d.fields.includes(k)&&CF[k]);
+    return{kind:'single',ph:'Search fields',w:300,groups:[{label:'Fields you are editing',items:d.fields.map(k=>({v:k,label:FIELDS[k].label,sub:'Grouped by today\'s value'}))},{label:'Other attributes',items:other.map(k=>({v:k,label:CF[k].label}))}],value:d.grid.groupBy,apply:v=>{d.grid.groupBy=v;d.grid.group=true;d.grid.collapsed=new Set();d.grid.scroll=0}}}
+  if(t==='gctx'){const d=S.d;const ks=Object.keys(CF).filter(k=>!CF[k].agg&&k!=='empid'&&!d.fields.includes(k));return{kind:'multi',ph:'Search attributes',w:300,groups:[...new Set(ks.map(k=>CF[k].grp))].map(gp=>({label:gp,items:ks.filter(k=>CF[k].grp===gp).map(k=>({v:k,label:CF[k].label}))})),value:d.grid.ctx||[],apply:v=>{d.grid.ctx=v}}}
   if(t==='rtc'||t==='setcur'||t.startsWith('samecur')){const loc=t==='setcur';const items=[...(loc?[{v:'local',label:"Each person's currency",sub:'No conversion'}]:[]),...Object.keys(FX).map(x=>({v:x,label:x,sub:'Converted to each person\'s pay currency'}))];
     return{kind:'single',search:false,w:260,groups:[{label:'',items}],value:t==='rtc'?S.rt.cur:t==='setcur'?(S.setCur||'local'):((S.d.sameCur||{})[p[1]]||'USD'),apply:v=>{if(t==='rtc')S.rt.cur=v;else if(t==='setcur')S.setCur=v;else{S.d.sameCur=S.d.sameCur||{};S.d.sameCur[p[1]]=v}}}}
   if(t==='rtcap')return{kind:'single',search:false,w:180,groups:[{label:'',items:[['max','band maximum'],['mid','band midpoint'],['','no cap']].map(([v,l])=>({v,label:l}))}],value:S.rt.cap,apply:v=>{S.rt.cap=v}};
@@ -1576,8 +1634,8 @@ function ddSpec(key){const p=key.split(':');const t=p[0];
   if(t.startsWith('same:')){const f=p[1];const F=FIELDS[f];const d=S.d;const opts=F.type==='team'?Object.entries(TEAMS).filter(([dp])=>!d.same.department||dp===d.same.department).map(([dp,ts])=>({label:dp,items:ts.map(x=>({v:x,label:x}))})):[{label:'',items:F.opts().map(x=>({v:x,label:x}))}];
     return{kind:'single',ph:'Search values',groups:opts,value:d.same[f],apply:v=>{d.same[f]=v;if(f==='department'&&d.modes.team==='same'&&d.same.team&&!TEAMS[v]?.includes(d.same.team))d.same.team=TEAMS[v]?.[0]||''}}}
   if(t==='ffilt'){const items=(p,ls)=>ls.map(l=>({v:p+l,label:l}));return{kind:'multi',search:false,w:240,groups:[{label:'Source',items:items('s:',['Standard','Custom field','App field','Connector'])},{label:'Type',items:items('t:',['Text','List','Number','Amount','Date','Person'])},{label:'Last used in a bulk change',items:[['new','Last 30 days'],['mid','Last 6 months'],['old','Over 6 months ago'],['never','Never']].map(([v,l])=>({v:'u:'+v,label:l}))}],value:S.fFilt,apply:v=>{S.fFilt=v}}}
-  if(t==='fmode'){const f=p[1];const rule=['compensation','bonus','spotBonus'].includes(f);return{kind:'single',search:false,w:280,groups:[{label:'',items:[{v:'diff',label:'Each person',sub:'Edit cells, paste or upload a CSV'},{v:'same',label:'One value for everyone',sub:'Set it once above the grid'},...(rule?[{v:'rule',label:'By rule',sub:'A percentage or amount for a group'}]:[])]}],value:S.d.modes[f]==='same'?'same':'diff',
-    apply:v=>{const d=S.d;if(v==='rule'){d.modes[f]='diff';d.grid.tool='rule';S.rt=null;rtInit(d);S.rt.field=f;S.rt.kind=RKINDS[f][0][0]}else{d.modes[f]=v;if(f==='department'&&d.fields.includes('team'))d.modes.team=v}}}}
+  if(t==='fmode'){const f=p[1];const rule=true;return{kind:'single',search:false,w:280,groups:[{label:'',items:[{v:'diff',label:'Each person',sub:'Edit cells, paste or upload a CSV'},{v:'same',label:'One value for everyone',sub:'Set it once above the grid'},...(rule?[{v:'rule',label:'By rule',sub:'An operation for the rows that match conditions'}]:[])]}],value:S.d.modes[f]==='same'?'same':'diff',
+    apply:v=>{const d=S.d;if(v==='rule'){d.grid.tool='rule';rtInit(d);S.rt.field=f;S.rt.op=ropsFor(f)[0][0];S.rt.cap=f==='compensation'?'max':''}else{if(d.modes[f]!==v)rec(`${FIELDS[f].label}: ${v==='same'?'one value for everyone':'each person'}`);d.modes[f]=v;if(f==='department'&&d.fields.includes('team'))d.modes.team=v}}}}
   if(t==='sample')return{kind:'single',search:false,w:300,groups:[{label:'',items:[['promotion-nominations-fy26.csv','Promotion nominations','Employee ID key · Yes/No, number, date and picklist columns'],['austin-office-movers.csv','Austin office movers','Work Email key · move date, relocation and parking columns']].map(([v,l,sb])=>({v,label:l,sub:sb}))}],value:null,apply:v=>{loadFile(S.se,v,SAMPLES[v]())}};
   return null}
 function renderDD(){const el=$('#pop2');if(!S.dd){el.innerHTML='';return}const sp=ddSpec(S.dd.key);if(!sp){S.dd=null;el.innerHTML='';return}
@@ -1587,7 +1645,7 @@ function renderDD(){const el=$('#pop2');if(!S.dd){el.innerHTML='';return}const s
     if(g.label)body+=`<div class="ddg">${multi?`<label class="ddgl"><input type="checkbox" data-act="ddgrp" data-g="${esc(g.label)}" ${allOn?'checked':''}>${esc(g.label)}</label>`:`<span>${esc(g.label)}</span>`}<span>${fmtN(g.items.length)}</span></div>`;
     body+=its.map(it=>{const on=multi?val.includes(it.v):val===it.v;const inner=`<span>${esc(it.label)}${it.sub?`<small>${esc(it.sub)}</small>`:''}</span>`;
       return multi?`<label class="ddi ${on?'on':''}"><input type="checkbox" data-act="ddtog" data-v="${esc(it.v)}" ${on?'checked':''}>${inner}${it.count!==undefined?`<em>${fmtN(it.count)}</em>`:''}</label>`
-        :`<button type="button" class="ddi ${on?'on':''}" data-act="ddpick" data-v="${esc(it.v)}">${inner}${on?'<i>✓</i>':it.count!==undefined?`<em>${fmtN(it.count)}</em>`:''}</button>`}).join('')}
+        :`<button type="button" class="ddi ${on?'on':''}" data-act="ddpick" data-v="${esc(it.v)}">${inner}${it.meta?`<em>${esc(it.meta)}</em>`:''}${on?'<i>✓</i>':it.count!==undefined?`<em>${fmtN(it.count)}</em>`:''}</button>`}).join('')}
   const W=Math.min(Math.max(S.dd.w,sp.w||240),window.innerWidth-16);const x=Math.max(8,Math.min(S.dd.x,window.innerWidth-W-8));const below=window.innerHeight-S.dd.y>300;const y=below?S.dd.y:Math.max(64,S.dd.top-390);
   el.innerHTML=`<div class="dd pp" style="left:${x}px;top:${y}px;width:${W}px" role="listbox">${sp.search!==false?`<div class="dds"><input type="search" id="dd-q" data-in="ddq" placeholder="${esc(sp.ph||'Search')}" value="${esc(S.dd.q||'')}" autocomplete="off"></div>`:''}
     ${multi?`<div class="ddbar"><button type="button" class="lnk" data-act="ddall">Select all${q?' matching':''}</button><button type="button" class="lnk" data-act="ddnone">Clear all</button><span class="muted">${fmtN(val.length)} selected</span></div>`:''}
@@ -1609,7 +1667,7 @@ document.addEventListener('change',ev=>{const t=ev.target;const d=S.d;
   if(t.dataset.cell){const[id,f]=t.dataset.cell.split('|');const F=FIELDS[f];let v=t.value;
     if(v==='')v='';else if(F.type==='money'||F.type==='int'){const n=parseMoney(v);if(!isFinite(n)){t.value='';toast(`"${v}" isn't an amount.`);return}v=f==='compensation'?roundComp(n,nv(d,EMPI[id],'per')):Math.round(n)}
     else if(F.type==='person'){if(v){const p=parsePerson(v);if(!p){toast(`No one called "${v}". Pick from the list.`);t.value='';return}v=p}}
-    setCell(id,f,v);refreshGrid();return}
+    rec(`Edited ${EMPI[id]?.name||id} · ${F.label}`);setCell(id,f,v);refreshGrid();return}
   const k=t.dataset.in;if(!k)return;const G2=t.dataset.ctx?groupsOf(t.dataset.ctx):null;const c=G2&&t.dataset.c!==undefined?G2[+t.dataset.g].conds[+t.dataset.c]:null;
   switch(k){
     case'name':d.name=t.value;render();break;case'reason':d.reason=t.value;break;
@@ -1622,7 +1680,7 @@ document.addEventListener('change',ev=>{const t=ev.target;const d=S.d;
     case'bvp':{const id=parsePerson(t.value);c.v=id?[id]:[];if(!id&&t.value)toast('Pick someone from the list.');render();break}
     case'bpick':{const id=parsePerson(t.value);if(id&&!c.v.includes(id))c.v.push(id);S.pop=`${t.dataset.ctx}-${t.dataset.g}-${t.dataset.c}`;render();break}
     case'paste':d.who.paste=t.value;break;
-    case'same':{const f=t.dataset.f;let v=t.value;const F=FIELDS[f];if(F.type==='person')v=parsePerson(v)||'';else if(F.type==='money'||F.type==='int'){const n=parseMoney(v);v=isFinite(n)?n:''}d.same[f]=v;if(f==='department'&&d.modes.team==='same'&&d.same.team&&!TEAMS[v]?.includes(d.same.team))d.same.team=TEAMS[v]?.[0]||'';render();break}
+    case'same':{const f=t.dataset.f;let v=t.value;rec(`${FIELDS[f].label}: one value for everyone`);const F=FIELDS[f];if(F.type==='person')v=parsePerson(v)||'';else if(F.type==='money'||F.type==='int'){const n=parseMoney(v);v=isFinite(n)?n:''}d.same[f]=v;if(f==='department'&&d.modes.team==='same'&&d.same.team&&!TEAMS[v]?.includes(d.same.team))d.same.team=TEAMS[v]?.[0]||'';render();break}
     case'setf':S.setF=t.value;render();break;
     case'gdept':d.grid.dept=t.value;d.grid.scroll=0;render();break;
     case'acknote':d.ackNote[t.dataset.issue]=t.value;break;
@@ -1638,7 +1696,8 @@ document.addEventListener('input',ev=>{const t=ev.target;const k=t.dataset.in;co
   else if(k==='hfx'){S.hmd.v=[t.value];const m=MT[S.hm.t];const c=compileFormula(t.value,m.allCols);const el=$('#fxmsg');if(el){const cnt=c.ok?m.base.filter(e=>{try{return!!c.fn(e)}catch(_){return false}}).length:0;el.className=!t.value?'muted':c.ok?'done-t':'loss';el.textContent=!t.value?'Write a formula or describe it below.':c.ok?`Valid · ${pl(cnt,'row')} match`:c.err}}
   else if(k==='hai'){S.hmd.ai=t.value}
   else if(k==='aiwho'){S.aiWho=S.aiWho||{};S.aiWho[t.dataset.ctx]=t.value}
-  else if(k==='rtv'){S.rt.val=t.value}
+  else if(k==='rta'){S.rt.a=t.value}
+  else if(k==='rtb'){S.rt.b=t.value}
   else if(k==='popq'){S.popQ=t.value;S.focus='pop-q';render()}
   else if(k==='whatq'){S.whatQ=t.value;S.focus='what-q';render()}
   else if(k==='aif'){S.aiF=t.value}
@@ -1654,7 +1713,8 @@ document.addEventListener('input',ev=>{const t=ev.target;const k=t.dataset.in;co
   else if(k==='paste'&&d)d.who.paste=t.value;
   else if(k==='acknote'&&d)d.ackNote[t.dataset.issue]=t.value;
   else if(k==='apreason'&&d)d.rejected.set(t.dataset.id,t.value)});
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.dd){S.dd=null;renderDD();return}if(ev.key==='Escape'&&S.drawer){S.drawer=null;renderDrawer();return}
+document.addEventListener('keydown',ev=>{if((ev.metaKey||ev.ctrlKey)&&(ev.key==='z'||ev.key==='Z'||ev.key==='y')&&S.route==='draft'&&S.d&&!S.d.run&&!['INPUT','TEXTAREA','SELECT'].includes(ev.target.tagName)){ev.preventDefault();undoRedo(ev.key==='y'||ev.shiftKey?'r':'u');return}
+if(ev.key==='Escape'&&S.dd){S.dd=null;renderDD();return}if(ev.key==='Escape'&&S.drawer){S.drawer=null;renderDrawer();return}
   if(ev.key==='Enter'&&ev.target.id==='dd-q'){const b=document.querySelector('#pop2 .ddi');if(b&&b.tagName==='BUTTON'){ev.preventDefault();b.click()}return}
   if(ev.key==='Escape'){if(S.ov){S.ov=null;renderOverlay()}else if(S.hm){S.hm=null;renderHM()}else if(S.se&&S.se.inSheet){closeSheet()}else if(closePopups())render()}
   if(ev.key==='Enter'&&ev.target.dataset&&(ev.target.dataset.cell||ev.target.dataset.in==='bv'||ev.target.dataset.in==='bvp'))ev.target.blur();
@@ -1666,5 +1726,5 @@ window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(['bu
 build(S.size);makeSeeds();S.d=demoDraft();S.parked=extraDrafts();
 const h0=location.hash.slice(1);if(['bulk','segments','people'].includes(h0))S.route=h0;
 render();
-window.__app={rowApprovals,aiTargeting,parseAI,conv,whyIssue,ISS,analyze,impact,S,act,render,SEGS:()=>SEGS,members,MT,cohort,testVal,evalGroups,EMP:()=>EMP,segById,SAMPLES,compileFormula,aiFormula,testSheet};
+window.__app={pick,ropsFor,rowApprovals,aiTargeting,parseAI,conv,whyIssue,ISS,analyze,impact,S,act,render,SEGS:()=>SEGS,members,MT,cohort,testVal,evalGroups,EMP:()=>EMP,segById,SAMPLES,compileFormula,aiFormula,testSheet};
 })();
