@@ -1,0 +1,78 @@
+Employee ID,Name,Base pay (new),Level (new),Title (new),Manager notes
+E1008,Ayla Turcotte,110300,,,
+E1024,Theodora Kub,136.0k,,,
+E1028,Kofi Hackett,"1,17,300",,,
+E1032,Theodora Reichert,"$119,100",,,
+E1037,Rosalind Volkman,307200,,,
+E1043,Ulrich Turcotte,305.4k,,,
+E1044,Ulrich Abernathy,"1,14,500",,,
+E1050,Silas Abernathy,$33.00,,,
+E1054,Verna Bode,$44.50,,,
+E1055,Sanna Rempel,206.6k,L6,"Director, Design",Promotion approved in calibration
+E1057,Rhett Oberbrunner,"1,78,300",L5,Principal Software Engineer,Promotion approved in calibration
+E1059,Reva Tromp,"$85,600",,,
+E1067,Zelda Rempel,115100,,,Hold for mid-year
+E1071,Ximena Prosacco,165.9k,,,
+E1074,Leontine Gerlach,"2,02,600",,,
+E1078,Kofi Yost,"$156,300",,,Hold for mid-year
+E1079,Delphine Gerlach,105900,,,Hold for mid-year
+E1082,Yusuf Runolfsdottir,264.1k,,,
+E1087,Mei Reichert,"1,77,400",,,
+E1091,Rhett Kub,"$93,900",,,
+E1095,Wendell Hilpert,102600,,,
+E1098,Juniper Considine,190.4k,,,
+E1099,Nadia Ondricka,"69,200",,,
+E1102,Maverick Volkman,"$298,400",,,
+E1105,Dario Quigley,203800,,,
+E1106,Leontine Kub,98.1k,,,
+E1113,Dario Daugherty,$61.00,,,Hold for mid-year
+E1124,Ulrich Daugherty,"$98,900",,,
+E1126,Reva Runolfsdottir,94600,,,
+E1134,Kofi Gerlach,174.6k,,,
+E1140,Verna Turcotte,"82,400",,,
+E1146,Kofi Bechtelar,"$127,500",L4,Staff Financial Analyst,Promotion approved in calibration
+E1148,Hollis Abernathy,113600,L2,Software Engineer,Promotion approved in calibration
+E1149,Lavonne Haley,122.3k,,,
+E1153,Mafalda Considine,"2,28,500",,,
+E1157,Zelda Collier,"$67,900",,,
+E1171,Rosalind Ondricka,127500,L4,Staff Account Executive,Promotion approved in calibration
+E1173,Garnet Rau,145.9k,,,
+E1177,Ulrich Cormier,"2,15,600",L6,"Director, Product",Promotion approved in calibration
+E1186,Petra Larkin,"$142,200",,,
+E1190,Kenji Collier,117000,,,
+E1196,Rosalind Upton,125.8k,,,
+E1197,Yusuf Upton,"1,61,700",,,
+E1198,Juniper Bergstrom,$46.00,L4,Manager Customer Support,Promotion approved in calibration
+E1202,Verna Bode,191700,,,Hold for mid-year
+E1208,Marisol Volkman,104.3k,,,
+E1210,Tobias Bergstrom,"1,55,100",,,
+E1224,Dario Collier,"$192,600",,,
+E1233,Juniper Cormier,92200,,,
+E1250,Tobias Hackett,83.1k,,,
+E1252,Petra Wehner,"1,12,100",,,
+E1253,Ulrich Gerlach,"$186,100",,,
+E1254,Nadia Tromp,150300,,,
+E1256,Yusuf Koepp,186.6k,,,
+E1261,Garnet Upton,$42.00,,,
+E1265,Bram Upton,"$232,500",,,
+E1272,Theodora Stiedemann,134100,,,
+E1287,Anneliese Kub,84.2k,,,Hold for mid-year
+E1289,Celeste Hackett,"80,600",,,
+E1298,Kofi Rau,"$77,300",,,
+E1311,Hollis Wehner,81800,,,
+E1323,Kofi Abernathy,123.6k,,,
+E1335,Tomas Ebert,"1,46,700",L4,Staff Product Manager,Promotion approved in calibration
+E1340,Anneliese Yost,$70.50,,,
+E1345,Mei Collier,266500,,,
+E1356,Mei Zieme,124.5k,,,
+E1357,Ulrich Rau,"3,45,600",,,Hold for mid-year
+E1360,Mei Ondricka,"$125,600",,,
+E1368,Quincy Mraz,136300,,,
+E1372,Maverick Cormier,$33.50,,,
+E1378,Rosalind Collier,"1,00,800",,,
+E1396,Kenji Haley,"$133,900",L4,Staff Product Designer,Promotion approved in calibration
+E1407,Cyrus Daugherty,$46.50,,,
+E1408,Otis Ondricka,100.8k,,,
+E1409,Rhett Volkman,"77,100",,,
+E9991,Former employee,"$90,000",,,
+E9992,Typo row,abc,,,

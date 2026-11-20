@@ -33,6 +33,13 @@ const TEAMS={'Customer Support':['Tier 1','Tier 2','Escalations'],'Engineering':
 const ALLTEAMS=[...new Set(Object.values(TEAMS).flat())];
 const LOC={'San Francisco':{state:'CA',country:'US'},'New York':{state:'NY',country:'US'},'Austin':{state:'TX',country:'US'},'Denver':{state:'CO',country:'US'},'Toronto':{state:'ON',country:'CA'}};
 const LOCS=Object.keys(LOC);
+const FX={USD:1,CAD:1.37};const FX_NOTE='1 USD = 1.37 CAD, set by Priya Shah (Finance) in Settings › Currencies on 20 Nov 2026';
+const curCode=e=>LOC[e.location].country==='CA'?'CAD':'USD';const conv=(a,from,to)=>a/FX[from]*FX[to];const usd=(e,v)=>conv(v,curCode(e),'USD');
+const PAYTYPES=['Hourly','Salaried'];
+const PTO=['US Standard (15 days)','US Senior (20 days)','Canada · Ontario (2 weeks)','Canada · Ontario 2027 (3 weeks)','Unlimited (exempt)'];
+const ptoCountry=p=>String(p).startsWith('Canada')?'CA':String(p).startsWith('US')?'US':null;
+const LAPTOPS=['MacBook Pro 14 M1','MacBook Pro 14 M3','MacBook Pro 16 M3','MacBook Air 13 M2','Dell Latitude 7440'];
+const BENEFITS=['Standard','Executive','Part-time','Canada · Standard'];
 const LOC_W=[['San Francisco',36],['New York',22],['Austin',17],['Denver',13],['Toronto',12]];
 const LEVELS=['L1','L2','L3','L4','L5','L6','L7','L8'];
 const LV_W=[['L1',10],['L2',25],['L3',25],['L4',18],['L5',12],['L6',6],['L7',3],['L8',1]];
@@ -52,9 +59,9 @@ const hourlyRole=(dept,level)=>dept==='Customer Support'&&lvlN(level)<=4;
 const curOf=e=>LOC[e.location].country==='CA'?'CA$':'$';
 const r5=x=>Math.round(x*2)/2, r100=x=>Math.round(x/100)*100;
 function band(e,level,per,dept,loc){const b=BANDS[level]||BANDS.L3;const m=DMULT[dept||e.department]||1;const cad=LOC[loc||e.location].country==='CA'?1.25:1;
-  const a=b.map(x=>x*1000*m*cad);if(per==='Hour')return{min:r5(a[0]/2080),mid:r5(a[1]/2080),max:r5(a[2]/2080)};return{min:r100(a[0]),mid:r100(a[1]),max:r100(a[2])}}
-const roundComp=(v,per)=>per==='Hour'?r5(v):r100(v);
-const annual=(v,per)=>per==='Hour'?v*2080:v;
+  const a=b.map(x=>x*1000*m*cad);if(per==='Hourly')return{min:r5(a[0]/2080),mid:r5(a[1]/2080),max:r5(a[2]/2080)};return{min:r100(a[0]),mid:r100(a[1]),max:r100(a[2])}}
+const roundComp=(v,per)=>per==='Hourly'?r5(v):r100(v);
+const annual=(v,per)=>per==='Hourly'?v*2080:v;
 
 /* ================= fake company ================= */
 let EMP=[],EMPI={},CONFLICT=new Set(),NAMEIDX={};
@@ -66,15 +73,20 @@ function gen(N){
     const e={id,first:o.first,last:o.last,name:o.first+' '+o.last,department:o.dept,team:o.team||pick(TEAMS[o.dept]),level:o.level,location:o.loc||'San Francisco',
       rating:o.rating||'Meets',etype:o.etype||'Full-time',status:o.status||'Active',languages:o.languages||['English'],manager:null};
     e.email=(o.email||`${o.first}.${o.last}${n>1?n-1:''}@metzhand.com`).toLowerCase();
-    e.title=o.title||ladder(o.dept,o.level);e.per=o.per||(hourlyRole(o.dept,o.level)?'Hour':'Year');
+    e.title=o.title||ladder(o.dept,o.level);e.per=o.per||(hourlyRole(o.dept,o.level)?'Hourly':'Salaried');
     const b=band(e,e.level,e.per);e.compensation=o.comp??roundComp(b.min+(b.max-b.min)*(.22+r()*.5),e.per);
     e.bonus=o.bonus??(lvlN(e.level)>=5?r100(annual(e.compensation,e.per)*(.1+r()*.1)):0);
     e.equity=o.equity??Math.round(EQ[e.level]*(.8+r()*.4)/100)*100;
     e.startDate=o.start||iso(addDays(TODAY,-Math.round(20+Math.pow(r(),1.4)*3600)));
+    const tech=['Engineering','Product','Design'].includes(e.department);const ca=LOC[e.location].country==='CA';
+    e.timeOff=ca?'Canada · Ontario (2 weeks)':lvlN(e.level)>=6?'US Senior (20 days)':'US Standard (15 days)';
+    e.laptop=tech?(r()<.5?'MacBook Pro 14 M1':'MacBook Pro 14 M3'):(r()<.6?'MacBook Air 13 M2':'Dell Latitude 7440');e.refresh=iso(addDays(TODAY,-Math.round(30+r()*1500)));
+    e.benefits=ca?'Canada · Standard':lvlN(e.level)>=7?'Executive':'Standard';e.oncall=e.department==='Engineering'?['None','None','Primary','Secondary'][Math.floor(r()*4)]:'None';e.spotBonus=0;
+    e.quota=e.department==='Sales'?Math.round(45+r()*90):'';e.activeDays=Math.floor(r()*8);e.lastActive=iso(addDays(TODAY,-Math.floor(Math.pow(r(),3)*120)));
     e.costCenter='CC-'+(100+Math.max(0,DEPTS.indexOf(e.department)));E.push(e);return e}
   mk({first:'Odessa',last:'Marvin',dept:'Executive',level:'L8',title:'Chief Executive Officer',rating:'Exceeds',team:'Office of the CEO',start:'2016-03-01'});
   mk({first:'Fleda',last:'Pfannerstill',dept:'Customer Support',level:'L7',team:'Escalations',languages:['English','Spanish'],start:'2018-06-11'});
-  mk({first:'Virge',last:'Considine',dept:'Customer Support',level:'L4',team:'Tier 1',title:'Manager Customer Support',per:'Hour',comp:50,email:'virge.considine0@metzhand.com',rating:'Exceeds',equity:0,bonus:0,start:'2021-09-20'});
+  mk({first:'Virge',last:'Considine',dept:'Customer Support',level:'L4',team:'Tier 1',title:'Manager Customer Support',per:'Hourly',comp:50,email:'virge.considine0@metzhand.com',rating:'Exceeds',equity:0,bonus:0,start:'2021-09-20'});
   mk({first:'Priya',last:'Shah',dept:'Finance',level:'L7',team:'FP&A',start:'2019-01-07'});
   mk({first:'Raj',last:'Patel',dept:'IT',level:'L6',team:'Security',start:'2020-04-13'});
   mk({first:'Jason',last:'Lee',dept:'Product',level:'L4',team:'Core HR',loc:'New York',start:'2023-02-27'});
@@ -87,7 +99,7 @@ function gen(N){
     list.forEach(e=>{if(e===head)return;const cands=list.filter(x=>x!==e&&lvlN(x.level)>lvlN(e.level)&&lvlN(x.level)>=5);
       if(!cands.length){e.manager=head.id;return}const minL=Math.min(...cands.map(x=>lvlN(x.level)));const c2=cands.filter(x=>lvlN(x.level)===minL);e.manager=c2[Math.floor(r()*c2.length)].id})});
   return E}
-function build(N){EMP=gen(N);EMPI={};NAMEIDX={};EMP.forEach(e=>{EMPI[e.id]=e;e.reports=[];NAMEIDX[e.name.toLowerCase()]=NAMEIDX[e.name.toLowerCase()]||e.id});
+function build(N){AGGC=null;EMP=gen(N);EMPI={};NAMEIDX={};EMP.forEach(e=>{EMPI[e.id]=e;e.reports=[];NAMEIDX[e.name.toLowerCase()]=NAMEIDX[e.name.toLowerCase()]||e.id});
   EMP.forEach(e=>{if(e.manager)EMPI[e.manager].reports.push(e.id)});
   CONFLICT=new Set(EMP.filter(e=>e.department==='Engineering'&&e.team==='Platform').slice(0,40).map(e=>e.id));
   $('#dl-people').innerHTML=EMP.map(e=>`<option value="${esc(e.name)} · ${e.id}"></option>`).join('');
@@ -99,48 +111,73 @@ function under(e,mid){if(!e)return false;let x=e.manager,g=0;while(x&&g<20){if(x
 
 /* ================= value fields (bulk change) ================= */
 const FIELDS={
-  title:{label:'Title',tab:'emp',type:'text'},
-  department:{label:'Department',tab:'emp',type:'select',opts:()=>DEPTS,approval:true},
-  team:{label:'Team',tab:'emp',type:'team'},
-  compensation:{label:'Compensation',tab:'emp',type:'money',approval:true},
-  per:{label:'Per',tab:'emp',type:'select',opts:()=>['Hour','Year'],approval:true},
-  bonus:{label:'Target annual bonus',tab:'emp',type:'money',approval:true},
-  equity:{label:'Equity - Number of shares',tab:'emp',type:'int',approval:true},
-  email:{label:'Work Email',tab:'emp',type:'text',identity:true},
-  manager:{label:'Manager',tab:'emp',type:'person',approval:true},
-  location:{label:'Work location',tab:'emp',type:'select',opts:()=>LOCS,approval:true},
-  level:{label:'Level',tab:'add',type:'select',opts:()=>LEVELS},
-  rating:{label:'Performance rating',tab:'add',type:'select',opts:()=>RATINGS},
-  costCenter:{label:'Cost center',tab:'add',type:'select',opts:()=>DEPTS.map((d,i)=>'CC-'+(100+i))}
+  title:{label:'Title',grp:'emp',type:'text'},
+  department:{label:'Department',grp:'emp',type:'select',opts:()=>DEPTS,approval:true},
+  team:{label:'Team',grp:'emp',type:'team'},
+  manager:{label:'Manager',grp:'emp',type:'person',approval:true},
+  location:{label:'Work location',grp:'emp',type:'select',opts:()=>LOCS,approval:true},
+  email:{label:'Work email',grp:'emp',type:'text',identity:true},
+  compensation:{label:'Base pay',grp:'pay',type:'money',approval:true},
+  per:{label:'Pay type',grp:'pay',type:'select',opts:()=>PAYTYPES,approval:true},
+  bonus:{label:'Target annual bonus',grp:'pay',type:'money',approval:true},
+  spotBonus:{label:'One-time bonus',grp:'pay',type:'money',approval:true},
+  equity:{label:'Equity grant (shares)',grp:'pay',type:'int',approval:true},
+  timeOff:{label:'Time off policy',grp:'time',type:'select',opts:()=>PTO},
+  laptop:{label:'Laptop model',grp:'dev',type:'select',opts:()=>LAPTOPS},
+  refresh:{label:'Device refresh date',grp:'dev',type:'date'},
+  benefits:{label:'Benefits class',grp:'ben',type:'select',opts:()=>BENEFITS,approval:true},
+  level:{label:'Level',grp:'add',type:'select',opts:()=>LEVELS},
+  rating:{label:'Performance rating',grp:'add',type:'select',opts:()=>RATINGS},
+  costCenter:{label:'Cost center',grp:'add',type:'select',opts:()=>DEPTS.map((d,i)=>'CC-'+(100+i))},
+  oncall:{label:'On-call rotation',grp:'add',type:'select',opts:()=>['None','Primary','Secondary']}
 };
-const FORDER=['compensation','per','bonus','equity','level','title','department','team','manager','location','email','rating','costCenter'];
+const FGROUPS=[['emp','Employment information','Profile'],['pay','Compensation','Payroll'],['time','Time off','Time off'],['dev','Devices','Device Management'],['ben','Benefits','Benefits administration'],['add','Additional information','Custom fields defined in Rippling']];
+const MONEY=new Set(['compensation','bonus','spotBonus']);
+const FORDER=['compensation','per','bonus','spotBonus','equity','level','title','department','team','manager','location','email','timeOff','laptop','refresh','benefits','rating','costCenter','oncall'];
 function fmtVal(e,f,v){if(v===undefined||v===null||v==='')return'';
-  if(f==='compensation'||f==='bonus'){const c=curOf(e);const n=+v;return c+(f==='compensation'&&n<1000?n.toFixed(n%1?2:0):fmtN(n))}
-  if(f==='equity')return fmtN(+v);if(f==='manager')return EMPI[v]?EMPI[v].name:'';return String(v)}
+  if(MONEY.has(f)){const n=+v;if(f==='spotBonus'&&!n)return'—';const c=curOf(e);return c+(f==='compensation'&&n<1000?n.toFixed(n%1?2:0):fmtN(n))}
+  if(f==='equity')return fmtN(+v);if(f==='manager')return EMPI[v]?EMPI[v].name:'';if(FIELDS[f]&&FIELDS[f].type==='date')return fmtIso(v);return String(v)}
 function parseMoney(s){if(s===undefined||s===null)return NaN;let t=String(s).trim().toLowerCase().replace(/ca\$|usd|\$|\s|%/g,'');if(!t)return NaN;
   let mult=1;if(/k$/.test(t)){mult=1000;t=t.slice(0,-1)}t=t.replace(/,/g,'');const n=parseFloat(t);return isFinite(n)&&/^-?[\d.]+$/.test(t)?n*mult:NaN}
 
 /* ================= condition engine (one catalog for every builder and column filter) ================= */
 const CF={
   empid:{label:'Employee ID',type:'id',grp:'Employee',get:e=>e.id},
-  title:{label:'Title',type:'text',grp:'Employment',get:e=>e.title},
-  department:{label:'Department',type:'pick',grp:'Employment',get:e=>e.department,opts:()=>DEPTS},
-  team:{label:'Team',type:'pick',grp:'Employment',get:e=>e.team,opts:()=>ALLTEAMS},
-  manager:{label:'Manager',type:'person',grp:'Employment',get:e=>e.manager},
-  location:{label:'Work location',type:'pick',grp:'Employment',get:e=>e.location,opts:()=>LOCS},
-  email:{label:'Work Email',type:'text',grp:'Employment',get:e=>e.email},
-  etype:{label:'Employment type',type:'pick',grp:'Employment',get:e=>e.etype,opts:()=>['Full-time','Contractor']},
-  status:{label:'Employment status',type:'pick',grp:'Employment',get:e=>e.status,opts:()=>['Active','On leave','Scheduled termination']},
-  startDate:{label:'Start date',type:'date',grp:'Employment',get:e=>e.startDate},
-  compensation:{label:'Compensation (annualised)',type:'num',grp:'Compensation',get:e=>annual(e.compensation,e.per)},
-  per:{label:'Per (pay type)',type:'pick',grp:'Compensation',get:e=>e.per,opts:()=>['Hour','Year']},
-  bonus:{label:'Target annual bonus',type:'num',grp:'Compensation',get:e=>e.bonus},
-  equity:{label:'Equity - Number of shares',type:'num',grp:'Compensation',get:e=>e.equity},
-  level:{label:'Level',type:'ord',grp:'Additional Information',get:e=>e.level,opts:()=>LEVELS},
-  rating:{label:'Performance rating',type:'pick',grp:'Additional Information',get:e=>e.rating,opts:()=>RATINGS},
-  costCenter:{label:'Cost center',type:'pick',grp:'Additional Information',get:e=>e.costCenter,opts:()=>DEPTS.map((d,i)=>'CC-'+(100+i))},
-  languages:{label:'Languages spoken',type:'multi',grp:'Additional Information',get:e=>e.languages,opts:()=>['English','Spanish','French']}
+  title:{label:'Title',type:'text',grp:'Employment information',get:e=>e.title},
+  department:{label:'Department',type:'pick',grp:'Employment information',get:e=>e.department,opts:()=>DEPTS},
+  team:{label:'Team',type:'pick',grp:'Employment information',get:e=>e.team,opts:()=>ALLTEAMS},
+  manager:{label:'Manager',type:'person',grp:'Employment information',get:e=>e.manager},
+  location:{label:'Work location',type:'pick',grp:'Employment information',get:e=>e.location,opts:()=>LOCS},
+  email:{label:'Work email',type:'text',grp:'Employment information',get:e=>e.email},
+  etype:{label:'Employment type',type:'pick',grp:'Employment information',get:e=>e.etype,opts:()=>['Full-time','Contractor']},
+  status:{label:'Employment status',type:'pick',grp:'Employment information',get:e=>e.status,opts:()=>['Active','On leave','Scheduled termination']},
+  startDate:{label:'Start date',type:'date',grp:'Employment information',get:e=>e.startDate},
+  compensation:{label:'Base pay (annualised)',type:'num',money:true,grp:'Compensation',get:e=>annual(e.compensation,e.per)},
+  per:{label:'Pay type',type:'pick',grp:'Compensation',get:e=>e.per,opts:()=>PAYTYPES},
+  bonus:{label:'Target annual bonus',type:'num',money:true,grp:'Compensation',get:e=>e.bonus},
+  equity:{label:'Equity grant (shares)',type:'num',grp:'Compensation',get:e=>e.equity},
+  timeOff:{label:'Time off policy',type:'pick',grp:'Time off',get:e=>e.timeOff,opts:()=>PTO},
+  laptop:{label:'Laptop model',type:'pick',grp:'Devices',get:e=>e.laptop,opts:()=>LAPTOPS},
+  refresh:{label:'Device refresh date',type:'date',grp:'Devices',get:e=>e.refresh},
+  benefits:{label:'Benefits class',type:'pick',grp:'Benefits',get:e=>e.benefits,opts:()=>BENEFITS},
+  level:{label:'Level',type:'ord',grp:'Additional information',get:e=>e.level,opts:()=>LEVELS},
+  rating:{label:'Performance rating',type:'pick',grp:'Additional information',get:e=>e.rating,opts:()=>RATINGS},
+  costCenter:{label:'Cost center',type:'pick',grp:'Additional information',get:e=>e.costCenter,opts:()=>DEPTS.map((d,i)=>'CC-'+(100+i))},
+  oncall:{label:'On-call rotation',type:'pick',grp:'Additional information',get:e=>e.oncall,opts:()=>['None','Primary','Secondary']},
+  languages:{label:'Languages spoken',type:'multi',grp:'Additional information',get:e=>e.languages,opts:()=>['English','Spanish','French']},
+  quota:{label:'Quota attainment % (FY26)',type:'num',grp:'Custom attributes from connectors',src:'Salesforce',get:e=>e.quota},
+  activeDays:{label:'Weekly active days',type:'num',grp:'Custom attributes from connectors',src:'Amplitude',get:e=>e.activeDays},
+  lastActive:{label:'Last active date',type:'date',grp:'Custom attributes from connectors',src:'Segment',get:e=>e.lastActive},
+  deptHeadcount:{label:'Department headcount',type:'num',grp:'Group totals',agg:true,get:e=>AGG().dc[e.department]},
+  teamHeadcount:{label:'Team headcount',type:'num',grp:'Group totals',agg:true,get:e=>AGG().tc[e.department+'|'+e.team]},
+  deptPay:{label:'Department total base pay (USD)',type:'num',grp:'Group totals',agg:true,get:e=>AGG().dp[e.department]},
+  deptAvgPay:{label:'Department average base pay (USD)',type:'num',grp:'Group totals',agg:true,get:e=>AGG().da[e.department]},
+  reportsCount:{label:'Direct reports',type:'num',grp:'Group totals',agg:true,get:e=>e.reports.length},
+  mgrSpan:{label:"Manager's direct reports",type:'num',grp:'Group totals',agg:true,get:e=>EMPI[e.manager]?EMPI[e.manager].reports.length:0}
 };
+let AGGC=null;function AGG(){if(AGGC)return AGGC;const dc={},tc={},dp={};EMP.forEach(e=>{dc[e.department]=(dc[e.department]||0)+1;const k=e.department+'|'+e.team;tc[k]=(tc[k]||0)+1;dp[e.department]=(dp[e.department]||0)+usd(e,annual(e.compensation,e.per))});
+  const da={};Object.keys(dp).forEach(k=>{dp[k]=Math.round(dp[k]);da[k]=Math.round(dp[k]/dc[k])});return AGGC={dc,tc,dp,da}}
+const CONN_NOTE={Salesforce:'Synced daily from Salesforce through a custom connector',Amplitude:'Synced daily from Amplitude through a custom connector',Segment:'Synced hourly from Segment through a custom connector'};
 const OPS={
   id:[['inseg','belongs to segment'],['notinseg',"doesn't belong to segment"],['eq','is exactly'],['ne','is not'],['anyof','is any of'],['noneof','is none of'],['starts','starts with'],['contains','contains']],
   text:[['contains','contains'],['ncontains','does not contain'],['starts','starts with'],['ends','ends with'],['eq','is exactly'],['ne','is not'],['empty','is empty'],['nempty','is not empty']],
@@ -180,7 +217,7 @@ function testVal(t,val,c,e){const v=c.v||[];const op=c.op;
     case'bool':{const y=val===true||/^(yes|y|true|1)$/i.test(String(val??'').trim());return op==='yes'?y:!y}}
   return false}
 const fieldOf=c=>CF[c.f]||{label:c.f,type:'text',get:()=>''};
-const testCond=(c,e)=>{const F=fieldOf(c);return testVal(F.type,F.get(e),c,e)};
+const testCond=(c,e)=>{const F=fieldOf(c);let v=F.get(e);if(F.money&&typeof v==='number')v=conv(v,curCode(e),c.cur||'USD');return testVal(F.type,v,c,e)};
 function groupMatch(g,e){const cs=g.conds.filter(complete);if(!cs.length)return false;const m=g.mode||'all';
   if(m==='all')return cs.every(c=>testCond(c,e));if(m==='any')return cs.some(c=>testCond(c,e));
   let k=0;for(const c of cs)if(testCond(c,e))k++;const n=+g.n||1;return m==='atleast'?k>=n:m==='atmost'?k<=n:k===n}
@@ -191,6 +228,7 @@ function condTxt(c){const F=fieldOf(c);const v=c.v||[];let vt='';
   if(!NOVAL.has(c.op)){if(F.type==='id'){vt=(c.op==='inseg'||c.op==='notinseg')?`"${segName(v[0])}"`:['eq','ne','anyof','noneof'].includes(c.op)?names(v):`"${v[0]||''}"`}
     else if(F.type==='person')vt=EMPI[v[0]]?.name||'…';else if(F.type==='date'&&c.op!=='between')vt=v[0]==='exact'?fmtIso(v[1]):relLabel(v[0]).toLowerCase();
     else if(TWO.has(c.op))vt=`${fmtCV(F.type,v[0])} and ${fmtCV(F.type,v[1])}`;else if(LISTOP.has(c.op))vt=v.join(', ');else if(F.type==='text')vt=`"${v[0]||''}"`;else vt=fmtCV(F.type,v[0])}
+  if(F.money&&vt&&!NOVAL.has(c.op))vt+=' '+(c.cur||'USD');
   return`${F.label} ${opLabel(F.type,c.op)}${vt?' '+vt:''}`}
 function groupsTxt(groups){const live=groups.filter(g=>g.conds.some(complete));if(!live.length)return'';
   return live.map(g=>{const cs=g.conds.filter(complete);const m=g.mode||'all';let s;
@@ -237,18 +275,26 @@ function sampleNominations(){const r=rng(EMP.length+77);const pool=EMP.filter(e=
   return lines.join('\n')}
 function sampleMovers(){const r=rng(EMP.length+31);const pool=EMP.filter(e=>e.location!=='Austin'&&e.location!=='Toronto'&&['Sales','Customer Support','Marketing'].includes(e.department)&&e.etype==='Full-time');
   const pick=pool.filter(()=>r()<.25).slice(0,Math.max(5,Math.round(EMP.length*.05)));
-  const lines=[csvLine(['Work Email','Employee name','Desk','Move date','Relocation package','Parking needed','Notes'])];
+  const lines=[csvLine(['Work email','Employee name','Desk','Move date','Relocation package','Parking needed','Notes'])];
   pick.forEach((e,i)=>{const dd=4+Math.floor(r()*24);lines.push(csvLine([i%5===2?' '+e.email.toUpperCase()+' ':e.email,e.name,`${'ABC'[i%3]}-${String(10+Math.floor(r()*40))}`,`${String(dd).padStart(2,'0')}/01/2027`,r()<.6?'Yes':'No',r()<.4?'Y':'N',i%4===0?'Needs a standing desk':'']))});
   lines.push(csvLine(['casey.nguyen@metzhand.com','Not in Rippling','B-11','11/01/2027','Yes','N','']),csvLine(['old.contractor@agency.com','External','C-02','18/01/2027','No','N','']));
   return lines.join('\n')}
 function sampleCompChanges(){const r=rng(EMP.length+5);const rows=EMP.filter(e=>e.etype==='Full-time'&&e.status==='Active'&&e.rating!=='Below'&&e.department!=='Executive').filter(()=>r()<.2).slice(0,400);
-  const lines=[csvLine(['Employee ID','Name','Compensation (new)','Level (new)','Title (new)','Manager notes'])];let k=0;
+  const lines=[csvLine(['Employee ID','Name','Base pay (new)','Level (new)','Title (new)','Manager notes'])];let k=0;
   rows.forEach(e=>{const promo=e.rating==='Exceeds'&&lvlN(e.level)<7&&r()<.35;const nl=promo?'L'+(lvlN(e.level)+1):'';const b=band(e,nl||e.level,e.per);
     let v=roundComp(promo?Math.max(e.compensation*1.08,b.min+(b.mid-b.min)*.5):e.compensation*(1.03+r()*.05),e.per);k++;
-    const amt=e.per==='Hour'?'$'+v.toFixed(2):[`$${fmtN(v)}`,String(v),(v/1000).toFixed(1)+'k',v.toString().replace(/(\d)(?=(\d\d)+\d{3}$)/g,'$1,').replace(/(\d)(\d{3})$/,'$1,$2')][k%4];
+    const amt=e.per==='Hourly'?'$'+v.toFixed(2):[`$${fmtN(v)}`,String(v),(v/1000).toFixed(1)+'k',v.toString().replace(/(\d)(?=(\d\d)+\d{3}$)/g,'$1,').replace(/(\d)(\d{3})$/,'$1,$2')][k%4];
     lines.push(csvLine([e.id,e.name,amt,nl,promo?ladder(e.department,nl):'',promo?'Promotion approved in calibration':(r()<.08?'Hold for mid-year':'')]))});
   lines.push(csvLine(['E9991','Former employee','$90,000','','','']),csvLine(['E9992','Typo row','abc','','','']));return lines.join('\n')}
-const SAMPLES={'promotion-nominations-fy26.csv':()=>sampleNominations(),'austin-office-movers.csv':()=>sampleMovers(),'fy26-comp-changes.csv':()=>sampleCompChanges()};
+function sampleLaptops(){const old=iso(addDays(TODAY,-1095));const rows=EMP.filter(e=>['Engineering','Product','Design'].includes(e.department)&&e.refresh<old).slice(0,300);
+  const lines=[csvLine(['Employee ID','Name','Laptop model (new)','Device refresh date (new)','Ship to','Notes'])];
+  rows.forEach((e,i)=>lines.push(csvLine([e.id,e.name,lvlN(e.level)>=5?'MacBook Pro 16 M3':'MacBook Pro 14 M3',i%3===0?'15/01/2027':'2027-01-15',i%4===0?'Home address on file':e.location+' office',i%7===0?'Needs a UK keyboard':''])));
+  lines.push(csvLine(['E9990','Former employee','MacBook Pro 14 M3','2027-01-15','','']));return lines.join('\n')}
+function sampleBonus(){const rows=EMP.filter(e=>e.department==='Engineering'&&(e.team==='Platform'||e.team==='Infrastructure')).slice(0,200);
+  const lines=[csvLine(['Work email','Name','One-time bonus (new)','Currency','Reason'])];
+  rows.forEach((e,i)=>{const ca=curCode(e)==='CAD';lines.push(csvLine([e.email,e.name,e.team==='Platform'?(ca&&i%2?'1370':'1000'):'500',e.team==='Platform'&&ca&&i%2?'CAD':'USD',e.team==='Platform'?'Q4 platform launch':'Launch support']))});
+  lines.push(csvLine(['ana.contractor@agency.com','External','1000','USD','Not in Rippling']),csvLine([rows[0]?rows[0].email:'x@metzhand.com','Duplicate currency typo','900','EUR','Unsupported currency']));return lines.join('\n')}
+const SAMPLES={'promotion-nominations-fy26.csv':()=>sampleNominations(),'austin-office-movers.csv':()=>sampleMovers(),'fy26-comp-changes.csv':()=>sampleCompChanges(),'laptop-refresh-q1-2027.csv':()=>sampleLaptops(),'q4-launch-bonus.csv':()=>sampleBonus()};
 function makeSeeds(){SEGS=[];SEGN=110;SEGC.clear();
   const dyn=(id,name,desc,groups,owner,updated,usedSeed)=>({id,name,desc,type:'dynamic',source:'conditions',groups,owner,updated,created:updated,usedSeed:usedSeed||[],version:1});
   SEGS.push(dyn('SEG-101','All full-time employees','Everyone on a full-time contract.',[{mode:'all',conds:[{f:'etype',op:'anyof',v:['Full-time']}]}],'Dana Okuneva','12 Nov 2026'));
@@ -272,13 +318,21 @@ let DRAFTN=2041;
 const STEPS=[{k:'setup',t:'Details',h:'Change details'},{k:'who',t:'Segments',h:'Target segments'},{k:'what',t:'Fields',h:'Fields to update'},{k:'values',t:'Values',h:'Enter values'},{k:'review',t:'Validation',h:'Validation'},{k:'impact',t:'Impact & approvals',h:'Impact & approvals'},{k:'status',t:'Submit & track',h:'Submission status'}];
 function blankDraft(){return{id:'BC-'+(DRAFTN++),name:'',reason:'',date:null,dateKind:null,template:null,
   who:{groups:[{mode:'all',conds:[]}],incLeave:true,incTerm:false,incContract:false,cnt:null,prev:null,paste:'',pasteOpen:false},
-  fields:[],modes:{},same:{},manual:{},csv:{},csvHits:new Set(),rules:[],moved:new Set(),ack:{},ackNote:{},
+  fields:[],modes:{},same:{},sameCur:{},manual:{},csv:{},csvHits:new Set(),rules:[],moved:new Set(),exceptions:new Set(),applyMode:'together',ack:{},ackNote:{},
   grid:{changed:false,group:null,dept:'',issue:null,collapsed:new Set(),tool:null,scroll:0},show:{},
   cutoff:{choice:'next',confirmed:false},appSync:'effective',digest:true,notifyEmp:false,notifyMgr:true,accessAck:false,run:null,visited:new Set(['setup']),rejected:new Map()}}
 function demoDraft(){const d=blankDraft();d.name='FY26 annual review';d.reason='Outcomes of the FY26 performance review cycle';d.date=NEXTP;d.dateKind='next';d.template='comp';
   d.who.groups=[{mode:'all',conds:[{f:'empid',op:'inseg',v:['SEG-101']}]}];d.fields=['compensation','title','level'];d.fields.forEach(f=>d.modes[f]='diff');
-  d.rules=[{field:'compensation',pct:8,where:{f:'rating',v:['Exceeds']},cap:'max',ai:false,accepted:true},{field:'compensation',pct:4,where:{f:'rating',v:['Meets']},cap:'max',ai:false,accepted:true}];
+  d.rules=[{field:'compensation',kind:'pct',pct:8,where:{f:'rating',op:'anyof',v:['Exceeds']},cap:'max',ai:false,accepted:true},{field:'compensation',kind:'pct',pct:4,where:{f:'rating',op:'anyof',v:['Meets']},cap:'max',ai:false,accepted:true}];
   seedPromos(d);['setup','who','what','values'].forEach(k=>d.visited.add(k));return d}
+function extraDrafts(){const v=x=>['setup','who','what','values'].forEach(k=>x.visited.add(k));
+  const c=blankDraft();c.name='Q4 launch bonus · Platform team';c.reason='Thank-you bonus for the Q4 platform launch';c.date=D(2026,11,15);c.dateKind='custom';
+  c.who.groups=[{mode:'all',conds:[{f:'department',op:'anyof',v:['Engineering']},{f:'team',op:'anyof',v:['Platform']}]}];c.fields=['spotBonus'];c.modes={spotBonus:'same'};c.same={spotBonus:1000};c.sameCur={spotBonus:'USD'};v(c);
+  const a=blankDraft();a.name='Laptop refresh · Q1 2027';a.reason='Replace laptops older than three years';a.date=D(2027,0,15);a.dateKind='custom';
+  a.who.groups=[{mode:'all',conds:[{f:'department',op:'anyof',v:['Engineering','Product','Design']},{f:'refresh',op:'before',v:['exact',iso(addDays(TODAY,-1095))]}]}];a.fields=['laptop','refresh'];a.modes={laptop:'same',refresh:'same'};a.same={laptop:'MacBook Pro 14 M3',refresh:'2027-01-15'};v(a);
+  const b=blankDraft();b.name='2027 time off policy · Ontario';b.reason='New Ontario policy with three weeks of vacation from 1 Jan 2027';b.date=D(2027,0,1);b.dateKind='custom';
+  b.who.groups=[{mode:'all',conds:[{f:'location',op:'anyof',v:['Toronto']}]}];b.fields=['timeOff'];b.modes={timeOff:'same'};b.same={timeOff:'Canada · Ontario 2027 (3 weeks)'};v(b);
+  return[c,a,b]}
 function seedPromos(d){d.csv={};const r=rng(EMP.length+11);let k=0;
   cohort(d).list.forEach(e=>{const n=lvlN(e.level);if(e.rating==='Exceeds'&&n<7&&e.department!=='Executive'&&r()<.4){k++;const nl='L'+(n+1);const b=band(e,nl,e.per);
     let c=Math.max(b.min+(b.mid-b.min)*.6,e.compensation*1.06);if(k%11===0)c=b.max*1.06;else if(k%7===0)c=Math.min(e.compensation*1.19,b.max*.98);
@@ -293,42 +347,93 @@ function cohort(d){const g=d.who.groups;const list=[],why=new Map(),auto={leave:
     list.push(e);why.set(e.id,named?'Named by Employee ID':sc?'In '+segName(sc.v[0]):g.length>1?`Matches group ${gi+1}`:'Matches the conditions')}
   return{list,why,auto}}
 function rowsOf(d){let base;if(d.run&&d.run.frozen)base=d.run.frozen.map(id=>EMPI[id]).filter(Boolean);else base=cohort(d).list;return base.filter(e=>!d.moved.has(e.id))}
-function ruleHit(d,e,f){for(let i=d.rules.length-1;i>=0;i--){const r=d.rules[i];if(r.field!==f)continue;if(r.where&&r.where.v.length&&!r.where.v.includes(e[r.where.f]))continue;return r}return null}
-function ruleVal(d,e,f,r){if(!r)return undefined;
-  if(f==='compensation'){const per=nv(d,e,'per');if(per!==e.per)return undefined;let x=e.compensation*(1+r.pct/100);if(r.cap){const b=band(e,nv(d,e,'level'),per,nv(d,e,'department'),nv(d,e,'location'));const cap=r.cap==='max'?b.max:b.mid;if(x>cap)x=Math.max(e.compensation,cap)}return roundComp(x,per)}
-  if(f==='bonus'){const sal=annual(nv(d,e,'compensation'),nv(d,e,'per'));return r100(sal*r.pct/100)}return undefined}
+function ruleHit(d,e,f){for(let i=d.rules.length-1;i>=0;i--){const r=d.rules[i];if(r.field!==f)continue;if(r.where&&complete(r.where)&&!testCond(r.where,e))continue;return r}return null}
+function ruleVal(d,e,f,r){if(!r)return undefined;const k=r.kind||'pct';const cur=curCode(e);
+  if(f==='compensation'){const per=nv(d,e,'per');if(per!==e.per)return undefined;const div=per==='Hourly'?2080:1;
+    let x=k==='pct'?e.compensation*(1+r.pct/100):k==='add'?e.compensation+conv(r.amt,r.cur,cur)/div:conv(r.amt,r.cur,cur)/div;
+    if(r.cap&&k!=='set'){const b=band(e,nv(d,e,'level'),per,nv(d,e,'department'),nv(d,e,'location'));const cap=r.cap==='max'?b.max:b.mid;if(x>cap)x=Math.max(e.compensation,cap)}return roundComp(x,per)}
+  if(f==='bonus'||f==='spotBonus'){if(k==='pct'){const sal=annual(nv(d,e,'compensation'),nv(d,e,'per'));return r100(sal*r.pct/100)}return Math.round(conv(r.amt,r.cur,cur)/10)*10}return undefined}
 function val(d,e,f){const m=d.manual[e.id];if(m&&f in m)return m[f];const c=d.csv[e.id];if(c&&f in c)return c[f];
-  if(d.modes[f]==='same'&&d.same[f]!==undefined&&d.same[f]!=='')return d.same[f];return ruleVal(d,e,f,ruleHit(d,e,f))}
+  if(d.modes[f]==='same'&&d.same[f]!==undefined&&d.same[f]!==''){const v=d.same[f];if(MONEY.has(f)){const from=(d.sameCur||{})[f]||'USD';const x=conv(+v,from,curCode(e));return f==='compensation'?roundComp(e.per==='Hourly'?x/2080:x,e.per):Math.round(x/10)*10}return v}
+  return ruleVal(d,e,f,ruleHit(d,e,f))}
 function src(d,e,f){const m=d.manual[e.id];if(m&&f in m)return m[f]===''?null:'m';const c=d.csv[e.id];if(c&&f in c)return'c';
   if(d.modes[f]==='same'&&d.same[f]!==undefined&&d.same[f]!=='')return's';const r=ruleHit(d,e,f);if(r&&ruleVal(d,e,f,r)!==undefined)return r.ai&&!r.accepted?'ai':'r';return null}
 function nv(d,e,f){if(!d.fields.includes(f))return e[f];const v=val(d,e,f);return(v===undefined||v===''||v===null)?e[f]:v}
 function changed(d,e,f){if(!d.fields.includes(f))return false;const v=val(d,e,f);if(v===undefined||v===''||v===null)return false;return String(v)!==String(e[f])}
 
 /* ================= validation ================= */
+const POL={
+  bands:{name:'Compensation bands',kind:'Company policy',owner:'Priya Shah (Finance)',where:'Settings › Compensation › Bands',changed:'1 Oct 2026',desc:'Minimum, midpoint and maximum pay for each level and department. Pay above the maximum is blocked unless Finance approves an exception.'},
+  merit:{name:'FY26 merit guidelines',kind:'Company policy',owner:'Priya Shah (Finance)',where:'Settings › Compensation › Review cycles',changed:'15 Sep 2026',desc:'Raises above 15% are flagged for a second look.'},
+  org:{name:'Org structure rules',kind:'Built into Rippling',owner:'Rippling',where:'Not editable',changed:'',desc:"A team belongs to one department, and reporting lines can't loop or point at someone who is leaving."},
+  entity:{name:'Legal entities',kind:'Company setup',owner:'Dana Okuneva (People)',where:'Settings › Company › Entities',changed:'3 Mar 2026',desc:'Work locations in another country belong to a different legal entity, so moving there is an international transfer.'},
+  payroll:{name:'Payroll calendar',kind:'Company setup',owner:'Priya Shah (Finance)',where:'Settings › Payroll › Pay schedules',changed:'2 Jan 2026',desc:'Semi-monthly runs on the 15th and the last day of the month, with a cutoff three days before each run.'},
+  flsa:{name:'Overtime classification',kind:'Compliance rule in Rippling',owner:'Rippling',where:'Not editable',changed:'',desc:'Switching between hourly and salaried changes overtime eligibility and how pay is calculated.'},
+  equity:{name:'Equity plan rules',kind:'Company policy',owner:'Priya Shah (Finance)',where:'Settings › Equity',changed:'20 Jun 2026',desc:'Grants are added, not reduced. A decrease is flagged.'},
+  ladder:{name:'Job architecture',kind:'Company setup',owner:'Dana Okuneva (People)',where:'Settings › Job architecture',changed:'8 Aug 2026',desc:'Each level and department has a standard title.'},
+  identity:{name:'Identity and sign-in',kind:'Company setup',owner:'Raj Patel (IT)',where:'Settings › Apps › Identity',changed:'11 May 2026',desc:'Work email is the sign-in for Google Workspace, Slack and GitHub.'},
+  pto:{name:'Time off policies by country',kind:'Company policy',owner:'Dana Okuneva (People)',where:'Settings › Time off › Policies',changed:'1 Nov 2026',desc:'Each time off policy applies to one country.'},
+  drafts:{name:'Draft conflicts',kind:'Built into Rippling',owner:'Rippling',where:'Not editable',changed:'',desc:'Two drafts that change the same people and fields are flagged, so the second one shows a conflict.'},
+  approvals:{name:'Approval thresholds',kind:'Company policy',owner:'Priya Shah (Finance) and Dana Okuneva (People)',where:'Settings › Approvals',changed:'1 Oct 2026',desc:'Changes inside your limits apply without approval. Changes above them are routed to the owner named in the thresholds table.'},
+  fx:{name:'Exchange rates',kind:'Company setup',owner:'Priya Shah (Finance)',where:'Settings › Currencies',changed:'20 Nov 2026',desc:'1 USD = 1.37 CAD. Used whenever an amount is entered in a currency other than the employee\'s own.'}};
+const POL_APPLIES={bands:'Error and warning',merit:'Warning',org:'Error',entity:'Error',payroll:'Warning',flsa:'Warning',equity:'Warning',ladder:'Info',identity:'Info',pto:'Error',drafts:'Warning',approvals:'Approval',fx:'Conversion'};
+const THRESH=[['Base pay raise','8% or less, and inside the band','Priya Shah (Finance)'],['Base pay above the band maximum','Never: needs an exception','Priya Shah (Finance)'],['Pay type','Never','Priya Shah (Finance)'],['Target annual bonus','Never','Priya Shah (Finance)'],
+  ['One-time bonus','2,500 USD equivalent or less','Priya Shah (Finance)'],['Equity grant','Never','Priya Shah (Finance)'],['Level (promotion)','Never','Dana Okuneva (People)'],['Manager, department or work location','Never','Dana Okuneva (People)'],['Benefits class','Never','Dana Okuneva (People)'],['Work email','Never','Raj Patel (IT)'],
+  ['Title, team, time off policy, laptop, device refresh date, cost center, on-call rotation','Always','No approval']];
 const ISS={
-  band_max:{sev:'e',f:'compensation',label:'Above the band maximum',desc:'Compensation is above the hard maximum in comp policy for the new level.',fix:[['Cap at band maximum','capmax'],['Move to a new draft','move']]},
-  bad_number:{sev:'e',f:'compensation',label:'Not a valid amount',desc:'The value could not be read as an amount.',fix:[['Clear these values','clearcomp']]},
-  team_dept:{sev:'e',f:'team',label:"Team doesn't belong to the new department",desc:'Team ▾ is filtered by Department, so the old team is no longer valid.',fix:[["Use each department's first team",'fixteam']]},
-  cross_country:{sev:'e',f:'location',label:'Moves to another country',desc:'Toronto is a different legal entity. Cross-entity moves go through an international transfer, not a bulk edit.',fix:[['Move to a new draft','move']]},
-  mgr_cycle:{sev:'e',f:'manager',label:'Manager creates a reporting loop',desc:'The new manager reports up to this employee.',fix:[['Undo the manager change','clearmgr']]},
-  mgr_term:{sev:'e',f:'manager',label:'New manager has a scheduled termination',desc:'Approval chains would break on the termination date.',fix:[['Undo the manager change','clearmgr']]},
-  conflict:{sev:'w',f:null,label:"Also in Dana Okuneva's draft 'Q4 reorg'",desc:'Both drafts touch reporting lines. Whichever is submitted second shows a conflict diff.'},
-  raise15:{sev:'w',f:'compensation',label:'Raise above 15%',desc:'Valid, but unusual for an annual cycle. Finance sees these first.'},
-  above_mid:{sev:'w',f:'compensation',label:'Crosses the band midpoint',desc:'Moves from below the midpoint to above it. Valid; Finance approval covers these.'},
-  unit_switch:{sev:'w',f:'per',label:'Pay type changes (Hour ↔ Year)',desc:'Changes overtime eligibility and how payroll calculates pay. Shown annualised in the grid.'},
-  equity_down:{sev:'w',f:'equity',label:'Equity decreases',desc:'Share counts usually only go up. Check this is intended.'},
-  retro:{sev:'w',f:null,label:'Effective date is in a paid period',desc:'Payroll computes retro pay in the next run.'},
-  title_ladder:{sev:'i',f:'title',label:"Title doesn't follow the level ladder",desc:'Allowed. Some titles are intentionally off-ladder.',fix:[['Use the ladder title','laddertitle']]},
-  email_identity:{sev:'i',f:'email',label:'Work Email renames sign-in for every app',desc:'Google, Slack and GitHub accounts are renamed on the effective date.'}
+  band_max:{sev:'e',f:'compensation',pol:'bands',label:'Above the band maximum',desc:'Base pay is above the hard maximum for the new level.',how:'Cap it at the maximum, request an exception (Finance then approves the row), or change the level.',fix:[['Cap at band maximum','capmax'],['Request an exception','exception'],['Move to a new draft','move']]},
+  bad_number:{sev:'e',f:'compensation',pol:null,label:'Not a valid amount',desc:"The value couldn't be read as an amount.",how:'Type a number, for example 92500 or 92.5k.',fix:[['Clear these values','clearcomp']]},
+  team_dept:{sev:'e',f:'team',pol:'org',label:"Team doesn't belong to the new department",desc:'Team is filtered by Department, so the old team is no longer valid.',how:'Pick a team in the new department.',fix:[["Use each department's first team",'fixteam']]},
+  cross_country:{sev:'e',f:'location',pol:'entity',label:'Moves to another country',desc:'A move to another country is an international transfer, not a bulk edit.',how:'Remove these people from this change and start an international transfer.',fix:[['Move to a new draft','move']]},
+  mgr_cycle:{sev:'e',f:'manager',pol:'org',label:'Manager creates a reporting loop',desc:'The new manager reports up to this employee.',how:'Pick a manager outside this person\'s reporting line.',fix:[['Undo the manager change','clearmgr']]},
+  mgr_term:{sev:'e',f:'manager',pol:'org',label:'New manager has a scheduled termination',desc:'Approval chains would break on the termination date.',how:'Pick a manager who is staying.',fix:[['Undo the manager change','clearmgr']]},
+  pto_country:{sev:'e',f:'timeOff',pol:'pto',label:"Time off policy doesn't match the work location's country",desc:'Each time off policy applies to one country.',how:"Pick a policy for the person's country.",fix:[["Use each person's current policy",'ptokeep']]},
+  conflict:{sev:'w',f:null,pol:'drafts',label:"Also in Dana Okuneva's draft 'Q4 reorg'",desc:'Both drafts change reporting lines. Whichever is submitted second shows a conflict.',how:'Agree with Dana which draft owns these people, or remove them from one.'},
+  band_exc:{sev:'w',f:'compensation',pol:'bands',label:'Band exception requested',desc:'Above the band maximum. Finance must approve these rows.',how:'No action needed. Finance sees these rows first.'},
+  raise15:{sev:'w',f:'compensation',pol:'merit',label:'Raise above 15%',desc:'Valid, but unusual for an annual cycle. Finance sees these first.',how:'Acknowledge it if intended, or lower the raise.'},
+  above_mid:{sev:'w',f:'compensation',pol:'bands',label:'Crosses the band midpoint',desc:'Moves from below the midpoint to above it.',how:'Acknowledge it if intended.'},
+  unit_switch:{sev:'w',f:'per',pol:'flsa',label:'Pay type changes (Hourly ↔ Salaried)',desc:'Changes overtime eligibility and how payroll calculates pay.',how:'Acknowledge it if intended. Base pay is shown annualised in the grid.'},
+  equity_down:{sev:'w',f:'equity',pol:'equity',label:'Equity decreases',desc:'Share counts usually only go up.',how:'Acknowledge it if intended, or restore the current number.'},
+  retro:{sev:'w',f:null,pol:'payroll',label:'Effective date is in a paid period',desc:'Payroll computes retro pay in the next run.',how:'Acknowledge it, or move the effective date on Details.'},
+  title_ladder:{sev:'i',f:'title',pol:'ladder',label:"Title doesn't follow the level ladder",desc:'Allowed. Some titles are intentionally off-ladder.',how:'Use the standard title if you meant to.',fix:[['Use the ladder title','laddertitle']]},
+  email_identity:{sev:'i',f:'email',pol:'identity',label:'Work email renames sign-in for every app',desc:'Google Workspace, Slack and GitHub accounts are renamed on the effective date.',how:'No action needed. Raj Patel (IT) approves these rows.'}
 };
+const deptOfTeam=t=>Object.keys(TEAMS).find(dp=>TEAMS[dp].includes(t))||'another department';
+function whyIssue(k,d,e){const N=f=>nv(d,e,f);const cu=curOf(e);const b=()=>band(e,N('level'),N('per'),N('department'),N('location'));const hr=N('per')==='Hourly'?' per hour':'';
+  switch(k){case'band_max':return`New base pay ${fmtVal(e,'compensation',N('compensation'))} is above the ${N('level')} ${N('department')} maximum of ${cu}${fmtN(b().max)}${hr}.`;
+    case'band_exc':return`New base pay ${fmtVal(e,'compensation',N('compensation'))} is above the maximum of ${cu}${fmtN(b().max)}${hr}. You requested an exception, so Finance must approve it.`;
+    case'above_mid':return`Moves from ${fmtVal(e,'compensation',e.compensation)} to ${fmtVal(e,'compensation',N('compensation'))}, past the midpoint of ${cu}${fmtN(b().mid)}${hr}.`;
+    case'raise15':{const p=(+N('compensation')-e.compensation)/e.compensation*100;return`A raise of ${p.toFixed(1)}%. The guideline flags anything above 15%.`}
+    case'bad_number':return`"${val(d,e,'compensation')}" isn't an amount.`;
+    case'team_dept':return`Team "${N('team')}" belongs to ${deptOfTeam(N('team'))}, not ${N('department')}.`;
+    case'cross_country':return`${e.location} (${LOC[e.location].country}) to ${N('location')} (${LOC[N('location')].country}) changes legal entity.`;
+    case'mgr_cycle':return`${EMPI[N('manager')]?.name} reports up to ${e.name}, so the reporting line would loop.`;
+    case'mgr_term':return`${EMPI[N('manager')]?.name} has a scheduled termination.`;
+    case'pto_country':return`"${N('timeOff')}" is a ${ptoCountry(N('timeOff'))==='CA'?'Canadian':'US'} policy, but ${e.name} works in ${N('location')}.`;
+    case'conflict':return`${e.name} is also in BC-2037 (Dana Okuneva), which changes reporting lines.`;
+    case'unit_switch':return`${e.per} to ${N('per')} changes overtime eligibility.`;
+    case'equity_down':return`${fmtN(e.equity)} to ${fmtN(+N('equity'))} shares.`;
+    case'retro':return`Effective ${fmtD(d.date)} is in a pay period that has already been paid.`;
+    case'title_ladder':return`The standard title for ${N('level')} in ${N('department')} is "${ladder(N('department'),N('level'))}".`;
+    case'email_identity':return`Sign-in changes from ${e.email} to ${N('email')} in every connected app.`}return''}
+const APPROVERS={finance:{who:'Priya Shah',role:'Head of Finance',short:'Finance'},hrbp:{who:'Dana Okuneva',role:'Director, People',short:'People'},it:{who:'Raj Patel',role:'Director, IT',short:'IT'}};
+const SELF_LIMIT={raisePct:8,bonusUSD:2500};
+function rowApprovals(d,e){const out=[];const ch=f=>changed(d,e,f);const add=(k,w)=>{const x=out.find(y=>y.k===k);if(x)x.why.push(w);else out.push({k,why:[w]})};
+  if(ch('compensation')&&nv(d,e,'per')===e.per){const p=(+nv(d,e,'compensation')-e.compensation)/e.compensation*100;if(p>SELF_LIMIT.raisePct)add('finance',`raise of ${p.toFixed(1)}% is above your ${SELF_LIMIT.raisePct}% limit`)}
+  if(d.exceptions&&d.exceptions.has(e.id)&&ch('compensation'))add('finance','band exception');
+  if(ch('per'))add('finance','pay type change');if(ch('bonus'))add('finance','target bonus change');
+  if(ch('spotBonus')){const u=usd(e,+nv(d,e,'spotBonus'));if(u>SELF_LIMIT.bonusUSD)add('finance',`one-time bonus of ${fmtN(u)} USD equivalent is above the ${fmtN(SELF_LIMIT.bonusUSD)} USD limit`)}
+  if(ch('equity'))add('finance','equity grant');if(ch('level'))add('hrbp','promotion');if(ch('manager')||ch('department')||ch('location'))add('hrbp','reporting line or location change');if(ch('benefits'))add('hrbp','benefits class change');if(ch('email'))add('it','work email rename');
+  return out}
 const ISS_ORDER=Object.keys(ISS);
 function rowIssues(d,e){const out=[];const has=f=>d.fields.includes(f);const ch=f=>changed(d,e,f);if(!d.fields.some(ch))return out;
   if(ch('compensation')){const v=+val(d,e,'compensation');if(!(v>0))out.push('bad_number');else{const per=nv(d,e,'per');const b=band(e,nv(d,e,'level'),per,nv(d,e,'department'),nv(d,e,'location'));
-    if(v>b.max)out.push('band_max');else if(v>b.mid&&e.compensation<=band(e,e.level,e.per).mid)out.push('above_mid');if(per===e.per&&(v-e.compensation)/e.compensation>.15)out.push('raise15')}}
+    if(v>b.max)out.push(d.exceptions&&d.exceptions.has(e.id)?'band_exc':'band_max');else if(v>b.mid&&e.compensation<=band(e,e.level,e.per).mid)out.push('above_mid');if(per===e.per&&(v-e.compensation)/e.compensation>.15)out.push('raise15')}}
   if(ch('per'))out.push('unit_switch');
   if((ch('department')||ch('team'))&&has('department')){const dp=nv(d,e,'department'),t=nv(d,e,'team');if(!TEAMS[dp].includes(t))out.push('team_dept')}
   if(ch('location')&&LOC[nv(d,e,'location')].country!==LOC[e.location].country)out.push('cross_country');
   if(ch('manager')){const m=nv(d,e,'manager');if(m===e.id||under(EMPI[m],e.id))out.push('mgr_cycle');else if(EMPI[m]?.status==='Scheduled termination')out.push('mgr_term')}
+  if(ch('timeOff')){const pc=ptoCountry(nv(d,e,'timeOff'));if(pc&&pc!==LOC[nv(d,e,'location')].country)out.push('pto_country')}
   if(ch('equity')&&+nv(d,e,'equity')<e.equity)out.push('equity_down');
   if((ch('title')||ch('level'))&&nv(d,e,'title')!==ladder(nv(d,e,'department'),nv(d,e,'level')))out.push('title_ladder');
   if(ch('email'))out.push('email_identity');
@@ -336,39 +441,39 @@ function rowIssues(d,e){const out=[];const has=f=>d.fields.includes(f);const ch=
   if(CONFLICT.has(e.id)&&(has('manager')||has('department')||has('team')))out.push('conflict');
   return out}
 let A_CACHE=null;
-function analyze(d){if(A_CACHE&&A_CACHE.d===d)return A_CACHE;const rows=rowsOf(d);const rowIss=new Map(),issues={},rowChanged=new Set();let changes=0;
-  for(const e of rows){let c=0;for(const f of d.fields)if(changed(d,e,f))c++;if(c){rowChanged.add(e.id);changes+=c}
+function analyze(d){if(A_CACHE&&A_CACHE.d===d)return A_CACHE;const rows=rowsOf(d);const rowIss=new Map(),issues={},rowChanged=new Set(),rowAppr=new Map(),apCount={finance:0,hrbp:0,it:0};let changes=0;
+  for(const e of rows){let c=0;for(const f of d.fields)if(changed(d,e,f))c++;if(c){rowChanged.add(e.id);changes+=c;const ap=rowApprovals(d,e);if(ap.length){rowAppr.set(e.id,ap);ap.forEach(x=>apCount[x.k]++)}}
     const iss=rowIssues(d,e);if(iss.length){rowIss.set(e.id,iss);iss.forEach(k=>(issues[k]=issues[k]||[]).push(e.id))}}
-  let err=0,warn=0,info=0;for(const k in issues){const s=ISS[k].sev;if(s==='e')err+=issues[k].length;else if(s==='w')warn+=issues[k].length;else info+=issues[k].length}
-  A_CACHE={d,rows,rowIss,issues,rowChanged,changes,err,warn,info};return A_CACHE}
+  let err=0,warn=0,info=0;for(const k in issues){const s2=ISS[k].sev;if(s2==='e')err+=issues[k].length;else if(s2==='w')warn+=issues[k].length;else info+=issues[k].length}
+  A_CACHE={d,rows,rowIss,issues,rowChanged,changes,err,warn,info,rowAppr,apCount,needAppr:rowAppr.size,noAppr:rowChanged.size-rowAppr.size};return A_CACHE}
 const dirty=()=>{A_CACHE=null;SEGC.clear()};
 
 /* ================= impact ================= */
 function impact(d){const A=analyze(d);const R=A.rows.filter(e=>A.rowChanged.has(e.id));const ch=(e,f)=>changed(d,e,f);const N=(e,f)=>nv(d,e,f);
   const I={people:R.length};
-  I.pay=R.filter(e=>ch(e,'compensation')||ch(e,'per')||ch(e,'bonus')).length;
+  I.pay=R.filter(e=>ch(e,'compensation')||ch(e,'per')||ch(e,'bonus')||ch(e,'spotBonus')).length;
   I.tax=R.filter(e=>ch(e,'location')&&LOC[N(e,'location')].state!==LOC[e.location].state).length;
-  let delta=0,base=0;A.rows.forEach(e=>{base+=annual(e.compensation,e.per)});R.forEach(e=>{if(ch(e,'compensation')||ch(e,'per'))delta+=annual(+N(e,'compensation'),N(e,'per'))-annual(e.compensation,e.per)});
-  I.delta=delta;I.base=base;
-  I.benSal=R.filter(e=>(ch(e,'compensation')||ch(e,'per'))&&N(e,'per')==='Year').length;
+  let delta=0,base=0,spot=0;A.rows.forEach(e=>{base+=usd(e,annual(e.compensation,e.per))});
+  R.forEach(e=>{if(ch(e,'compensation')||ch(e,'per'))delta+=usd(e,annual(+N(e,'compensation'),N(e,'per')))-usd(e,annual(e.compensation,e.per));if(ch(e,'spotBonus'))spot+=usd(e,+N(e,'spotBonus'))});
+  I.delta=delta;I.base=base;I.spot=spot;I.spotN=R.filter(e=>ch(e,'spotBonus')).length;I.cad=R.filter(e=>curCode(e)==='CAD'&&d.fields.some(f=>MONEY.has(f)&&ch(e,f))).length;
+  I.benSal=R.filter(e=>(ch(e,'compensation')||ch(e,'per'))&&N(e,'per')==='Salaried').length;
   I.benLoc=R.filter(e=>ch(e,'location')&&LOC[N(e,'location')].state!==LOC[e.location].state).length;
-  I.benClass=R.filter(e=>ch(e,'per')).length;I.pto=I.benLoc;I.ot=R.filter(e=>ch(e,'per')).length;I.dev=R.filter(e=>ch(e,'department')).length;
-  I.wf=R.filter(e=>ch(e,'manager')).length;I.wfAppr=R.filter(e=>ch(e,'manager')).reduce((s,e)=>s+(parseInt(e.id.slice(1))%3),0);
+  I.benClass=R.filter(e=>ch(e,'per')).length;I.benCls=R.filter(e=>ch(e,'benefits')).length;
+  I.pto=I.benLoc;I.ot=R.filter(e=>ch(e,'per')).length;I.ptoPol=R.filter(e=>ch(e,'timeOff')).length;
+  I.devPol=R.filter(e=>ch(e,'department')).length;I.laptops=R.filter(e=>ch(e,'laptop')).length;I.refreshN=R.filter(e=>ch(e,'refresh')).length;I.dev=I.devPol+I.laptops+I.refreshN;
+  I.wf=R.filter(e=>ch(e,'manager')).length;I.wfAppr=R.filter(e=>ch(e,'manager')).reduce((s2,e)=>s2+(parseInt(e.id.slice(1))%3),0);
   const cnt=pred=>R.filter(pred).length;const deptCh=e=>ch(e,'department')||ch(e,'team');
   I.apps={
-    slack:{name:'Slack',items:[[cnt(e=>ch(e,'title')),'profile title updates','Title → Slack profile title'],[cnt(e=>ch(e,'manager')),'manager field updates','Manager → Slack profile manager'],[cnt(e=>ch(e,'location')),'location and time zone updates','Work location → Slack time zone'],[cnt(e=>ch(e,'department')),'user-group moves','Department → Slack user groups'],[cnt(e=>ch(e,'email')),'sign-in email changes','Work Email → Slack account email']],
+    slack:{name:'Slack',items:[[cnt(e=>ch(e,'title')),'profile title updates','Title → Slack profile title'],[cnt(e=>ch(e,'manager')),'manager field updates','Manager → Slack profile manager'],[cnt(e=>ch(e,'location')),'location and time zone updates','Work location → Slack time zone'],[cnt(e=>ch(e,'department')),'user-group moves','Department → Slack user groups'],[cnt(e=>ch(e,'email')),'sign-in email changes','Work email → Slack account email'],[cnt(e=>ch(e,'oncall')),'on-call group changes','On-call rotation → Slack on-call group']],
       loss:cnt(e=>ch(e,'department')),lossTxt:n=>`${pl(n,'person','people')} will lose their old department channels`},
-    google:{name:'Google Workspace',items:[[cnt(e=>ch(e,'title')),'directory title updates','Title → Directory title'],[cnt(deptCh),'OU and group moves','Department, Team → Org unit and Groups'],[cnt(e=>ch(e,'manager')),'directory manager updates','Manager → Directory manager'],[cnt(e=>ch(e,'location')),'building and address updates','Work location → Directory building'],[cnt(e=>ch(e,'email')),'primary email renames','Work Email → Primary email (renames sign-in)']],
+    google:{name:'Google Workspace',items:[[cnt(e=>ch(e,'title')),'directory title updates','Title → Directory title'],[cnt(deptCh),'OU and group moves','Department, Team → Org unit and Groups'],[cnt(e=>ch(e,'manager')),'directory manager updates','Manager → Directory manager'],[cnt(e=>ch(e,'location')),'building and address updates','Work location → Directory building'],[cnt(e=>ch(e,'email')),'primary email renames','Work email → Primary email (renames sign-in)']],
       loss:cnt(deptCh),lossTxt:n=>`${pl(n,'person','people')} will lose their old department Groups`},
-    github:{name:'GitHub',items:[[cnt(e=>(ch(e,'team')||ch(e,'department'))&&['Engineering','Product'].includes(N(e,'department'))),'team membership changes','Team → GitHub team'],[cnt(e=>ch(e,'email')&&['Engineering','Product'].includes(e.department)),'SSO email updates','Work Email → SSO identity']],
-      loss:cnt(e=>ch(e,'department')&&['Engineering','Product'].includes(e.department)&&!['Engineering','Product'].includes(N(e,'department'))),lossTxt:n=>`${pl(n,'person','people')} will lose access to the GitHub organisation`}};
-  Object.values(I.apps).forEach(a=>{a.total=a.items.reduce((s,x)=>s+x[0],0)});I.losses=Object.values(I.apps).reduce((s,a)=>s+a.loss,0);
-  const ap=[];const anyF=fs=>R.some(e=>fs.some(f=>ch(e,f)));
-  if(anyF(['compensation','per','bonus','equity']))ap.push({who:'Priya Shah',role:'Head of Finance',what:'Compensation, Per, bonus and equity changes'});
-  if(anyF(['manager','location','department']))ap.push({who:'Dana Okuneva',role:'Director, People',what:'Manager, department and location changes'});
-  if(anyF(['email']))ap.push({who:'Raj Patel',role:'Director, IT',what:'Work Email renames'});
-  I.approvers=ap;return I}
-
+    github:{name:'GitHub',items:[[cnt(e=>(ch(e,'team')||ch(e,'department'))&&['Engineering','Product'].includes(N(e,'department'))),'team membership changes','Team → GitHub team'],[cnt(e=>ch(e,'email')&&['Engineering','Product'].includes(e.department)),'SSO email updates','Work email → SSO identity']],
+      loss:cnt(e=>ch(e,'department')&&['Engineering','Product'].includes(e.department)&&!['Engineering','Product'].includes(N(e,'department'))),lossTxt:n=>`${pl(n,'person','people')} will lose access to the GitHub organisation`},
+    pagerduty:{name:'PagerDuty',items:[[cnt(e=>ch(e,'oncall')),'schedule changes','On-call rotation → PagerDuty schedule']],loss:0,lossTxt:()=>''}};
+  Object.values(I.apps).forEach(a=>{a.total=a.items.reduce((s2,x)=>s2+x[0],0)});I.losses=Object.values(I.apps).reduce((s2,a)=>s2+a.loss,0);
+  const what={finance:'Raises above 8%, band exceptions, pay type, target bonus, one-time bonuses above 2,500 USD, equity',hrbp:'Promotions, reporting line, department, location and benefits class changes',it:'Work email renames'};
+  I.approvers=Object.entries(A.apCount).filter(([,n])=>n).map(([k,n])=>({k,...APPROVERS[k],n,what:what[k]}));return I}
 /* ================= shell ================= */
 const ICON={bulk:'<path d="M2 5l6-3 6 3-6 3z M2 8l6 3 6-3 M2 11l6 3 6-3" fill="none" stroke="currentColor" stroke-width="1.4"/>',
   segments:'<circle cx="6" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.4"/>',
@@ -392,7 +497,7 @@ function snavHtml(){const d=S.d;const locked=!!d.run;
 function render(){dirty();let h='';
   switch(S.route){case'bulk':h=bulkList();break;case'draft':h=draftPage();break;case'segments':h=segList();break;case'segment':h=segDetail();break;
     case'segedit':h=`<div class="crumbs"><button data-act="nav" data-k="segments">Segments</button><span>/</span><span>${S.se.segId?'Edit segment':'New '+(S.se.type==='static'?'static':'dynamic')+' segment'}</span></div>`+segEditor(S.se);break;
-    case'people':h=peoplePage();break;default:h=placeholder()}
+    case'people':h=peoplePage();break;case'settings':h=settingsPage();break;default:h=placeholder()}
   $('#app').innerHTML=h+`<p class="disclaimer">Concept prototype by Vrajesh Iyengar for a Rippling product case study. Metzhand, its people and all data are fictional. Not a Rippling product.</p>`;
   renderNav();renderSheet();renderOverlay();renderNotes();renderDemo();renderDrawer();renderHM();renderDD();afterRender()}
 function renderSheet(){const on=!!(S.se&&S.se.inSheet);$('#sheet').classList.toggle('on',on);$('#sheetbg').classList.toggle('on',on);
@@ -421,7 +526,7 @@ function renderSearch(){const q=S.gq.trim().toLowerCase();const el=$('#gres');if
 function bulkList(){const rows=[];const iso2=d=>d?iso(d):'';
   for(const d of [S.d,...S.parked].filter(Boolean)){const A=analyze(d);const st=d.run?(d.run.phase==='approval'?'Awaiting approval':d.run.phase==='scheduled'?'Scheduled':'Committed'):`Draft · ${STEPS.find(s=>s.k===lastStep(d)).t}`;
     rows.push({id:d.id,act:'resume',name:d.name||'Untitled change',sub:`${d.id} · You · edited today`,status:st,segs:[...new Set(d.who.groups.flatMap(g=>g.conds.filter(c=>c.f==='empid'&&c.op==='inseg'&&c.v[0]).map(c=>segName(c.v[0]))))].join(', ')||'Custom conditions',people:A.rows.length,fields:d.fields.map(f=>FIELDS[f].label).join(', '),eff:iso2(d.date)})}
-  if(S.followups)rows.push({id:'fu',name:`${(S.d&&S.d.name)||'FY26 annual review'} · follow-ups`,sub:'Rows moved out of the main change',status:'Draft',segs:'Named employees',people:S.followups,fields:'Compensation, Title, Level',eff:iso(NEXTP)});
+  if(S.followups)rows.push({id:'fu',name:`${(S.d&&S.d.name)||'FY26 annual review'} · follow-ups`,sub:'Rows moved out of the main change',status:'Draft',segs:'Named employees',people:S.followups,fields:'Base pay, Title, Level',eff:iso(NEXTP)});
   rows.push({id:'BC-2037',act:'q4',name:'Q4 reorg · Platform',sub:'BC-2037 · Dana Okuneva · edited 2 days ago',status:'Draft · Values',segs:'Engineering · US · L5 and above',people:EMP.filter(e=>CONFLICT.has(e.id)).length,fields:'Department, Team, Manager',eff:'2027-01-01'});
   rows.push({id:'BC-2019',name:'Austin office move',sub:'BC-2019 · You · completed',status:'Committed',segs:'Austin office movers · Q3',people:members('SEG-105').size,fields:'Work location, Manager',eff:'2026-09-22'});
   const badge=st=>st.startsWith('Draft')?`<span class="badge b-lock">${esc(st)}</span>`:st==='Committed'?`<span class="badge b-ok">${st}</span>`:st==='Scheduled'?`<span class="badge b-appr">${st}</span>`:`<span class="badge b-warn">${esc(st)}</span>`;
@@ -433,8 +538,14 @@ function lastStep(d){let k='setup';STEPS.forEach(s=>{if(d.visited.has(s.k)&&(s.k
 function peoplePage(){const cols=[{key:'name',label:'Name',type:'text',get:e=>e.name,render:e=>person(e)},{key:'id',label:'Employee ID',type:'text',get:e=>e.id},{key:'title',label:'Title',type:'text',get:e=>e.title},{key:'department',label:'Department',type:'pick',get:e=>e.department},
     {key:'location',label:'Work location',type:'pick',get:e=>e.location},{key:'level',label:'Level',type:'ord',get:e=>e.level},{key:'startDate',label:'Start date',type:'date',get:e=>e.startDate}];
   return`<div class="ph"><div><h1>People</h1><p>${fmtN(EMP.length)} employees at Metzhand. Open anyone to see the single-employee profile.</p></div></div>${dataTable('people',tsOf('people'),EMP,cols,{searchPh:'Search people',rowAttrs:e=>`data-act="profile" data-id="${e.id}"`})}`}
-function placeholder(){const n=(NAV.find(x=>x[0]===S.modName)||[0,'Module'])[1];return`<div class="ph"><div><h1>${esc(n)}</h1></div></div><div class="pcard"><div class="empty"><b>Not part of this prototype</b><span>Bulk change, Segments and People are built. ${esc(n)} reads the same employee record they change.</span><button class="btn2" data-act="nav" data-k="bulk">Go to Bulk change</button></div></div>`}
-
+function placeholder(){const n=(NAV.find(x=>x[0]===S.modName)||[0,'Module'])[1];return`<div class="ph"><div><h1>${esc(n)}</h1></div></div><div class="pcard"><div class="empty"><b>Not part of this prototype</b><span>Bulk change, Segments, People and Settings are built. ${esc(n)} reads the same employee record they change.</span><button class="btn2" data-act="nav" data-k="bulk">Go to Bulk change</button></div></div>`}
+function settingsPage(){const rows=Object.entries(POL).map(([k,p])=>({id:k,...p,applies:POL_APPLIES[k]}));
+  const cols=[{key:'name',label:'Rule',type:'text',get:r=>r.name,render:r=>`<b>${esc(r.name)}</b><br><small class="muted">${esc(r.desc)}</small>`,wrap:true},{key:'applies',label:'Shows up as',type:'pick',get:r=>r.applies},{key:'kind',label:'Type',type:'pick',get:r=>r.kind},
+    {key:'owner',label:'Owner',type:'pick',get:r=>r.owner,wrap:true},{key:'where',label:'Where it is set',type:'text',get:r=>r.where},{key:'changed',label:'Last changed',type:'date',get:r=>parseDateStr(r.changed)||''}];
+  return`<div class="crumbs"><span>Settings</span><span>/</span><span>Bulk change rules</span></div><div class="ph"><div><h1>Bulk change rules</h1><p>Every error, warning, approval and currency conversion in a bulk change comes from one of these. Owners change them where listed; rules built into Rippling can't be changed.</p></div></div>
+  ${dataTable('pol',tsOf('pol'),rows,cols,{searchPh:'Search rules',rowAttrs:r=>`data-act="policy" data-k="${r.id}"`})}
+  <div class="pcard"><h3>Approval thresholds</h3><div class="tw"><table class="t"><thead><tr><th>Change</th><th>No approval when</th><th>Otherwise approved by</th></tr></thead><tbody>${THRESH.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')}</tbody></table></div><p class="note">Set by Priya Shah (Finance) and Dana Okuneva (People) in Settings › Approvals. Limits apply to the person submitting the change: Sam Rivera, HR admin.</p></div>
+  <div class="pcard"><h3>Exchange rates</h3><div class="rows">${row('USD → CAD','1.37')}${row('Set by','Priya Shah (Finance), 20 Nov 2026')}</div></div>`}
 /* ================= draft (bulk change editor) ================= */
 function draftPage(){if(S.approver)return`<div class="crumbs"><button data-act="nav" data-k="bulk">Bulk change</button><span>/</span><span>${esc(S.d.name)}</span><span>/</span><span>Approval</span></div>`+approverView();
   return`<div class="crumbs"><button data-act="nav" data-k="bulk">Bulk change</button><span>/</span><span>${esc(S.d.name||'New bulk change')}</span></div>`+draftView()}
@@ -463,9 +574,9 @@ function setupView(d){const pi=d.date?payInfo(d.date):null;
 const TPL={blank:{f:[],m:{}},comp:{f:['compensation','title','level'],m:{}},reorg:{f:['department','team','manager'],m:{department:'same',team:'same',manager:'same'}},office:{f:['location','manager'],m:{location:'same'}}};
 
 /* ================= condition builder (shared) ================= */
-const groupsOf=ctx=>ctx==='d'?S.d.who.groups:S.se.groups;
+const groupsOf=ctx=>ctx==='d'?S.d.who.groups:ctx==='rule'?[S.rt.wg]:S.se.groups;
 function builder(ctx,groups){return groups.map((g,gi)=>{const m=g.mode||'all';const quant=['atleast','atmost','exactly'].includes(m);const lbl={all:'all',any:'any',atleast:'at least',atmost:'at most',exactly:'exactly'}[m];
-  return`<div class="grp"><div class="grp-h"><span>${gi===0?'Employees where':'Or employees where'}</span>${ddBtn(`bm:${ctx}:${gi}`,lbl,'','mini')}${quant?`<input class="nin" type="number" min="1" max="${Math.max(1,g.conds.length)}" data-in="bgn" data-ctx="${ctx}" data-g="${gi}" value="${g.n||1}" aria-label="How many conditions">`:''}<span>of these ${g.conds.length===1?'is':'are'} true</span>
+  return`<div class="grp ${g.ai?'aig':''}">${g.ai?`<div class="aiflag"><span class="badge b-ai">✦ Drafted by AI · review before continuing</span><button class="lnk" data-act="aiok" data-ctx="${ctx}" data-g="${gi}">Looks right</button></div>`:''}<div class="grp-h"><span>${gi===0?'Employees where':'Or employees where'}</span>${ddBtn(`bm:${ctx}:${gi}`,lbl,'','mini')}${quant?`<input class="nin" type="number" min="1" max="${Math.max(1,g.conds.length)}" data-in="bgn" data-ctx="${ctx}" data-g="${gi}" value="${g.n||1}" aria-label="How many conditions">`:''}<span>of these ${g.conds.length===1?'is':'are'} true</span>
     ${quant&&(g.n||1)>g.conds.length?`<span class="warn-t">This group has only ${pl(g.conds.length,'condition')}</span>`:''}${gi>0?`<button class="x" data-act="bdelgroup" data-ctx="${ctx}" data-g="${gi}" aria-label="Remove group" style="margin-left:auto">×</button>`:''}</div>
     ${g.conds.map((c,ci)=>condRow(ctx,c,gi,ci)).join('')||`<p class="sub" style="padding:6px 0">No conditions yet.</p>`}<div style="padding-top:8px"><button class="lnk" data-act="baddcond" data-ctx="${ctx}" data-g="${gi}">+ Add condition</button></div></div>`}).join('<div class="or">OR</div>')
   +(groups[0].conds.length?`<div><button class="lnk" data-act="baddgroup" data-ctx="${ctx}">+ Add condition group (OR)</button></div>`:'')}
@@ -481,7 +592,8 @@ function valueCtl(ctx,c,gi,ci,F){const v=c.v||[];const op=c.op,t=F.type;const k=
   if(t==='date'){if(op==='between')return`<span class="twov"><input class="box" type="date" data-in="bv" ${da} data-i="0" value="${esc(v[0]||'')}"><span>and</span><input class="box" type="date" data-in="bv" ${da} data-i="1" value="${esc(v[1]||'')}"></span>`;
     return`<span class="twov">${ddBtn('brel:'+k,v[0]?relLabel(v[0]):'','Choose')}${v[0]==='exact'?`<input class="box" type="date" data-in="bv" ${da} data-i="1" value="${esc(v[1]||'')}">`:''}</span>`}
   const typ=t==='num'?'number':'text';const inp=i=>`<input class="box" type="${typ}" data-in="bv" ${da} data-i="${i}" value="${esc(v[i]??'')}" placeholder="Value">`;
-  return TWO.has(op)?`<span class="twov">${inp(0)}<span>and</span>${inp(1)}</span>`:inp(0)}
+  const cur=F.money?ddBtn('bcur:'+k,c.cur||'USD','','mini'):'';
+  return TWO.has(op)?`<span class="twov">${inp(0)}<span>and</span>${inp(1)}${cur}</span>`:cur?`<span class="twov">${inp(0)}${cur}</span>`:inp(0)}
 function condPop(){return''}
 /* ================= bulk change: Segments step ================= */
 function segStepView(d){const w=d.who;const C=cohort(d);const n=C.list.length;if(n!==w.cnt){w.prev=w.cnt;w.cnt=n}
@@ -493,12 +605,31 @@ function segStepView(d){const w=d.who;const C=cohort(d);const n=C.list.length;if
   const qa=`<div class="qa">${ddBtn('ins','','Insert saved segment','btnlike')}<button class="btn2 icb" data-act="createseg">${PLUS} Create segment</button><button class="btn2" data-act="pasteids">Paste employee IDs</button></div>`;
   const paste=w.pasteOpen?`<div class="pastecard"><b style="font-size:13.5px">Paste employee IDs, work emails or names</b><span class="sub">Any mix, one per line or comma-separated. They're added as an "Employee ID is any of" group, so they join the people you already target.</span>
     <textarea class="ta" id="paste-ta" data-in="paste">${esc(w.paste)}</textarea><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sm" data-act="pasteadd">Add people</button><button class="txt" data-act="pastesample">Paste a sample list</button><button class="txt" data-act="pasteids">Cancel</button></div></div>`:'';
-  return`${card}${qa}${paste}<div class="sec">${builder('d',w.groups)}</div>`}
-function renderDrawer(){const el=$('#drawer'),bg=$('#drawerbg');const on=S.drawer==='target'&&S.route==='draft'&&S.step==='who'&&S.d&&!S.se;el.classList.toggle('on',!!on);bg.classList.toggle('on',!!on);if(!on){el.innerHTML='';return}
-  const d=S.d,w=d.who;const C=cohort(d);const n=C.list.length;
+  return`${card}${qa}${aiBar('d')}${paste}<div class="sec">${builder('d',w.groups)}</div>`}
+function renderDrawer(){const el=$('#drawer'),bg=$('#drawerbg');const t=S.drawer;let html='';
+  if(t==='target'&&S.route==='draft'&&S.step==='who'&&S.d&&!S.se)html=drawerTarget();
+  else if(t&&typeof t==='object'){if(t.type==='policy')html=drawerPolicy(t);else if(S.d&&S.route==='draft')html=t.type==='why'?drawerWhy(t):drawerIssue(t)}
+  el.classList.toggle('on',!!html);bg.classList.toggle('on',!!html);el.innerHTML=html}
+function polCard(k){const p=POL[k];if(!p)return'';return`<div class="polc"><div class="sec-h"><b>${esc(p.name)}</b><span class="badge b-lock">${esc(p.kind)}</span></div><span>${esc(p.desc)}</span>
+  <div class="rows">${row('Set by',esc(p.owner))}${row('Where',esc(p.where))}${p.changed?row('Last changed',esc(p.changed)):''}${row('Who can change it',p.owner==='Rippling'?'Nobody. It is built into Rippling.':esc(p.owner.replace(/ \\(.*?\\)/g,''))+' or another admin with that permission')}</div></div>`}
+function drawerWhy(t){const d=S.d;const e=EMPI[t.id];if(!e)return'';const A=analyze(d);const iss=(A.rowIss.get(e.id)||[]).filter(k=>ISS[k].f===t.f);const ap=A.rowAppr.get(e.id)||[];
+  return`<div class="drh"><div><b>Why this cell is flagged</b><div class="muted" style="font-size:13px">${esc(e.name)} · ${esc(FIELDS[t.f].label)}</div></div><button class="btn2 sm" data-act="drawerclose">Close X</button></div>
+  <div class="drb">${iss.map(k=>{const I=ISS[k];return`<div class="sec"><div class="sec-h"><span><span class="sev ${I.sev}">${I.sev==='i'?'i':'!'}</span> <b>${esc(I.label)}</b></span><span class="badge ${I.sev==='e'?'b-err':I.sev==='w'?'b-warn':'b-lock'}">${I.sev==='e'?"Error: can't be submitted":I.sev==='w'?'Warning: acknowledge to continue':'Info'}</span></div>
+    <div class="readback">${esc(whyIssue(k,d,e))}</div><b style="font-size:13px">How to resolve it</b><span style="font-size:13.5px">${esc(I.how||'')}</span>
+    <div class="qa">${(I.fix||[]).filter(x=>x[1]!=='move'||true).map(([l,fx])=>`<button class="btn2 sm" data-act="fixrow" data-issue="${k}" data-fix="${fx}" data-id="${e.id}">${esc(l)}</button>`).join('')}<span class="muted" style="font-size:13px">or edit the value in the grid.</span></div>
+    ${I.pol?`<b style="font-size:13px">Where this rule comes from</b>${polCard(I.pol)}`:''}</div>`}).join('<hr class="hr">')||'<p class="sub">Nothing is flagged on this cell any more.</p>'}
+    ${ap.length?`<hr class="hr"><div class="sec"><b>Approval for this row</b>${ap.map(x=>`<span style="font-size:13.5px">${esc(APPROVERS[x.k].who)} (${esc(APPROVERS[x.k].short)}): ${esc(x.why.join('; '))}</span>`).join('')}<button class="lnk" data-act="policy" data-k="approvals">See the approval thresholds</button></div>`:''}</div>`}
+function drawerIssue(t){const d=S.d;const I=ISS[t.k];if(!I)return'';const A=analyze(d);const ids=A.issues[t.k]||[];
+  return`<div class="drh"><div><b>${esc(I.label)}</b><div class="muted" style="font-size:13px">${pl(ids.length,'row')} · ${I.sev==='e'?'error':I.sev==='w'?'warning':'info'}</div></div><button class="btn2 sm" data-act="drawerclose">Close X</button></div>
+  <div class="drb"><span>${esc(I.desc)}</span><b style="font-size:13px">How to resolve it</b><span style="font-size:13.5px">${esc(I.how||'')}</span>${I.pol?`<b style="font-size:13px">Where this rule comes from</b>${polCard(I.pol)}`:''}
+    <b style="font-size:13px">The rows, and why each one is flagged</b><div class="tw"><table class="t">${ids.slice(0,25).map(id=>{const e=EMPI[id];return`<tr><td>${person(e,e.title)}</td><td><small>${esc(whyIssue(t.k,d,e))}</small></td></tr>`}).join('')}</table></div>${ids.length>25?`<p class="note">Showing 25 of ${fmtN(ids.length)}.</p>`:''}</div>`}
+function drawerPolicy(t){const k=t.k;return`<div class="drh"><div><b>${esc(POL[k].name)}</b><div class="muted" style="font-size:13px">${esc(POL[k].where)}</div></div><button class="btn2 sm" data-act="drawerclose">Close X</button></div>
+  <div class="drb">${polCard(k)}${k==='approvals'?`<div class="tw"><table class="t"><thead><tr><th>Change</th><th>No approval when</th><th>Otherwise</th></tr></thead><tbody>${THRESH.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`:''}
+  <button class="btn2 sm" data-act="nav" data-k="settings">Open all bulk change rules</button></div>`}
+function drawerTarget(){const d=S.d,w=d.who;const C=cohort(d);const n=C.list.length;
   const autoRow=(k,label,n2,o)=>`<div><span>${esc(label)}: <b class="num">${fmtN(n2)}</b> · ${o?'included':'excluded'}</span><button class="lnk" data-act="autotg" data-k="${k}">${o?'Exclude':'Include'}</button></div>`;
   const samp=spread(C.list,8).map(e=>`<tr><td>${person(e,e.title)}</td><td><span class="badge b-lock">${esc(C.why.get(e.id))}</span></td></tr>`).join('');
-  el.innerHTML=`<div class="drh"><div><b>Targeting breakdown</b><div class="muted" style="font-size:13px">${pl(n,'person','people')} in ${esc(d.name||'this bulk change')}</div></div><button class="btn2 sm" data-act="drawerclose">Close X</button></div>
+  return`<div class="drh"><div><b>Targeting breakdown</b><div class="muted" style="font-size:13px">${pl(n,'person','people')} in ${esc(d.name||'this bulk change')}</div></div><button class="btn2 sm" data-act="drawerclose">Close X</button></div>
   <div class="drb"><div class="readback"><b>${fmtN(n)}</b> = ${esc(groupsTxt(w.groups)||'No conditions')}</div>
     <div class="sec"><span class="h3" style="font-size:13px">Always left out unless you include them</span><div class="auto">${autoRow('leave','On leave',C.auto.leave,w.incLeave)}${autoRow('term','Scheduled termination',C.auto.term,w.incTerm)}${autoRow('contract','Contractors',C.auto.contract,w.incContract)}</div></div>
     ${n?`<div class="sec"><span class="h3" style="font-size:13px">By department</span><div class="bars">${topN(C.list,'department').map(([k,c])=>bar(k,c,n)).join('')}</div></div>
@@ -620,7 +751,7 @@ function segEditor(se){const allCols=edColsAll(se);const base=edBase(se);const r
     ${se.type==='static'?`<div><span class="req">Source</span><span class="seg2"><button class="${se.source==='conditions'?'on':''}" data-act="sesrc" data-v="conditions" ${se.locked?'disabled':''}>Conditions</button><button class="${se.source==='csv'?'on':''}" data-act="sesrc" data-v="csv" ${se.locked?'disabled':''}>File upload</button></span></div>`:''}
     <span>${se.locked?'Type and source are fixed after the first save.':se.type==='dynamic'?'Computed from the rules each time the segment is used.':'Always the same employees, even when their attributes change later.'}</span></div></div>`;
   let def;
-  if(!isCsv)def=`<div class="pcard"><div class="sec-h"><h3 class="h3 req">Conditions</h3><span class="muted" style="font-size:13px">${se.type==='dynamic'?'Computed each time the segment is used, including when a bulk change is submitted.':'Evaluated once, when you save. After that the segment keeps exactly these employees.'}</span></div>${builder('se',se.groups)}</div>`;
+  if(!isCsv)def=`<div class="pcard"><div class="sec-h"><h3 class="h3 req">Conditions</h3><span class="muted" style="font-size:13px">${se.type==='dynamic'?'Computed each time the segment is used, including when a bulk change is submitted.':'Evaluated once, when you save. After that the segment keeps exactly these employees.'}</span></div>${aiBar('se')}${builder('se',se.groups)}</div>`;
   else if(!f)def=`<div class="pcard"><h3 class="req">File</h3><div class="drop"><b>Upload a CSV of employees</b><span class="sub">Any columns you like. One column must identify the employee: Employee ID, ID or Work Email.</span><input type="file" id="seg-file" accept=".csv,text/csv" aria-label="Choose CSV file">
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center"><button class="btn2 sm" data-act="sepaste">Paste CSV instead</button>${ddBtn('sample','','Use a sample file','btnlike sm')}</div></div>
     ${se.pasteOpen?`<textarea class="ta" id="se-paste" data-in="sepastetxt" placeholder="Employee ID,Promo flag,Notes">${esc(se.pasteText)}</textarea><div><button class="btn sm" data-act="sepasteload">Load pasted CSV</button></div>`:''}</div>`;
@@ -681,27 +812,30 @@ function renderHM(){const el=$('#pop');if(!S.hm||!MT[S.hm.t]){el.innerHTML='';re
 /* ================= fields, values, validation, impact, status, approver ================= */
 function whatView(d){const q=S.whatQ.toLowerCase();const sel=new Set(d.fields);const auto={team:sel.has('department'),compensation:sel.has('per')};
   const frow=k=>{const F=FIELDS[k];if(q&&!F.label.toLowerCase().includes(q))return'';const on=sel.has(k);const lk=auto[k]&&on;
-    let fx=(F.approval?'<span class="badge b-appr">Needs approval</span>':'')+(F.identity?'<span class="badge b-id">Identity field</span>':'');
+    let fx=(F.approval?'<span class="badge b-appr">Can need approval</span>':'')+(F.identity?'<span class="badge b-id">Identity field</span>':'')+(MONEY.has(k)?'<span class="badge b-lock">USD or CAD</span>':'');
     if(on){fx+=` <span class="mode" role="group" aria-label="Value mode"><button class="${d.modes[k]==='same'?'on':''}" data-act="mode" data-f="${k}" data-m="same">Same for all</button><button class="${d.modes[k]!=='same'?'on':''}" data-act="mode" data-f="${k}" data-m="diff">Different per person</button></span>`;
-      if(lk)fx+=`<span class="note">${k==='team'?'Added because Department changes. Team ▾ is filtered by Department.':'Added because Per changes. The rate has to be re-entered in the new unit.'}</span>`}
+      if(lk)fx+=`<span class="note">${k==='team'?'Added because Department changes. Team is filtered by Department.':'Added because Pay type changes. Base pay has to be re-entered in the new unit.'}</span>`}
     return`<label class="frow ${on?'on':''}"><input type="checkbox" data-act="field" data-f="${k}" ${on?'checked':''} ${lk?'disabled':''}><span>${esc(F.label)}</span><span class="fx">${fx}</span></label>`};
-  const emp=['title','department','team','compensation','per','bonus','equity','email','manager','location'].map(frow).join(''),add=['level','rating','costCenter'].map(frow).join('');
-  const sugg=[];if(sel.has('level')){if(!sel.has('title'))sugg.push(['title','Title']);if(!sel.has('compensation'))sugg.push(['compensation','Compensation'])}
-  if((sel.has('department')||sel.has('location'))&&!sel.has('manager'))sugg.push(['manager','Manager']);
+  const groups=FGROUPS.map(([g,label,sys])=>{const rows=Object.keys(FIELDS).filter(k=>FIELDS[k].grp===g).map(frow).join('');return rows?`<div class="fgrp"><div class="fgrp-h">${esc(label)}<span class="muted" style="font-weight:400">${esc(sys)}</span></div>${rows}</div>`:''}).join('');
+  const sugg=[];if(sel.has('level')){if(!sel.has('title'))sugg.push(['title','Title']);if(!sel.has('compensation'))sugg.push(['compensation','Base pay'])}
+  if((sel.has('department')||sel.has('location'))&&!sel.has('manager'))sugg.push(['manager','Manager']);if(sel.has('location')&&!sel.has('timeOff'))sugg.push(['timeOff','Time off policy']);if(sel.has('laptop')&&!sel.has('refresh'))sugg.push(['refresh','Device refresh date']);
   const lock='<svg width="11" height="12" viewBox="0 0 11 12" aria-hidden="true"><path d="M2.5 5V3.5a3 3 0 0 1 6 0V5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1" y="5" width="9" height="7" rx="1.5" fill="currentColor"/></svg>';
+  const conn=Object.entries(CF).filter(([,x])=>x.src).map(([k,x])=>`<div class="frow"><input type="checkbox" disabled aria-label="${esc(x.label)}"><span>${esc(x.label)}</span><span class="fx"><span class="badge b-lock">${lock} Read-only</span>${esc(CONN_NOTE[x.src])}. Use it to target people or in a rule.</span></div>`).join('');
   const pers=['Legal name','Date of birth','Home address','Phone number'].map(l=>`<div class="frow"><input type="checkbox" disabled aria-label="${l}"><span class="muted">${l}</span><span class="fx"><span class="badge b-lock">${lock} Locked</span> Needs the Personal information permission. Ask Dana Okuneva (People).</span></div>`).join('');
   return`<div class="sec"><div class="sec-h"><input class="in" id="what-q" data-in="whatq" value="${esc(S.whatQ)}" placeholder="Search fields, including custom ones" style="max-width:360px;border-bottom:1px solid var(--rule)"><span class="muted">${d.fields.length?'Selected: '+d.fields.map(f=>FIELDS[f].label).join(' · '):'Nothing selected yet'}</span></div>
+  <p class="sub"><b>Same for all</b> gives everyone one value, for example everyone moves to the Austin office. <b>Different per person</b> gives each row its own value, for example each person's raise.</p>
   ${sugg.length?`<div class="sugg"><span class="muted">Usually changed together:</span>${sugg.map(([k,l])=>`<button data-act="suggest" data-f="${k}">+ ${l}</button>`).join('')}</div>`:''}</div>
-  <div class="fgrp"><div class="fgrp-h">Employment Information<span class="muted" style="font-weight:400">Same fields as the profile</span></div>${emp}</div>
-  <div class="fgrp"><div class="fgrp-h">Additional Information<span class="muted" style="font-weight:400">Custom fields</span></div>${add}</div>
-  <div class="fgrp"><div class="fgrp-h">Personal Information</div>${pers}</div>
-  <p class="note">Not offered here: Direct Reports (reporting lines change through Manager), Documents, Integrated Apps (they update from these fields automatically) and Two Factor Devices.</p>`}
+  ${groups}<div class="fgrp"><div class="fgrp-h">Custom attributes from connectors<span class="muted" style="font-weight:400">Owned by the source system</span></div>${conn}</div>
+  <div class="fgrp"><div class="fgrp-h">Personal information</div>${pers}</div>
+  <p class="note">Not offered here: Direct reports (reporting lines change through Manager), Documents, Integrated apps (they update from these fields automatically) and Two-factor devices.</p>`}
 const RH=48;const G={items:[],cols:[],ncol:0,raf:0};
-function gridCols(d){const F=d.fields.slice().sort((a,b)=>FORDER.indexOf(a)-FORDER.indexOf(b));const cols=[];
-  if(!F.includes('department')&&!d.grid.group)cols.push({ctx:'department',label:'Department'});if(!F.includes('rating'))cols.push({ctx:'rating',label:'Rating'});
+function gridCols(d){const F=d.fields.slice().sort((a,b)=>FORDER.indexOf(a)-FORDER.indexOf(b));const cols=[{appr:true}];
+  if(!F.includes('department')&&!d.grid.group)cols.push({ctx:'department',label:'Department'});if(!F.includes('rating')&&F.some(f=>MONEY.has(f)||f==='level'))cols.push({ctx:'rating',label:'Rating'});
+  if(F.some(f=>MONEY.has(f)))cols.push({ctx:'cur',label:'Currency'});
   F.forEach(f=>{cols.push({f});if((f==='compensation'&&!F.includes('per'))||(f==='per'))if(F.includes('compensation'))cols.push({pct:true})});return cols}
 function gridItems(d){const A=analyze(d);const g=d.grid;let rows=A.rows;
   if(g.dept)rows=rows.filter(e=>e.department===g.dept);if(g.changed)rows=rows.filter(e=>A.rowChanged.has(e.id));if(g.issue)rows=rows.filter(e=>(A.rowIss.get(e.id)||[]).includes(g.issue));
+  if(g.appr==='need')rows=rows.filter(e=>A.rowAppr.has(e.id));else if(g.appr==='none')rows=rows.filter(e=>A.rowChanged.has(e.id)&&!A.rowAppr.has(e.id));
   if(!g.group)return rows.map(e=>({e}));const by={};rows.forEach(e=>(by[e.department]=by[e.department]||[]).push(e));const items=[];
   Object.keys(by).sort().forEach(dp=>{items.push({h:dp,n:by[dp].length,ch:by[dp].filter(e=>A.rowChanged.has(e.id)).length});if(!g.collapsed.has(dp))by[dp].forEach(e=>items.push({e}))});return items}
 function valuesView(d){const A=analyze(d);const g=d.grid;if(g.group===null)g.group=A.rows.length>300;
@@ -712,29 +846,35 @@ function valuesView(d){const A=analyze(d);const g=d.grid;if(g.group===null)g.gro
   const samebar=sameF.length?`<div class="samebar"><b>Same for everyone</b>${sameF.map(f=>`<label class="tg">${esc(FIELDS[f].label)} ${editorSame(d,f)}</label>`).join('')}</div>`:'';
   const rules=d.rules.length?`<div class="rules">${d.rules.map((r,i)=>{const n=A.rows.filter(e=>src(d,e,r.field)&&ruleHit(d,e,r.field)===r&&!(d.manual[e.id]&&r.field in d.manual[e.id])&&!(d.csv[e.id]&&r.field in d.csv[e.id])).length;
     return`<div class="rule ${r.ai&&!r.accepted?'ai':''}"><b>Rule ${i+1}</b><span>${ruleTxt(r)}</span><span class="muted num">· ${pl(n,'row')}</span>${r.ai&&!r.accepted?`<span class="badge b-ai">✦ AI-drafted · not accepted</span><button class="btn sm" data-act="acceptai" data-i="${i}">Accept ${fmtN(n)} cells</button>`:''}<button class="txt" data-act="rmrule" data-i="${i}">Remove</button></div>`}).join('')}</div>`:'';
-  const head1=`<tr><th class="c-emp" rowspan="2">Employee</th>${G.cols.map(c=>c.f?`<th class="grp-th" colspan="2">${esc(FIELDS[c.f].label)}${FIELDS[c.f].approval?' <span class="badge b-appr">Approval</span>':''}</th>`:c.pct?`<th rowspan="2">% change</th>`:`<th rowspan="2" class="c-ctx">${esc(c.label)}</th>`).join('')}</tr>`;
+  const head1=`<tr><th class="c-emp" rowspan="2">Employee</th>${G.cols.map(c=>c.appr?`<th rowspan="2">Approval</th>`:c.f?`<th class="grp-th" colspan="2">${esc(FIELDS[c.f].label)}${FIELDS[c.f].approval?' <span class="badge b-appr">Approval</span>':''}</th>`:c.pct?`<th rowspan="2">% change</th>`:`<th rowspan="2" class="c-ctx">${esc(c.label)}</th>`).join('')}</tr>`;
   const head2=`<tr>${G.cols.filter(c=>c.f).map(()=>`<th style="border-left:1px solid var(--rule)">Current</th><th>New</th>`).join('')}</tr>`;
   return`<div class="toolbar">${tb('set','Set value')}${tb('rule','Apply rule',!ruleOk)}${tb('template','Download template')}${tb('upload','Upload CSV')}${tb('ai','✦ Describe a change')}<span class="sp"></span>
     <select class="sel" data-in="gdept" aria-label="Filter by department"><option value="">All departments</option>${DEPTS.map(x=>`<option ${g.dept===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
     <label class="tg"><input type="checkbox" data-act="gchanged" ${g.changed?'checked':''}> Show changed only</label><label class="tg"><input type="checkbox" data-act="ggroup" ${g.group?'checked':''}> Group by department</label></div>
   ${toolPanel(d,diffF)}${rules}${samebar}
+  <div class="apbar"><span><b>${fmtN(A.noAppr)}</b> ${A.noAppr===1?'person is':'people are'} inside your limits and need no approval · <b>${fmtN(A.needAppr)}</b> need approval${A.needAppr?` (${Object.entries(A.apCount).filter(([,n])=>n).map(([k,n])=>`${APPROVERS[k].short} ${fmtN(n)}`).join(', ')})`:''}</span>
+    <span class="seg2">${[['','All rows'],['need','Needs approval'],['none','No approval']].map(([k,l])=>`<button class="${(g.appr||'')===k?'on':''}" data-act="gappr" data-k="${k}">${l}</button>`).join('')}</span><button class="lnk" data-act="policy" data-k="approvals">Approval thresholds</button></div>
   ${g.issue?`<div class="issuebar"><span class="sev ${ISS[g.issue].sev}">!</span>Showing only: <b>${esc(ISS[g.issue].label)}</b> (${fmtN((A.issues[g.issue]||[]).length)})<button class="lnk" data-act="clearissue">Show all rows</button></div>`:''}
   <div class="gwrap" id="gwrap"><table class="g"><thead class="two2">${head1}${head2}</thead><tbody id="gbody"></tbody></table></div>
   <div class="legend"><span>Empty cell = no change (grey text is today's value)</span><span><i style="background:var(--chg);border:1px solid #D6E0FB"></i>Changed</span><span><i style="background:var(--err)"></i>Error</span><span><i style="background:#E0A43A"></i>Warning</span><span>✦ AI-drafted, needs accepting</span><span>↑ From your last upload</span><span class="num">${fmtN(G.items.filter(x=>x.e).length)} rows in view</span></div>`}
-function ruleTxt(r){const w=r.where&&r.where.v.length?` where ${CF[r.where.f]?.label||FIELDS[r.where.f]?.label||r.where.f} is ${r.where.v.join(', ')}`:' for everyone';
-  return r.field==='bonus'?`Target annual bonus = ${r.pct}% of new salary${w}`:`Compensation +${r.pct}%${w}${r.cap?`, capped at band ${r.cap==='max'?'maximum':'midpoint'}`:''}`}
+function ruleTxt(r){const F=FIELDS[r.field].label;const w=r.where&&complete(r.where)?` where ${condTxt(r.where)}`:' for everyone';const k=r.kind||'pct';const cap=r.cap?`, capped at band ${r.cap==='max'?'maximum':'midpoint'}`:'';
+  if(r.field==='compensation')return k==='pct'?`${F} +${r.pct}%${w}${cap}`:k==='add'?`${F} + ${fmtN(r.amt)} ${r.cur} a year, in each person's currency${w}${cap}`:`${F} = ${fmtN(r.amt)} ${r.cur} a year, in each person's currency${w}`;
+  return k==='pct'?`${F} = ${r.pct}% of base pay${w}`:`${F} = ${fmtN(r.amt)} ${r.cur}, in each person's currency${w}`}
+const RKINDS={compensation:[['pct','Raise by a percentage'],['add','Raise by a fixed amount'],['set','Set to a fixed amount']],bonus:[['pct','Set to % of base pay'],['set','Set to a fixed amount']],spotBonus:[['set','Set to a fixed amount'],['pct','Set to % of base pay']]};
+function rtInit(d){const f=['compensation','bonus','spotBonus'].find(x=>d.fields.includes(x))||'compensation';S.rt={field:f,kind:RKINDS[f][0][0],val:f==='compensation'?'6':'1000',cur:'USD',cap:'max',wg:{mode:'all',conds:[{f:'rating',op:'anyof',v:['Exceeds']}]}}}
 function toolPanel(d,diffF){const g=d.grid;
-  if(g.tool==='set'){const f=S.setF&&diffF.includes(S.setF)?S.setF:diffF[0];if(!f)return`<div class="tool">Every field is set to "Same for all". Use the bar below.</div>`;S.setF=f;
-    return`<div class="tool"><span>Set</span><select class="sel" data-in="setf">${diffF.map(x=>`<option value="${x}" ${x===f?'selected':''}>${esc(FIELDS[x].label)}</option>`).join('')}</select><span>to</span>${valueInput(f,'setv')}<span>for the <b class="num">${fmtN(G.items.filter(x=>x.e).length)}</b> rows in view</span><button class="btn sm" data-act="applyset">Apply</button><span class="note">Narrow the rows first with the department filter or "Show changed only".</span></div>`}
-  if(g.tool==='rule'){const tf=d.fields.includes('compensation')?'compensation':'bonus';
-    return`<div class="tool"><select class="sel" id="r-f">${['compensation','bonus'].filter(x=>d.fields.includes(x)).map(x=>`<option value="${x}" ${x===tf?'selected':''}>${x==='bonus'?'Set Target annual bonus to':'Raise Compensation by'}</option>`).join('')}</select>
-      <input class="in" id="r-pct" value="${tf==='bonus'?10:6}" inputmode="decimal" aria-label="Percent" style="max-width:60px">%<span>(bonus: of new salary)</span><span>where</span>
-      <select class="sel" id="r-wf"><option value="rating">Performance rating</option><option value="level">Level</option><option value="department">Department</option><option value="location">Work location</option></select><span>is</span>
-      <input class="in" id="r-wv" list="dl-rv" value="Exceeds" aria-label="Value" style="max-width:150px"><datalist id="dl-rv">${[...RATINGS,...LEVELS,...DEPTS,...LOCS].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
-      <span>cap at</span><select class="sel" id="r-cap"><option value="max">band maximum</option><option value="mid">band midpoint</option><option value="">no cap</option></select><button class="btn sm" data-act="addrule">Add rule</button>
-      <span class="note">Rules write visible values into the grid. You can still edit any cell; your edit wins.</span></div>`}
+  if(g.tool==='set'){const f=S.setF&&diffF.includes(S.setF)?S.setF:diffF[0];if(!f)return`<div class="tool">Every field is set to "Same for all". Use the bar below.</div>`;S.setF=f;const F=FIELDS[f];
+    const vin=F.type==='select'||F.type==='team'?`<span style="min-width:200px">${ddBtn('setv',S.setV||'','Choose a value')}</span>`:F.type==='person'?`<input class="box" id="setv" list="dl-mgr" placeholder="Type a manager's name" style="max-width:240px">`:F.type==='date'?`<input class="box" id="setv" type="date">`:`<input class="box" id="setv" ${F.type!=='text'?'inputmode="decimal"':''} style="max-width:160px">`;
+    return`<div class="tool"><span>Set</span><span style="min-width:180px">${ddBtn('setf',F.label,'Field')}</span><span>to</span>${vin}${MONEY.has(f)?ddBtn('setcur',S.setCur&&S.setCur!=='local'?S.setCur:"Each person's currency",'','mini'):''}<span>for the <b class="num">${fmtN(G.items.filter(x=>x.e).length)}</b> rows in view</span><button class="btn sm" data-act="applyset">Apply</button>
+      ${MONEY.has(f)?`<span class="note">An amount in USD or CAD is converted for each person at ${esc(FX_NOTE)}.</span>`:`<span class="note">Narrow the rows first with the department filter or "Show changed only".</span>`}</div>`}
+  if(g.tool==='rule'){if(!S.rt||!d.fields.includes(S.rt.field))rtInit(d);const R=S.rt;const kinds=RKINDS[R.field];const kl=(kinds.find(x=>x[0]===R.kind)||kinds[0])[1];const amt=R.kind!=='pct';
+    return`<div class="tool rtool"><span>For</span><span style="min-width:170px">${ddBtn('rtf',FIELDS[R.field].label,'Field')}</span><span style="min-width:200px">${ddBtn('rtk',kl,'')}</span>
+      <input class="box" data-in="rtv" value="${esc(R.val)}" inputmode="decimal" style="max-width:110px" aria-label="Amount">${amt?ddBtn('rtc',R.cur,'','mini'):'<span>%</span>'}<span>where</span>
+      <div class="rtw">${R.wg.conds.length?condRow('rule',R.wg.conds[0],0,0):`<span>everyone</span> <button class="lnk" data-act="rtaddw">add a condition</button>`}</div>
+      ${R.field==='compensation'&&R.kind!=='set'?`<span>cap at</span>${ddBtn('rtcap',{max:'band maximum',mid:'band midpoint','':'no cap'}[R.cap],'','mini')}`:''}<button class="btn sm" data-act="addrule">Add rule</button>
+      <span class="note">Rules write visible values into the grid. ${amt?'Fixed amounts are converted to each person\'s currency. ':''}You can still edit any cell; your edit wins.</span></div>`}
   if(g.tool==='ai')return`<div class="tool" style="flex-direction:column;align-items:stretch"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="badge b-ai">✦ Draft only</span><span class="note">Turns a sentence into a rule in this grid. Drafted cells stay marked until you accept them. It never submits.</span></div>
-      <textarea class="ta" id="ai-ta" style="min-height:64px;font-family:var(--font);font-size:14px" placeholder="Describe the change, for example: 6% raise for Engineering, capped at the band maximum">${esc(S.aiText||'')}</textarea>
+      <textarea class="ta" id="ai-ta" style="min-height:64px;font-family:var(--font);font-size:14px" placeholder="Describe the change, for example: 1,000 USD one-time bonus for the Platform team">${esc(S.aiText||'')}</textarea>
       <div><button class="btn sm" data-act="aigo">Draft into the grid</button></div></div>`;
   return''}
 function valueInput(f,id){const F=FIELDS[f];if(F.type==='select')return`<select class="sel" id="${id}">${F.opts().map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
@@ -742,9 +882,11 @@ function valueInput(f,id){const F=FIELDS[f];if(F.type==='select')return`<select 
   if(F.type==='person')return`<input class="in" id="${id}" list="dl-mgr" placeholder="Type a manager's name" style="max-width:240px">`;
   return`<input class="in" id="${id}" ${f==='title'?'list="dl-titles"':''} ${F.type!=='text'?'inputmode="decimal"':''} style="max-width:200px">`}
 function editorSame(d,f){const F=FIELDS[f];const v=d.same[f]??'';
-  if(F.type==='select'||F.type==='team'){const opts=F.type==='team'?(TEAMS[d.same.department]||ALLTEAMS):F.opts();return`<select class="sel" data-in="same" data-f="${f}"><option value="">Choose</option>${opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`}
-  if(F.type==='person')return`<input class="in" list="dl-mgr" data-in="same" data-f="${f}" value="${v&&EMPI[v]?esc(EMPI[v].name+' · '+v):''}" placeholder="Type a name" style="max-width:220px">`;
-  return`<input class="in" data-in="same" data-f="${f}" value="${esc(v)}" style="max-width:180px">`}
+  if(F.type==='select'||F.type==='team')return`<span style="min-width:200px;display:inline-block">${ddBtn('same:'+f,v,'Choose')}</span>`;
+  if(F.type==='person')return`<input class="box" list="dl-mgr" data-in="same" data-f="${f}" value="${v&&EMPI[v]?esc(EMPI[v].name+' · '+v):''}" placeholder="Type a name" style="max-width:220px">`;
+  if(F.type==='date')return`<input class="box" type="date" data-in="same" data-f="${f}" value="${esc(v)}">`;
+  if(MONEY.has(f))return`<span class="twov"><input class="box" data-in="same" data-f="${f}" value="${esc(v===''?'':fmtN(+v))}" style="max-width:140px" inputmode="decimal">${ddBtn('samecur:'+f,(d.sameCur||{})[f]||'USD','','mini')}</span><small class="muted">Each person gets the equivalent in their own currency.</small>`;
+  return`<input class="box" data-in="same" data-f="${f}" value="${esc(v)}" style="max-width:180px">`}
 function renderGridRows(){const wrap=$('#gwrap');if(!wrap||!S.d)return;const d=S.d;const A=analyze(d);const items=G.items;const h=wrap.clientHeight||560;
   const st=Math.max(0,Math.floor(wrap.scrollTop/RH)-6),en=Math.min(items.length,st+Math.ceil(h/RH)+14);
   let html=st?`<tr class="spacer"><td colspan="${G.ncol}" style="height:${st*RH}px"></td></tr>`:'';
@@ -752,17 +894,21 @@ function renderGridRows(){const wrap=$('#gwrap');if(!wrap||!S.d)return;const d=S
   if(items.length>en)html+=`<tr class="spacer"><td colspan="${G.ncol}" style="height:${(items.length-en)*RH}px"></td></tr>`;
   if(!items.length)html=`<tr><td colspan="${G.ncol}" style="padding:24px;text-align:center" class="muted">No rows match. Clear the filters above.</td></tr>`;
   $('#gbody').innerHTML=html}
-function rowHtml(d,e,iss){let h=`<tr><td class="c-emp"><button class="lnk" data-act="profile" data-id="${e.id}"><span class="av">${initials(e.name)}</span><span><b>${esc(e.name)}</b><small>${esc(e.title)}</small></span></button></td>`;
-  for(const c of G.cols){if(c.ctx){h+=`<td class="c-ctx">${esc(e[c.ctx])}</td>`;continue}if(c.pct){h+=pctCell(d,e);continue}
-    const f=c.f,s=src(d,e,f),chg=changed(d,e,f);const fi=iss.filter(k=>ISS[k].f===f);const sev=fi.find(k=>ISS[k].sev==='e')?'e':fi.find(k=>ISS[k].sev==='w')?'w':'';
-    const tip=fi.map(k=>ISS[k].label);if(f==='compensation'){const b=band(e,nv(d,e,'level'),nv(d,e,'per'),nv(d,e,'department'),nv(d,e,'location'));const cu=curOf(e);tip.push(`Band ${nv(d,e,'level')}: ${cu}${fmtN(b.min)} · ${cu}${fmtN(b.mid)} · ${cu}${fmtN(b.max)}${nv(d,e,'per')==='Hour'?' per hour':''}`)}
-    const cls=['c-new','f-'+f,chg?'chg':'',sev,s==='ai'?'ai':'',d.csvHits.has(e.id+'|'+f)?'up':''].join(' ');
-    h+=`<td class="c-cur">${esc(fmtVal(e,f,e[f]))}</td><td class="${cls}" title="${esc(tip.join('\n'))}">${editor(d,e,f)}</td>`}return h+'</tr>'}
+function rowHtml(d,e,iss){const A=analyze(d);let h=`<tr><td class="c-emp"><button class="lnk" data-act="profile" data-id="${e.id}"><span class="av">${initials(e.name)}</span><span><b>${esc(e.name)}</b><small>${esc(e.title)}</small></span></button></td>`;
+  for(const c of G.cols){if(c.appr){const ap=A.rowAppr.get(e.id);h+=`<td>${!A.rowChanged.has(e.id)?'':ap?`<span class="badge b-warn" title="${esc(ap.map(x=>APPROVERS[x.k].who+': '+x.why.join('; ')).join('\n'))}">${ap.map(x=>APPROVERS[x.k].short).join(' · ')}</span>`:'<span class="badge b-ok">No approval</span>'}</td>`;continue}
+    if(c.ctx){h+=`<td class="c-ctx">${esc(c.ctx==='cur'?curCode(e):e[c.ctx])}</td>`;continue}if(c.pct){h+=pctCell(d,e);continue}
+    const f=c.f,s2=src(d,e,f),chg=changed(d,e,f);const fi=iss.filter(k=>ISS[k].f===f);const sev=fi.find(k=>ISS[k].sev==='e')?'e':fi.find(k=>ISS[k].sev==='w')?'w':fi.length?'i':'';
+    const tip=fi.map(k=>`${ISS[k].label}: ${whyIssue(k,d,e)}`);
+    if(f==='compensation'){const b=band(e,nv(d,e,'level'),nv(d,e,'per'),nv(d,e,'department'),nv(d,e,'location'));const cu=curOf(e);tip.push(`Band ${nv(d,e,'level')}: ${cu}${fmtN(b.min)} · ${cu}${fmtN(b.mid)} · ${cu}${fmtN(b.max)}${nv(d,e,'per')==='Hourly'?' per hour':''}`)}
+    if(MONEY.has(f)&&chg){let from=null,amt=null;if(s2==='s'){from=(d.sameCur||{})[f]||'USD';amt=d.same[f]}else if(s2==='r'||s2==='ai'){const r=ruleHit(d,e,f);if(r&&r.kind&&r.kind!=='pct'){from=r.cur;amt=r.amt}}if(from&&from!==curCode(e))tip.push(`Converted from ${fmtN(amt)} ${from} at ${FX_NOTE}`)}
+    const cls=['c-new','f-'+f,chg?'chg':'',sev==='i'?'':sev,s2==='ai'?'ai':'',d.csvHits.has(e.id+'|'+f)?'up':''].join(' ');
+    h+=`<td class="c-cur">${esc(fmtVal(e,f,e[f]))}</td><td class="${cls}" title="${esc(tip.join('\n'))}">${editor(d,e,f)}${fi.length?`<button class="whyb ${sev}" data-act="why" data-id="${e.id}" data-f="${f}" aria-label="Why is this flagged?">${sev==='i'?'i':'!'}</button>`:''}</td>`}return h+'</tr>'}
 function pctCell(d,e){if(!changed(d,e,'compensation')&&!changed(d,e,'per'))return`<td class="pct"></td>`;const np=nv(d,e,'per'),v=+nv(d,e,'compensation');if(!(v>0))return`<td class="pct">—</td>`;
   const a1=annual(e.compensation,e.per),a2=annual(v,np);const p=(a2-a1)/a1*100;return`<td class="pct ${p>15?'hi':''}">${p>=0?'+':''}${p.toFixed(1)}%${np!==e.per?' <small>annualised</small>':''}</td>`}
 function editor(d,e,f){const F=FIELDS[f];const key=e.id+'|'+f;
-  if(d.modes[f]==='same'){const v=d.same[f];return v?`<span>${esc(fmtVal(e,f,v))}</span>`:`<span class="muted">Set above</span>`}
+  if(d.modes[f]==='same'){const v=d.same[f];return v!==undefined&&v!==''?`<span>${esc(fmtVal(e,f,val(d,e,f)))}</span>`:`<span class="muted">Set above</span>`}
   const v=val(d,e,f);const shown=(v===undefined||v===null||v===''||String(v)===String(e[f]))?'':v;
+  if(F.type==='date')return`<input class="cell" type="date" data-cell="${key}" value="${esc(shown)}" aria-label="New ${esc(F.label)}" title="Today: ${esc(fmtIso(e[f]))}">`;
   if(F.type==='select'||F.type==='team'){const opts=F.type==='team'?TEAMS[nv(d,e,'department')]:F.opts();
     return`<select class="cell s ${shown?'':'ghost'}" data-cell="${key}" aria-label="New ${esc(F.label)}"><option value="">${esc(fmtVal(e,f,e[f]))}</option>${opts.filter(o=>o!==e[f]).map(o=>`<option ${o===shown?'selected':''}>${esc(o)}</option>`).join('')}</select>`}
   if(F.type==='person')return`<input class="cell" list="dl-mgr" data-cell="${key}" value="${shown&&EMPI[shown]?esc(EMPI[shown].name):''}" placeholder="${esc(fmtVal(e,f,e[f]))}" aria-label="New manager">`;
@@ -780,21 +926,23 @@ function issueCard(d,A,k){const I=ISS[k],ids=A.issues[k];const open=d.show[k];
   const fixes=(I.fix||[]).map(([l,fx])=>`<button class="btn2 sm" data-act="fix" data-issue="${k}" data-fix="${fx}">${esc(l)} (${fmtN(ids.length)})</button>`).join('');
   const ack=I.sev==='w'?(d.ack[k]?`<span class="acked">✓ Acknowledged${d.ackNote[k]?': '+esc(d.ackNote[k]):''}</span>`:`<input class="notein" data-in="acknote" data-issue="${k}" placeholder="Note for the audit log (optional)" value="${esc(d.ackNote[k]||'')}"><button class="btn2 sm" data-act="ack" data-issue="${k}">Acknowledge ${fmtN(ids.length)}</button>`):'';
   const rows=open?`<div class="rowsx"><div class="tw"><table class="t">${ids.slice(0,6).map(id=>{const e=EMPI[id];const f=I.f;return`<tr><td>${person(e,e.title)}</td>${f?`<td class="muted">${esc(fmtVal(e,f,e[f]))}</td><td>→</td><td><b>${esc(fmtVal(e,f,nv(d,e,f)))}</b></td>`:'<td colspan="3"></td>'}</tr>`}).join('')}</table></div>${ids.length>6?`<button class="lnk" data-act="opengrid" data-issue="${k}">Open all ${fmtN(ids.length)} in the grid</button>`:''}</div>`:'';
-  return`<div class="icard"><div class="icard-h"><div class="t"><span class="sev ${I.sev}">${I.sev==='i'?'i':'!'}</span><div><b>${esc(I.label)} · <span class="num">${fmtN(ids.length)}</span></b><span class="muted" style="font-size:13px">${esc(I.desc)}</span></div></div>
-    <div class="icard-a">${fixes}${ack}<button class="txt" data-act="showrows" data-issue="${k}">${open?'Hide rows':'Show rows'}</button><button class="lnk" data-act="opengrid" data-issue="${k}">Filter the grid</button></div></div>${rows}</div>`}
+  return`<div class="icard"><div class="icard-h"><div class="t"><span class="sev ${I.sev}">${I.sev==='i'?'i':'!'}</span><div><b>${esc(I.label)} · <span class="num">${fmtN(ids.length)}</span></b><span class="muted" style="font-size:13px">${esc(I.desc)}${I.pol?` Rule: ${esc(POL[I.pol].name)}, set by ${esc(POL[I.pol].owner)}.`:''}</span></div></div>
+    <div class="icard-a">${fixes}${ack}<button class="lnk" data-act="whyissue" data-k="${k}">Why, and who sets this rule</button><button class="txt" data-act="showrows" data-issue="${k}">${open?'Hide rows':'Show rows'}</button><button class="lnk" data-act="opengrid" data-issue="${k}">Filter the grid</button></div></div>${rows}</div>`}
 function impactView(d){const A=analyze(d);const I=impact(d);const pi=d.date?payInfo(d.date):null;const payNeeded=I.pay>0||I.tax>0;
   const payCard=`<div class="icd first"><h4>Payroll <span class="badge b-appr">Highest stakes, shown first</span></h4>
     ${payNeeded?`<div><span class="n">${fmtN(I.pay)}</span> pay changes land in the <b>${fmtD(pi.run)}</b> run${I.tax?` · ${pl(I.tax,'tax-state change')}`:''}</div>
-    <div class="muted" style="font-size:13.5px">Annual payroll ${I.delta>=0?'+':'−'}$${fmtN(Math.abs(I.delta))} (${I.base?(I.delta/I.base*100).toFixed(1):'0.0'}% of this group's base pay). Hourly pay is annualised at 2,080 hours.</div>
+    ${I.delta?`<div class="muted" style="font-size:13.5px">Annual base pay ${I.delta>=0?'+':'−'}${fmtN(Math.abs(I.delta))} USD equivalent (${I.base?(I.delta/I.base*100).toFixed(1):'0.0'}% of this group's base pay). Hourly pay is annualised at 2,080 hours.</div>`:''}
+    ${I.spotN?`<div class="muted" style="font-size:13.5px">${pl(I.spotN,'one-time bonus','one-time bonuses')}, ${fmtN(I.spot)} USD equivalent in total, paid in the ${fmtD(pi.run)} run.</div>`:''}
+    ${I.cad?`<div class="muted" style="font-size:13.5px">${pl(I.cad,'person','people')} paid in CAD: amounts entered in USD are converted at ${esc(FX_NOTE)}.</div>`:''}
     <div class="cutoff"><b>If approval lands after the ${fmtD(pi.cutoff)} cutoff:</b>
       <label><input type="radio" name="cut" data-act="cut" value="next" ${d.cutoff.choice==='next'?'checked':''}> Pay from the effective date in the next run (${fmtD(pi.next)}), with retro pay. <span class="muted">Pre-selected.</span></label>
       <label><input type="radio" name="cut" data-act="cut" value="offcycle" ${d.cutoff.choice==='offcycle'?'checked':''}> Run an off-cycle payroll for these changes.</label>
       <label><input type="radio" name="cut" data-act="cut" value="date" ${d.cutoff.choice==='date'?'checked':''}> Change the effective date instead.</label>
       ${d.cutoff.confirmed?`<span class="done-t">✓ Payroll timing confirmed</span>`:`<div><button class="btn sm" data-act="confirmcut">Confirm payroll timing</button></div>`}</div>`:`<div class="muted">No pay changes in this change.</div>`}</div>`;
   const cards=[],zeros=[];const card=(name,n,lines)=>{if(!n){zeros.push(name);return}cards.push(`<div class="icd"><h4>${esc(name)}</h4><div><span class="n">${fmtN(n)}</span> ${n===1?'person':'people'}</div><ul>${lines.filter(Boolean).map(l=>`<li>${l}</li>`).join('')}</ul></div>`)};
-  card('Benefits',I.benSal+I.benLoc+I.benClass,[I.benSal&&`${fmtN(I.benSal)} salary-linked life and disability coverage amounts recalculate`,I.benLoc&&`${fmtN(I.benLoc)} move to a region with different plan availability, which opens an enrollment window`,I.benClass&&`${fmtN(I.benClass)} change benefits class with the pay type`]);
-  card('Time off',I.pto+I.ot,[I.pto&&`${fmtN(I.pto)} move to a different state's leave policy`,I.ot&&`${fmtN(I.ot)} change overtime eligibility`]);
-  card('Devices',I.dev,[I.dev&&`${fmtN(I.dev)} move to a different department's device policy`]);
+  card('Benefits',I.benSal+I.benLoc+I.benClass+I.benCls,[I.benCls&&`${fmtN(I.benCls)} change benefits class, which opens an enrollment window`,I.benSal&&`${fmtN(I.benSal)} salary-linked life and disability coverage amounts recalculate`,I.benLoc&&`${fmtN(I.benLoc)} move to a region with different plan availability, which opens an enrollment window`,I.benClass&&`${fmtN(I.benClass)} change benefits class with the pay type`]);
+  card('Time off',I.pto+I.ot+I.ptoPol,[I.ptoPol&&`${fmtN(I.ptoPol)} move to a new time off policy; balances are recalculated on ${fmtD(d.date)}`,I.pto&&`${fmtN(I.pto)} move to a different state's leave policy`,I.ot&&`${fmtN(I.ot)} change overtime eligibility`]);
+  card('Devices',I.dev,[I.laptops&&`${fmtN(I.laptops)} new laptops ordered to arrive before ${fmtD(d.date)}; old devices get prepaid return labels`,I.refreshN&&`${fmtN(I.refreshN)} device refresh dates updated in Device Management`,I.devPol&&`${fmtN(I.devPol)} move to a different department's device policy`]);
   card('Workflows',I.wf,[I.wf&&`${fmtN(I.wfAppr)} pending PTO and expense approvals re-route to new managers`,I.wf&&`<label class="tg"><input type="checkbox" data-act="digest" ${d.digest?'checked':''}> Send new managers one digest instead of ${fmtN(I.wf)} emails</label>`]);
   const apps=Object.entries(I.apps).map(([k,a])=>{if(!a.total&&!a.loss)return'';const open=d.show['app-'+k];
     return`<div class="icd"><h4>${esc(a.name)}<button class="lnk" data-act="whyapp" data-k="${k}">${open?'Hide mapping':'Why this app?'}</button></h4><ul>${a.items.filter(x=>x[0]).map(x=>`<li><b class="num">${fmtN(x[0])}</b> ${esc(x[1])}</li>`).join('')}${a.loss?`<li class="loss"><b>${esc(a.lossTxt(a.loss))}</b></li>`:''}</ul>${open?`<div class="mapping">Changed fields mapped to this app:<br>${a.items.map(x=>esc(x[2])).join('<br>')}</div>`:''}</div>`}).join('');
@@ -806,7 +954,12 @@ function impactView(d){const A=analyze(d);const I=impact(d);const pi=d.date?payI
     ${apps?`<div class="cards">${apps}</div>`:''}${appsZero.length?`<div class="zero"><b>No change:</b> ${appsZero.join(' · ')}</div>`:''}
     ${I.losses?`<label class="tg" style="color:var(--err)"><input type="checkbox" data-act="accessack" ${d.accessAck?'checked':''}> I understand ${pl(I.losses,'access removal')} will happen on ${fmtD(d.date)}</label>`:''}
     <div class="rows">${row('When apps update',`<label class="tg"><input type="radio" name="sync" data-act="appsync" value="effective" ${d.appSync==='effective'?'checked':''}> On the effective date (${fmtD(d.date)})</label><label class="tg"><input type="radio" name="sync" data-act="appsync" value="now" ${d.appSync==='now'?'checked':''}> As soon as it's approved</label><span class="hint">A reorg announced Monday shouldn't cut anyone's access on Friday.</span>`)}</div></div>
-  <div class="region"><h3 class="h3">Approvals</h3>${I.approvers.length?`<div class="tw"><table class="t">${I.approvers.map(a=>`<tr><td>${person({name:a.who},a.role)}</td><td>${esc(a.what)}</td><td class="muted">From your approval policy</td></tr>`).join('')}</table></div><p class="note">One request per approver for the whole change. They can reject single rows; the rest go ahead.</p>`:`<p class="sub">No approval needed. You can cancel until ${fmtD(d.date)}.</p>`}</div>
+  <div class="region"><div class="region-h"><h3 class="h3">Approvals</h3><button class="lnk" data-act="policy" data-k="approvals">Approval thresholds</button></div>
+    <p class="sub">${fmtN(A.noAppr)} of ${pl(A.rowChanged.size,'person','people')} are inside your limits and need no approval.${A.needAppr?` ${fmtN(A.needAppr)} need approval:`:''}</p>
+    ${I.approvers.length?`<div class="tw"><table class="t">${I.approvers.map(a=>`<tr><td>${person({name:a.who},a.role)}</td><td class="num">${pl(a.n,'row')}</td><td>${esc(a.what)}</td></tr>`).join('')}</table></div><p class="note">One request per approver for the whole change. They can send single rows back; the rest go ahead.</p>`:`<p class="sub">You can cancel until ${fmtD(d.date)}.</p>`}
+    ${A.needAppr&&A.noAppr?`<div class="sec"><b class="req">When do the changes take effect?</b>
+      <label class="opt"><input type="radio" name="apm" data-act="apm" value="together" ${d.applyMode!=='asready'?'checked':''}><span><b>All rows together</b><small class="muted">Nothing changes until every row is approved. Then everyone's change lands on ${fmtD(d.date)}, or on the day the last approval comes in if that's later.</small></span></label>
+      <label class="opt"><input type="radio" name="apm" data-act="apm" value="asready" ${d.applyMode==='asready'?'checked':''}><span><b>Each row as soon as it's cleared</b><small class="muted">The ${fmtN(A.noAppr)} rows without approval take effect on ${fmtD(d.date)}. Each of the other ${fmtN(A.needAppr)} takes effect once its own approvals clear.</small></span></label></div>`:''}</div>
   <div class="region"><h3 class="h3">Notifications</h3><div class="rows">
     ${row('You','Every status change, and one digest if an app needs attention.')}${row('Approvers',I.approvers.length?'A request now, with the summary and outliers first.':'Not needed.')}
     ${row('App owners','Only when their app needs a person to act (for example Raj Patel for Google Workspace).')}
@@ -821,6 +974,7 @@ function statusView(d){const R=d.run;const A=analyze(d);const I=impact(d);const 
   const demo=R.phase==='approval'?`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="demo-l">Demo</span><button class="btn2 sm demo" data-act="approveas">Open as Priya Shah (Finance approver)</button><button class="btn2 sm demo" data-act="approveall">Approve everything</button></div>`
     :R.phase==='scheduled'?`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="demo-l">Demo</span><button class="btn2 sm demo" data-act="arrive">Jump to ${fmtD(d.date)}: the effective date arrives</button></div>`:'';
   const band1=`<div class="band"><div class="sec-h"><h3>Rippling record</h3><span class="muted">${esc(d.id)} · submitted 11:20 IST · ${pl(n,'person','people')} frozen at submit</span></div>${track}
+    ${A.needAppr&&A.noAppr?`<p class="sub">${d.applyMode==='asready'?`${fmtN(A.noAppr)} rows without approval take effect on ${fmtD(d.date)}; the other ${fmtN(A.needAppr)} follow as their approvals clear.`:`All rows take effect together once every row is approved.`}</p>`:''}
     <p class="sub">${R.phase==='committed'?'The new values are the record. Payroll and every other Rippling product read them from here.':R.phase==='scheduled'?`Approved. Profiles show "Upcoming" until ${fmtD(d.date)}.`:'Nothing changes until approval.'}</p>${demo}</div>`;
   let band2='';
   if(R.phase==='committed'&&R.sync){const rows=R.sync.map(s=>{let st='',det='',act='';
@@ -857,18 +1011,18 @@ function tick(d){const R=d.run;if(!R||!R.sync){clearInterval(S.timer);return}let
     else if(s.state==='retry'){s.next-=1;if(s.next<=0){s.state='prog';s.done=0}live=true}});
   if(!live)clearInterval(S.timer);if(S.route==='draft'&&S.step==='status'&&!S.approver&&!S.ov&&S.d===d){const y=window.scrollY;render();window.scrollTo(0,y)}}
 function approverView(){const d=S.d;const A=analyze(d);const fs=['compensation','per','bonus','equity'].filter(f=>d.fields.includes(f));
-  const rows=A.rows.filter(e=>fs.some(f=>changed(d,e,f)));const I=impact(d);const budget=I.base*.06;
+  const rows=A.rows.filter(e=>(A.rowAppr.get(e.id)||[]).some(x=>x.k==='finance'));const I=impact(d);const budget=I.base*.06;
   const pct=e=>{const a1=annual(e.compensation,e.per),a2=annual(+nv(d,e,'compensation'),nv(d,e,'per'));return(a2-a1)/a1*100};
   const isOut=e=>{const iss=A.rowIss.get(e.id)||[];return iss.includes('raise15')||iss.includes('above_mid')||iss.includes('unit_switch')||(changed(d,e,'equity')&&+nv(d,e,'equity')>e.equity)};
   const outs=rows.filter(isOut).sort((a,b)=>pct(b)-pct(a));const rest=rows.filter(e=>!isOut(e));const sel=d.rejected;
-  const tr=e=>{const iss=(A.rowIss.get(e.id)||[]).filter(k=>['raise15','above_mid','unit_switch'].includes(k));
-    return`<tr><td><input type="checkbox" data-act="apsel" data-id="${e.id}" ${sel.has(e.id)?'checked':''} aria-label="Send ${esc(e.name)} back"></td><td>${person(e,e.title)}</td><td class="num">${esc(fmtVal(e,'compensation',e.compensation))} → <b>${esc(fmtVal(e,'compensation',nv(d,e,'compensation')))}</b></td><td class="num ${pct(e)>15?'loss':''}">${pct(e)>=0?'+':''}${pct(e).toFixed(1)}%</td><td>${iss.map(k=>`<span class="badge b-warn">${esc(ISS[k].label)}</span>`).join(' ')}</td>
+  const tr=e=>{const iss=(A.rowIss.get(e.id)||[]).filter(k=>['raise15','above_mid','unit_switch','band_exc'].includes(k));const ap=(A.rowAppr.get(e.id)||[]).find(x=>x.k==='finance');
+    return`<tr><td><input type="checkbox" data-act="apsel" data-id="${e.id}" ${sel.has(e.id)?'checked':''} aria-label="Send ${esc(e.name)} back"></td><td>${person(e,e.title)}</td><td class="num">${esc(fmtVal(e,'compensation',e.compensation))} → <b>${esc(fmtVal(e,'compensation',nv(d,e,'compensation')))}</b></td><td class="num ${pct(e)>15?'loss':''}">${pct(e)>=0?'+':''}${pct(e).toFixed(1)}%</td><td><small>${esc(ap?ap.why.join('; '):'')}</small>${iss.length?'<br>':''}${iss.map(k=>`<span class="badge b-warn">${esc(ISS[k].label)}</span>`).join(' ')}</td>
       <td>${sel.has(e.id)?`<input class="notein" data-in="apreason" data-id="${e.id}" value="${esc(sel.get(e.id))}" placeholder="Reason (required)">`:''}</td></tr>`};
   return`<div class="card nos"><section class="main"><header class="bar"><h2>Approve: ${esc(d.name)}</h2><div class="bar-act"><button data-act="apback">Back to submitter view</button></div></header>
-  <div class="strip">${kv('Your fields',fs.map(f=>FIELDS[f].label).join(', '))}${kv('People',fmtN(rows.length))}${kv('Annual cost',`${I.delta>=0?'+':'−'}$${fmtN(Math.abs(I.delta))}`)}${kv('Merit budget',`$${fmtN(budget)}`)}${kv('Of budget',`${budget?(I.delta/budget*100).toFixed(0):0}%`,I.delta>budget?'err':'')}${kv('Effective',fmtD(d.date,true))}</div>
-  <div class="content"><p class="sub">${I.delta<=budget?`Within budget: $${fmtN(budget-I.delta)} left`:`$${fmtN(I.delta-budget)} over budget`}. That's ${(I.delta/I.base*100).toFixed(1)}% of this group's base pay against a 6% merit budget.</p>
+  <div class="strip">${kv('Your fields',fs.map(f=>FIELDS[f].label).join(', '))}${kv('People',fmtN(rows.length))}${kv('Annual cost (USD)',`${I.delta>=0?'+':'−'}${fmtN(Math.abs(I.delta))}`)}${kv('Merit budget (USD)',fmtN(budget))}${kv('Of budget',`${budget?(I.delta/budget*100).toFixed(0):0}%`,I.delta>budget?'err':'')}${kv('Effective',fmtD(d.date,true))}</div>
+  <div class="content"><p class="sub">Only rows above the self-approval limits are here. Amounts are in USD equivalent. ${I.delta<=budget?`Within budget: ${fmtN(budget-I.delta)} USD left`:`${fmtN(I.delta-budget)} USD over budget`}. That's ${(I.delta/I.base*100).toFixed(1)}% of this group's base pay against a 6% merit budget.</p>
     <div class="sec"><div class="sec-h"><h3>Outliers first · ${fmtN(outs.length)}</h3><span class="muted">Raises above 15%, crossing the band midpoint, pay-type switches, equity grants</span></div>
-      <div class="tw"><table class="t"><thead><tr><th>Send back</th><th>Employee</th><th>Compensation</th><th>Change</th><th>Why it's here</th><th></th></tr></thead><tbody>${outs.slice(0,60).map(tr).join('')||'<tr><td colspan="6" class="muted">No outliers.</td></tr>'}</tbody></table></div></div>
+      <div class="tw"><table class="t"><thead><tr><th>Send back</th><th>Employee</th><th>Base pay</th><th>Change</th><th>Why it needs your approval</th><th></th></tr></thead><tbody>${outs.slice(0,60).map(tr).join('')||'<tr><td colspan="6" class="muted">No outliers.</td></tr>'}</tbody></table></div></div>
     <div class="sec"><div class="sec-h"><h3>Within guidelines · ${fmtN(rest.length)}</h3><button class="lnk" data-act="apall">${S.apAll?'Hide':'Show'} them</button></div>
       ${S.apAll?`<div class="tw"><table class="t"><tbody>${rest.slice(0,80).map(tr).join('')}</tbody></table></div>${rest.length>80?`<p class="note">Showing 80 of ${fmtN(rest.length)}.</p>`:''}`:''}</div>
     <div class="gate"><span>${sel.size?`${pl(sel.size,'row')} go back to the submitter as a follow-up draft, each with a reason.`:'Approve all, or tick rows to send them back with a reason.'}</span><button class="btn" data-act="approve">Approve ${fmtN(rows.length-sel.size)}${sel.size?` · send ${fmtN(sel.size)} back`:''}</button></div>
@@ -877,12 +1031,12 @@ function approverView(){const d=S.d;const A=analyze(d);const fs=['compensation',
 /* ================= overlays ================= */
 function renderOverlay(){const o=$('#overlay');if(!S.ov){o.classList.remove('on');o.innerHTML='';return}o.classList.add('on');o.innerHTML=S.ov.type==='profile'?profileModal():modal()}
 function profileModal(){const e=EMPI[S.ov.id];if(!e){S.ov=null;return''}const d=S.d;const tab=S.ov.tab;const R=d&&d.run;const inChange=R&&R.frozen&&R.frozen.includes(e.id)&&!d.moved.has(e.id);
-  const tabs=[['emp','Employment Information'],['personal','Personal Information'],['add','Additional Information'],['reports','Direct Reports'],['docs','Documents'],['apps','Integrated Apps'],['tfa','Two Factor Devices']];
+  const tabs=[['emp','Employment information'],['personal','Personal information'],['add','Additional information'],['reports','Direct reports'],['docs','Documents'],['apps','Integrated apps'],['tfa','Two-factor devices']];
   const fv=f=>{const cur=fmtVal(e,f,e[f]);if(!inChange||!changed(d,e,f))return esc(cur);const nw=fmtVal(e,f,nv(d,e,f));
     if(R.phase==='committed')return`${esc(nw)}<br><span class="chipnote">via ${esc(d.name)} (${esc(d.id)}) · approved by Priya Shah</span>`;return`${esc(cur)}<br><span class="chipnote up">${R.phase==='scheduled'?'Upcoming':'Pending approval'}: ${esc(nw)} on ${fmtD(d.date)}</span>`};
   let body='';
-  if(tab==='emp')body=[['Title','title'],['Department','department'],['Team','team'],['Compensation','compensation'],['Per','per'],['Target annual bonus','bonus'],['Equity - Number of shares','equity'],['Work Email','email'],['Manager','manager'],['Work location','location']].map(([l,f])=>row(l,fv(f))).join('')+row('Start date',fmtIso(e.startDate));
-  else if(tab==='add')body=[['Level','level'],['Performance rating','rating'],['Cost center','costCenter']].map(([l,f])=>row(l,fv(f))).join('')+row('Languages spoken',esc(e.languages.join(', ')))+row('Segments',esc(SEGS.filter(s=>segHas(s.id,e.id)).map(s=>s.name).join(', ')||'None'));
+  if(tab==='emp')body=['title','department','team','compensation','per','bonus','equity','email','manager','location'].map(f=>row(FIELDS[f].label,fv(f))).join('')+row('Start date',fmtIso(e.startDate));
+  else if(tab==='add')body=['level','rating','costCenter','oncall','timeOff','benefits','laptop','refresh'].map(f=>row(FIELDS[f].label,fv(f))).join('')+Object.entries(CF).filter(([,x])=>x.src).map(([k,x])=>row(x.label,`${esc(isEmpty(e[k])?'—':x.type==='date'?fmtIso(e[k]):e[k])}<br><small class="muted">From ${x.src} · read-only</small>`)).join('')+row('Languages spoken',esc(e.languages.join(', ')))+row('Segments',esc(SEGS.filter(s=>segHas(s.id,e.id)).map(s=>s.name).join(', ')||'None'));
   else if(tab==='reports')body=e.reports.length?e.reports.slice(0,12).map(id=>row(EMPI[id].title,esc(EMPI[id].name))).join(''):row('Direct reports','None');
   else if(tab==='docs')body=inChange&&R.phase==='committed'&&d.notifyEmp?row('New',`Change letter · ${esc(d.name)}`):row('Documents','No new documents');
   else if(tab==='apps'){const apps=[['Slack',e.email],['Google Workspace',e.email]];if(['Engineering','Product'].includes(e.department))apps.push(['GitHub','@'+e.first.toLowerCase()+e.last.toLowerCase()]);
@@ -909,7 +1063,7 @@ function modal(){const o=S.ov;const d=S.d;const wrap=(t,b,f)=>`<div class="modal
   if(o.type==='upload'){const p=o.preview;return wrap('Upload CSV',`<p class="sub">Upload the template your managers filled in, or paste it. Columns can be in any order. Amounts like $92,500, 92500, 92.5k or 1,20,000 are all read correctly.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input type="file" id="up-file" accept=".csv,text/csv"><button class="txt" data-act="upsample">Use a sample file from managers</button></div>
     <textarea class="ta" id="up-ta" data-in="uptext" placeholder="Employee ID,Compensation (new),Level (new)">${esc(o.text||'')}</textarea>
-    ${p?`<div class="cutoff" style="background:var(--nav);border-color:var(--rule)"><b>${fmtN(p.matched)} rows matched · ${fmtN(p.cells)} values to write</b><span>${p.unknown.length?`${pl(p.unknown.length,'ID')} not in this change: ${esc(p.unknown.slice(0,4).join(', '))}${p.unknown.length>4?'…':''}. `:''}${p.norm?`${pl(p.norm,'amount')} normalised (e.g. "1,20,000" → 120000). `:''}${p.ignored.length?`Ignored columns: ${esc(p.ignored.join(', '))}.`:''}${p.bad?` ${pl(p.bad,'value')} couldn't be read and were skipped.`:''}</span></div>`:''}`,
+    ${p?`<div class="cutoff" style="background:var(--nav);border-color:var(--rule)"><b>${fmtN(p.matched)} rows matched · ${fmtN(p.cells)} values to write</b><span>${p.unknown.length?`${pl(p.unknown.length,'ID')} not in this change: ${esc(p.unknown.slice(0,4).join(', '))}${p.unknown.length>4?'…':''}. `:''}${p.norm?`${pl(p.norm,'amount')} normalised (e.g. "1,20,000" → 120000). `:''}${p.conv?`${pl(p.conv,'amount')} converted to the person's currency. `:''}${p.ignored.length?`Ignored columns: ${esc(p.ignored.join(', '))}.`:''}${p.bad?` ${pl(p.bad,'value')} couldn't be read and were skipped.`:''}</span></div>`:''}`,
     `<button class="btn2" data-act="uppreview">Preview</button><button class="btn" data-act="upapply" ${p&&p.cells?'':'disabled'}>Write ${p?fmtN(p.cells):''} values into the grid</button>`)}
   return''}
 
@@ -919,22 +1073,26 @@ function parseCSV(t){const rows=[];let row=[],f='',q=false;for(let i=0;i<t.lengt
   else if(c==='"')q=true;else if(c===','){row.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);f='';if(row.some(x=>x.trim()))rows.push(row);row=[]}else f+=c}
   row.push(f);if(row.some(x=>x.trim()))rows.push(row);return rows}
 const normH=s=>String(s).toLowerCase().replace(/\(new\)|new|\(current\)/g,'').replace(/[^a-z0-9]/g,'');
-const ALIAS={salary:'compensation',comp:'compensation',basepay:'compensation',pay:'compensation',paytype:'per',bonus:'bonus',targetbonus:'bonus',shares:'equity',equity:'equity',jobtitle:'title',location:'location',office:'location'};
-function previewCSV(d,text){const rows=parseCSV(text||'');if(rows.length<2)return{matched:0,cells:0,unknown:[],norm:0,ignored:[],bad:0,writes:[]};
-  const H=rows[0];let keyCol=-1,keyKind='';const cols=[];const ignored=[];
-  H.forEach((h,i)=>{const n=normH(h);if(/current/i.test(h))return;if(['employeeid','id','empid'].includes(n)){keyCol=i;keyKind='id';return}if(['workemail','email'].includes(n)&&keyCol<0){keyCol=i;keyKind='email';return}if(n==='name')return;
+const ALIAS={salary:'compensation',comp:'compensation',compensation:'compensation',basepay:'compensation',pay:'compensation',per:'per',paytype:'per',bonus:'bonus',targetbonus:'bonus',targetannualbonus:'bonus',shares:'equity',equity:'equity',equitynumberofshares:'equity',equitygrantshares:'equity',jobtitle:'title',location:'location',worklocation:'location',office:'location',laptop:'laptop',laptopmodel:'laptop',devicerefreshdate:'refresh',refreshdate:'refresh',timeoffpolicy:'timeOff',ptopolicy:'timeOff',onetimebonus:'spotBonus',spotbonus:'spotBonus',bonusamount:'spotBonus',benefitsclass:'benefits',oncallrotation:'oncall'};
+function previewCSV(d,text){const rows=parseCSV(text||'');if(rows.length<2)return{matched:0,cells:0,unknown:[],norm:0,ignored:[],bad:0,conv:0,writes:[]};
+  const H=rows[0];let keyCol=-1,keyKind='',curCol=-1;const cols=[];const ignored=[];
+  H.forEach((h,i)=>{const n=normH(h);if(/current/i.test(h))return;if(['employeeid','id','empid'].includes(n)){keyCol=i;keyKind='id';return}if(['workemail','email'].includes(n)&&keyCol<0){keyCol=i;keyKind='email';return}if(n==='name')return;if(n==='currency'){curCol=i;return}
     const f=Object.keys(FIELDS).find(k=>normH(FIELDS[k].label)===n)||ALIAS[n];if(f&&d.fields.includes(f))cols.push([i,f]);else ignored.push(h.trim()+(f?' (not in this change)':''))});
-  const inChange=new Set(analyze(d).rows.map(e=>e.id));const unknown=[];let matched=0,nrm=0,bad=0;const writes=[];
-  rows.slice(1).forEach(r=>{const k=(r[keyCol]||'').trim();const id=keyKind==='email'?parsePerson(k):(EMPI[k]?k:null);if(!id||!inChange.has(id)){if(k)unknown.push(k);return}matched++;const e=EMPI[id];
+  const inChange=new Set(analyze(d).rows.map(e=>e.id));const unknown=[];let matched=0,nrm=0,bad=0,nconv=0;const writes=[];
+  rows.slice(1).forEach(r=>{const k=(r[keyCol]||'').trim();const id=keyKind==='email'?parsePerson(k):(EMPI[k.toUpperCase()]?k.toUpperCase():null);if(!id||!inChange.has(id)){if(k)unknown.push(k);return}matched++;const e=EMPI[id];const rc=curCol>=0?(r[curCol]||'').trim().toUpperCase():'';
     cols.forEach(([i,f])=>{const raw=(r[i]||'').trim();if(!raw)return;let v=raw;const F=FIELDS[f];
-      if(F.type==='money'||F.type==='int'){v=parseMoney(raw);if(!isFinite(v)){bad++;return}if(String(v)!==raw)nrm++;if(f==='compensation')v=roundComp(v,nv(d,e,'per'))}
+      if(F.type==='money'||F.type==='int'){v=parseMoney(raw);if(!isFinite(v)){bad++;return}if(String(v)!==raw)nrm++;
+        if(MONEY.has(f)&&rc){if(!FX[rc]){bad++;return}if(rc!==curCode(e)){v=conv(v,rc,curCode(e));nconv++}}
+        v=f==='compensation'?roundComp(v,nv(d,e,'per')):MONEY.has(f)?Math.round(v/10)*10:Math.round(v)}
       else if(F.type==='select'){const o=F.opts().find(x=>x.toLowerCase()===raw.toLowerCase());if(!o){bad++;return}v=o}
+      else if(F.type==='team'){const o=ALLTEAMS.find(x=>x.toLowerCase()===raw.toLowerCase());if(!o){bad++;return}v=o}
+      else if(F.type==='date'){v=parseDateStr(raw);if(!v){bad++;return}if(v!==raw)nrm++}
       else if(F.type==='person'){v=parsePerson(raw);if(!v){bad++;return}}
       if(String(v)!==String(e[f]))writes.push([id,f,v])})});
-  return{matched,cells:writes.length,unknown,norm:nrm,ignored,bad,writes}}
+  return{matched,cells:writes.length,unknown,norm:nrm,ignored,bad,conv:nconv,writes}}
 function sampleCSV(d){const r=rng(99);const A=analyze(d);const rows=A.rows.filter(e=>e.rating!=='Below').filter(()=>r()<.16).slice(0,400);const fs=d.fields.filter(f=>['compensation','level','title','bonus'].includes(f));
   const lines=[csvLine(['Employee ID','Name',...fs.map(f=>FIELDS[f].label+' (new)'),'Manager notes'])];let k=0;
-  rows.forEach(e=>{const vals=fs.map(f=>{if(f==='compensation'){const v=roundComp(e.compensation*(1.03+r()*.07),e.per);k++;if(e.per==='Hour')return'$'+v.toFixed(2);const m=k%4;return m===0?'$'+fmtN(v):m===1?String(v):m===2?(v/1000).toFixed(1)+'k':v.toString().replace(/(\d)(?=(\d\d)+\d{3}$)/g,'$1,').replace(/(\d)(\d{3})$/,'$1,$2')}
+  rows.forEach(e=>{const vals=fs.map(f=>{if(f==='compensation'){const v=roundComp(e.compensation*(1.03+r()*.07),e.per);k++;if(e.per==='Hourly')return'$'+v.toFixed(2);const m=k%4;return m===0?'$'+fmtN(v):m===1?String(v):m===2?(v/1000).toFixed(1)+'k':v.toString().replace(/(\d)(?=(\d\d)+\d{3}$)/g,'$1,').replace(/(\d)(\d{3})$/,'$1,$2')}
     if(f==='level')return r()<.2?'L'+Math.min(8,lvlN(e.level)+1):e.level;return''});lines.push(csvLine([e.id,e.name,...vals,r()<.1?'Strong year, promote next cycle':'']))});
   lines.push(csvLine(['E9991','Former employee',...fs.map(()=>'')]),csvLine(['E9992','Typo row',...fs.map(()=>'')]));return lines.join('\n')}
 
@@ -942,10 +1100,10 @@ function sampleCSV(d){const r=rng(99);const A=analyze(d);const rows=A.rows.filte
 const NOTES={
   shell:[['Two-tier navigation inside a bulk change','Progressive disclosure; focus','Modules collapse to icons so the steps get the room; hovering brings the modules back without leaving the draft.'],['Toasts top-right, coloured by outcome, with a timer bar','Visibility of system status; von Restorff','Errors stand out in red where the eye scans first, and the bar shows how long the message stays.'],['Global nav with Bulk change first',"Jakob's law","Admins already live in enterprise HRIS conventions: modules on the left, the task they came for at the top."],['Breadcrumbs on every page','Wayfinding','A deep editor never strands the admin; one click back to the list.'],['Demo controls kept apart in a dashed panel','Mental-model match',"Nothing that isn't product sits in the product chrome."]],
   bulk:[['List of bulk changes, drafts first','Zeigarnik effect','Comp cycles run over days; an open draft stays visible until the cutoff.'],['Segments column on each change','Recognition over recall','Who a change targets is visible without opening it.'],["A colleague's overlapping draft is listed",'Error prevention (Norman: mistakes)','Two admins editing the same people gets caught before payroll, not after.']],
-  setup:[['Effective date required, nothing pre-filled','Forcing function','Pre-filling Today would make a prorated mid-period change the default.'],['"Start of next pay period" chip first','Serial position (primacy)','Steers to the clean option without choosing for them.'],['Payroll run and cutoff shown next to the date','Norman: mapping and feedback','Links the date to its money consequence at the moment of choosing.'],['Name and reason required','Mental model of an auditable object','“Who gave Sales a raise?” has an answer six months later.'],['Enterprise step names (Details, Segments, Fields…)',"Jakob's law",'They match the vocabulary of every admin tool the user already knows.'],['Required fields marked with *','Error prevention','The admin knows what is mandatory before submitting, not after an error.']],
+  setup:[['More than payroll: time off, devices, benefits drafts in the list','Mental-model match','Bulk change is one tool for every system that reads the employee record.'],['Effective date required, nothing pre-filled','Forcing function','Pre-filling Today would make a prorated mid-period change the default.'],['"Start of next pay period" chip first','Serial position (primacy)','Steers to the clean option without choosing for them.'],['Payroll run and cutoff shown next to the date','Norman: mapping and feedback','Links the date to its money consequence at the moment of choosing.'],['Name and reason required','Mental model of an auditable object','“Who gave Sales a raise?” has an answer six months later.'],['Enterprise step names (Details, Segments, Fields…)',"Jakob's law",'They match the vocabulary of every admin tool the user already knows.'],['Required fields marked with *','Error prevention','The admin knows what is mandatory before submitting, not after an error.']],
   who:[['Summary card with the count; breakdown in a side panel','Progressive disclosure; cognitive load','The builder stays in view; detail is one click away and scrolls on its own.'],['Group quantifiers: all, any, at least / at most / exactly N','Mental-model match','Eligibility policies are often "meets at least 2 of these 3"; all and any stay first because they are the common case.'],['Searchable, tiered dropdowns with Select all / Clear all',"Hick's law; recognition over recall",'Long value lists are searched, grouped (teams by department) and bulk-selected instead of scrolled.'],['"+ Create new segment" pinned to the bottom of the segment picker','Task continuity','The missing segment is created without losing the draft, then selected in place.'],['Targeting is one condition builder','Mental-model match','Segments, named people and attributes are all just conditions, so there is one thing to learn.'],["Employee ID belongs to / doesn't belong to segment",'Recognition over recall; reuse','A vetted segment is referenced, not rebuilt from memory.'],['Insert saved segment shows type and size','Recognition over recall','The admin picks by name and sees how big it is before adding it.'],['Create segment in a side sheet','Context preservation','The draft stays open behind it, so nothing has to be held in working memory.'],['Paste employee IDs, emails or names',"Postel's law",'Lists arrive from spreadsheets in any shape; be liberal in what you accept.'],['Operators match the data type','Error prevention','Only comparisons that make sense for a field are offered.'],['Live count with delta','Doherty threshold; feedback','They test one condition at a time against the number they already hold.'],['Sample with "why included"','Trust calibration','Explains a surprising inclusion, e.g. "In FY26 promotion nominees".'],['On leave, terminations, contractors shown','Norman: mistakes',"Hidden system rules create errors the admin can't see."]],
   what:[["Groups use the profile's tab names","Jakob's law",'Fields sit where the profile trained them to look.'],['Direct Reports, Documents, 2FA not offered',"Hick's law","They aren't attributes. Reporting lines change through Manager."],['"Needs approval" badge','Von Restorff',"Fields that move money or access stand out before they're chosen."],['Department auto-adds Team, locked','Forcing function',"A new department with an old team isn't a valid record."],['Same for all / Different per person','Progressive disclosure','An office move needs one value, not 400 cells.']],
-  values:[["Cells use the profile's own controls","Jakob's law","Nothing new to learn: the profile's Edit mode, multiplied across rows."],["Empty New cell, today's value as grey text",'Default effect; von Restorff',"A filled cell is an edit and an empty one isn't."],['Current and New side by side',"Gestalt proximity; anchoring on today's value",'Reviewers judge the delta against what the person earns now.'],['% change, annualised when the unit switches','Norman: slips','Order-of-magnitude typos become obvious.'],['Rules write visible values','Trust calibration',"Admins don't trust results they can't see per row."],['AI drafts stay marked until accepted','Automation bias countermeasure','It never submits; approvers can see what a person checked.']],
+  values:[['Approval column and summary: which rows need approval and why','Feedforward; visibility of system status','The admin sees before submitting which rows clear on their own and which wait for Finance or People.'],['"!" on a flagged cell opens the reason, the rule and its owner','Recognition over recall; error recovery','Every error says what broke, who set the rule, and the fixes that work for this row.'],['Amounts entered in USD or CAD, converted per person','Mental-model match','Finance thinks in one budget currency; each employee is still paid in their own.'],["Cells use the profile's own controls","Jakob's law","Nothing new to learn: the profile's Edit mode, multiplied across rows."],["Empty New cell, today's value as grey text",'Default effect; von Restorff',"A filled cell is an edit and an empty one isn't."],['Current and New side by side',"Gestalt proximity; anchoring on today's value",'Reviewers judge the delta against what the person earns now.'],['% change, annualised when the unit switches','Norman: slips','Order-of-magnitude typos become obvious.'],['Rules write visible values','Trust calibration',"Admins don't trust results they can't see per row."],['AI drafts stay marked until accepted','Automation bias countermeasure','It never submits; approvers can see what a person checked.']],
   review:[["Error = can't commit a valid, permitted record",'Forcing function','One predictable rule: an invalid record never reaches payroll.'],['Warning = valid but unusual, acknowledged per group','Habituation / alarm fatigue','300 per-row confirmations train blind clicking.'],['Move error rows to a new draft','Loss aversion; Zeigarnik',"Nobody drops rows they'd lose; the open draft keeps them visible."]],
   impact:[['Inside Rippling vs Integrated Apps',"Gestalt common region; Jakob's law","Uses the profile's own term and sets up “these behave differently”."],['Payroll card first','Serial position (primacy)','The highest stakes go first.'],['Late-approval choice pre-selected, must be confirmed','Forcing function + default effect','Payroll timing is settled at the decision point.'],['Losses written as losses','Framing; loss aversion',"Removals phrased neutrally get underweighted, and they're hardest to undo."],['Employee letters off by default','Default effect; irreversibility',"A wrong comp letter can't be unsent."]],
   status:[['Rippling record band on top','Mental-model match; common region','The record is done and payroll reads from it, whatever Slack does.'],['No "Retry now" while auto-retries run','Illusion of control','Avoids pointless clicks and false confidence.'],['End state names what worked and who owns the rest','Peak-end rule','The memory of the last run decides whether they use bulk change next year.']],
@@ -963,7 +1121,7 @@ function setSize(n){S.size=n;build(n);makeSeeds();const d=S.d;clearInterval(S.ti
   if(d){d.manual={};d.csv={};d.csvHits=new Set();d.moved=new Set();d.rejected=new Map();d.ack={};d.who.cnt=null;d.who.prev=null;d.grid.group=null;d.grid.issue=null;
     d.who.groups.forEach(g=>g.conds.forEach(c=>{if(c.f==='empid'&&['eq','ne','anyof','noneof'].includes(c.op))c.v=c.v.filter(id=>EMPI[id]);if(c.f==='manager'&&c.v[0]&&!EMPI[c.v[0]])c.v=[];if(c.f==='empid'&&['inseg','notinseg'].includes(c.op)&&!segById(c.v[0]))c.v=[]}));
     if(d.run){d.run=null;d.cutoff.confirmed=false;if(S.step==='status')S.step='impact'}d.visited.delete('status');if(d.name==='FY26 annual review'&&d.template==='comp')seedPromos(d)}
-  S.parked=[];S.approver=false;S.followups=0;S.ov=null;S.se=null;S.hm=null;if(S.route==='segment'||S.route==='segedit')S.route='segments';
+  S.parked=extraDrafts();S.approver=false;S.followups=0;S.ov=null;S.se=null;S.hm=null;S.drawer=null;if(S.route==='segment'||S.route==='segedit')S.route='segments';
   toast(`Metzhand now has ${fmtN(EMP.length)} employees. Same flow, same screens.`);render()}
 function next(){const d=S.d;const i=STEPS.findIndex(s=>s.k===S.step);const k=STEPS[i+1].k;if(k==='status')return;d.visited.add(k);S.step=k;S.menu=false;S.pop=null;render();window.scrollTo(0,0)}
 function back(){const i=STEPS.findIndex(s=>s.k===S.step);if(i>0){S.step=STEPS[i-1].k;render();window.scrollTo(0,0)}}
@@ -971,11 +1129,11 @@ function setCell(id,f,v){const d=S.d;d.manual[id]=d.manual[id]||{};d.manual[id][
 function refreshGrid(){dirty();G.items=gridItems(S.d);renderGridRows();const sm=$('#summary');if(sm)sm.outerHTML=summary(S.d)}
 function afterRender(){const w=$('#gwrap');if(w&&S.d){w.scrollTop=S.d.grid.scroll||0;renderGridRows();w.addEventListener('scroll',()=>{S.d.grid.scroll=w.scrollTop;if(!G.raf)G.raf=requestAnimationFrame(()=>{G.raf=0;renderGridRows()})},{passive:true})}
   if(S.focus){const el=document.getElementById(S.focus);if(el){el.focus();if(el.setSelectionRange&&el.type!=='date'&&el.type!=='number')try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}S.focus=null}}
-function applyFix(k,fx){const d=S.d;const A=analyze(d);const ids=A.issues[k]||[];
+function applyFix(k,fx,only){const d=S.d;const A=analyze(d);const ids=only||A.issues[k]||[];
   ids.forEach(id=>{const e=EMPI[id];if(fx==='capmax'){const b=band(e,nv(d,e,'level'),nv(d,e,'per'),nv(d,e,'department'),nv(d,e,'location'));setCell(id,'compensation',b.max)}
     else if(fx==='clearcomp')setCell(id,'compensation','');else if(fx==='fixteam')setCell(id,'team',TEAMS[nv(d,e,'department')][0]);else if(fx==='clearmgr')setCell(id,'manager','');
-    else if(fx==='laddertitle')setCell(id,'title',ladder(nv(d,e,'department'),nv(d,e,'level')));else if(fx==='move')d.moved.add(id)});
-  if(fx==='move')S.followups=d.moved.size;toast(fx==='move'?`Moved ${pl(ids.length,'row')} to a follow-up draft.`:`Fixed ${pl(ids.length,'row')}.`);render()}
+    else if(fx==='laddertitle')setCell(id,'title',ladder(nv(d,e,'department'),nv(d,e,'level')));else if(fx==='move')d.moved.add(id);else if(fx==='exception')d.exceptions.add(id);else if(fx==='ptokeep')setCell(id,'timeOff','')});
+  if(fx==='move')S.followups=d.moved.size;toast(fx==='move'?`Moved ${pl(ids.length,'row')} to a follow-up draft.`:fx==='exception'?`Exception requested for ${pl(ids.length,'row')}. Finance now approves ${ids.length===1?'it':'them'}.`:`Fixed ${pl(ids.length,'row')}.`);render()}
 function closeSheet(){S.se=null;render()}
 function openEditorFor(s,dup){const e=newEditor({segId:dup?null:s.id,name:dup?'Copy of '+s.name:s.name,desc:s.desc,type:s.type,source:s.source,groups:s.groups?clone(s.groups):undefined,excluded:dup?[]:(s.provenance?.excluded||[])});
   if(s.source==='csv')e.file={name:s.file.name,raw:null,header:['Employee ID',...s.columns.map(c=>c.label)],keyCol:0,types:{},cols:clone(s.columns),values:clone(s.values||{}),matched:s.members.slice(),unmatched:s.file.unmatched.slice(),rowsN:s.file.rows,showUnmatched:false};
@@ -998,7 +1156,7 @@ function openHM(a){const t=a.dataset.t,k=a.dataset.k;const r=a.getBoundingClient
   const f=ts.tf[k]||{};S.hm={t,k,x:r.left-8,y:r.bottom+6};S.hmd={op:f.cond?f.cond.op:'',v:f.cond?f.cond.v.slice():[],vals:f.vals?f.vals.slice():null,vq:'',ai:''};
   const cnt={};m.base.forEach(e=>{const v=dispVal(col,col.get(e));cnt[v]=(cnt[v]||0)+1});S.hmAll=Object.entries(cnt).sort((a2,b)=>a2[0].localeCompare(b[0]));renderHM()}
 function act(k,a){const d=S.d;switch(k){
-  case'nav':S.drawer=null;S.route=['bulk','segments','people'].includes(a.dataset.k)?a.dataset.k:'module';S.modName=a.dataset.k;S.approver=false;S.hm=null;if(S.se&&!S.se.inSheet)S.se=null;try{history.replaceState(null,'','#'+a.dataset.k)}catch(_){}render();window.scrollTo(0,0);break;
+  case'nav':S.drawer=null;S.route=['bulk','segments','people','settings'].includes(a.dataset.k)?a.dataset.k:'module';S.modName=a.dataset.k;S.approver=false;S.hm=null;if(S.se&&!S.se.inSheet)S.se=null;try{history.replaceState(null,'','#'+a.dataset.k)}catch(_){}render();window.scrollTo(0,0);break;
   case'size':setSize(+a.dataset.n);break;
   case'notes':S.notes=!S.notes;try{localStorage.setItem('bc-notes',S.notes?'1':'0')}catch(_){}render();break;
   case'demo':S.demo=!S.demo;renderDemo();break;
@@ -1053,7 +1211,7 @@ function act(k,a){const d=S.d;switch(k){
   case'pasteadd':{const toks=(d.who.paste||'').split(/[\n,;\t]+/).map(x=>x.trim()).filter(Boolean);const ids=[],miss=[];toks.forEach(t=>{const id=parsePerson(t);if(id){if(!ids.includes(id))ids.push(id)}else miss.push(t)});
     if(!ids.length){toast('None of those matched anyone.');break}addTargetCond(d,{f:'empid',op:'anyof',v:ids});d.who.paste='';d.who.pasteOpen=false;toast(`Added ${pl(ids.length,'person','people')}${miss.length?`. Not found: ${miss.slice(0,3).join(', ')}`:''}.`);render();break}
   case'autotg':{const m={leave:'incLeave',term:'incTerm',contract:'incContract'}[a.dataset.k];d.who[m]=!d.who[m];render();break}
-  case'exportlist':{const C=cohort(d);S.ov={type:'text',title:'Export the full list',sub:`${fmtN(C.list.length)} people. Copy it into a spreadsheet to check it against your own numbers.`,text:[csvLine(['Employee ID','Name','Title','Department','Work location','Level','Work Email'])].concat(C.list.map(e=>csvLine([e.id,e.name,e.title,e.department,e.location,e.level,e.email]))).join('\n')};renderOverlay();break}
+  case'exportlist':{const C=cohort(d);S.ov={type:'text',title:'Export the full list',sub:`${fmtN(C.list.length)} people. Copy it into a spreadsheet to check it against your own numbers.`,text:[csvLine(['Employee ID','Name','Title','Department','Work location','Level','Work email'])].concat(C.list.map(e=>csvLine([e.id,e.name,e.title,e.department,e.location,e.level,e.email]))).join('\n')};renderOverlay();break}
   case'newmenu':S.newMenu=!PREV.newMenu;render();break;
   case'newseg':S.newMenu=false;S.se=newEditor({type:a.dataset.t,source:'conditions'});S.route='segedit';S.focus='se-name';render();window.scrollTo(0,0);break;
   case'sltype':S.slType=a.dataset.k;render();break;
@@ -1106,16 +1264,28 @@ function act(k,a){const d=S.d;switch(k){
   case'suggest':{const f=a.dataset.f;if(!d.fields.includes(f)){d.fields.push(f);d.modes[f]='diff'}render();break}
   case'mode':d.modes[a.dataset.f]=a.dataset.m;if(a.dataset.f==='department'&&d.fields.includes('team'))d.modes.team=a.dataset.m;render();break;
   case'tool':{const t=a.dataset.k;if(t==='template'){const A=analyze(d);const fs=d.fields;S.ov={type:'text',title:'Download template',sub:`${fmtN(A.rows.length)} rows with today's values. Fill in the "(new)" columns and upload it back. Leave a cell empty for no change.`,
-      text:[csvLine(['Employee ID','Name','Work Email',...fs.flatMap(f=>[FIELDS[f].label+' (current)',FIELDS[f].label+' (new)'])])].concat(A.rows.map(e=>csvLine([e.id,e.name,e.email,...fs.flatMap(f=>[fmtVal(e,f,e[f]),''])]))).join('\n')};renderOverlay();break}
+      text:[csvLine(['Employee ID','Name','Work email',...fs.flatMap(f=>[FIELDS[f].label+' (current)',FIELDS[f].label+' (new)'])])].concat(A.rows.map(e=>csvLine([e.id,e.name,e.email,...fs.flatMap(f=>[fmtVal(e,f,e[f]),''])]))).join('\n')};renderOverlay();break}
     if(t==='upload'){S.ov={type:'upload',text:'',preview:null};renderOverlay();break}d.grid.tool=d.grid.tool===t?null:t;if(t==='ai')S.focus='ai-ta';render();break}
   case'gchanged':d.grid.changed=a.checked;d.grid.scroll=0;render();break;
   case'ggroup':d.grid.group=a.checked;d.grid.scroll=0;render();break;
   case'gcol':{const dp=a.dataset.dept;d.grid.collapsed.has(dp)?d.grid.collapsed.delete(dp):d.grid.collapsed.add(dp);refreshGrid();break}
   case'clearissue':d.grid.issue=null;render();break;
-  case'applyset':{const f=S.setF;const el=$('#setv');let v=el?el.value:'';const F=FIELDS[f];if(F.type==='money'||F.type==='int'){v=parseMoney(v);if(!isFinite(v)){toast('Enter an amount.');break}}if(F.type==='person'){v=parsePerson(v);if(!v){toast('Pick a manager from the list.');break}}if(v===''){toast('Enter a value.');break}
-    const rows=G.items.filter(x=>x.e).map(x=>x.e);rows.forEach(e=>setCell(e.id,f,f==='compensation'?roundComp(+v,nv(d,e,'per')):v));toast(`Set ${FIELDS[f].label} for ${pl(rows.length,'row')}.`);render();break}
-  case'addrule':{const f=$('#r-f').value,pct=parseFloat($('#r-pct').value),wf=$('#r-wf').value,wv=$('#r-wv').value.trim(),cap=$('#r-cap').value;if(!isFinite(pct)){toast('Enter a percentage.');break}
-    d.rules.push({field:f,pct,where:wv?{f:wf,v:[wv]}:null,cap:cap||null,ai:false,accepted:true});d.grid.tool=null;toast('Rule added. Values are in the grid.');render();break}
+  case'applyset':{const f=S.setF;const F=FIELDS[f];const el=$('#setv');let v=F.type==='select'||F.type==='team'?(S.setV||''):(el?el.value:'');if(F.type==='money'||F.type==='int'){v=parseMoney(v);if(!isFinite(v)){toast('Enter an amount.');break}}if(F.type==='person'){v=parsePerson(v);if(!v){toast('Pick a manager from the list.');break}}if(v===''){toast('Enter a value.');break}
+    const rows=G.items.filter(x=>x.e).map(x=>x.e);const cur=S.setCur||'local';let nconv=0;rows.forEach(e=>{let x=v;if(MONEY.has(f)&&cur!=='local'&&cur!==curCode(e)){x=conv(+v,cur,curCode(e));nconv++}setCell(e.id,f,f==='compensation'?roundComp(+x,nv(d,e,'per')):MONEY.has(f)?Math.round(+x/10)*10:x)});
+    toast(`Set ${FIELDS[f].label} for ${pl(rows.length,'row')}.${nconv?` ${pl(nconv,'amount')} converted to local currency.`:''}`);render();break}
+  case'addrule':{const R=S.rt;const n=parseMoney(R.val);if(!isFinite(n)){toast(R.kind==='pct'?'Enter a percentage.':'Enter an amount.');break}const w=R.wg.conds[0];
+    if(w&&!complete(w)){toast('Fill in the condition, or remove it to apply to everyone.');break}
+    d.rules.push({field:R.field,kind:R.kind,pct:R.kind==='pct'?n:undefined,amt:R.kind!=='pct'?n:undefined,cur:R.cur,where:w?clone(w):null,cap:R.field==='compensation'&&R.kind!=='set'&&R.cap?R.cap:null,ai:false,accepted:true});d.grid.tool=null;toast('Rule added. Values are in the grid.');render();break}
+  case'rtaddw':S.rt.wg.conds=[{f:'rating',op:'anyof',v:[]}];render();break;
+  case'gappr':d.grid.appr=a.dataset.k;d.grid.scroll=0;render();break;
+  case'apm':d.applyMode=a.value;render();break;
+  case'why':S.drawer={type:'why',id:a.dataset.id,f:a.dataset.f};renderDrawer();break;
+  case'whyissue':S.drawer={type:'issue',k:a.dataset.k};renderDrawer();break;
+  case'policy':S.drawer={type:'policy',k:a.dataset.k};renderDrawer();break;
+  case'fixrow':applyFix(a.dataset.issue,a.dataset.fix,[a.dataset.id]);break;
+  case'aiwho':{const ctx=a.dataset.ctx;const txt=(S.aiWho||{})[ctx]||'';const gs=aiTargeting(txt);if(!gs){toast("Couldn't turn that into conditions. Name a department, location, level, team, segment or date, for example: Engineering in the US at L5 and above.",'warning');break}
+    const G2=groupsOf(ctx);const n=gs.reduce((s2,g)=>s2+g.conds.length,0);if(G2.length===1&&!G2[0].conds.length)G2.splice(0,1,...gs);else G2.push(...gs);toast(`Drafted ${pl(n,'condition')}. Review them before you continue.`,'info');render();break}
+  case'aiok':{const g=groupsOf(a.dataset.ctx)[+a.dataset.g];if(g)delete g.ai;render();break}
   case'rmrule':d.rules.splice(+a.dataset.i,1);render();break;
   case'acceptai':d.rules[+a.dataset.i].accepted=true;toast('Accepted. Those cells are now yours.');render();break;
   case'aiex':S.aiText=a.dataset.t;render();break;
@@ -1144,18 +1314,42 @@ function act(k,a){const d=S.d;switch(k){
   case'arrive':d.run.phase='committed';startSync(d);render();break;
   case'retry':{const s=d.run.sync.find(x=>x.k===a.dataset.k);if(s){s.state='prog';s.fail=0;s.detail='';toast('Retrying after Raj Patel reactivated the accounts.');clearInterval(S.timer);S.timer=setInterval(()=>tick(d),700)}render();break}
   case'reversal':toast('A reversal draft with the old values is ready under Bulk change (not built in this prototype).');break;
-  case'upsample':S.ov.text=sampleCompChanges();S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
+  case'upsample':S.ov.text=d.fields.includes('spotBonus')?SAMPLES['q4-launch-bonus.csv']():d.fields.includes('laptop')?SAMPLES['laptop-refresh-q1-2027.csv']():sampleCompChanges();S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
   case'uppreview':S.ov.text=($('#up-ta')||{}).value||'';S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
   case'upapply':{const p=S.ov.preview;d.csvHits=new Set();p.writes.forEach(([id,f,v])=>{d.csv[id]=d.csv[id]||{};d.csv[id][f]=v;d.csvHits.add(id+'|'+f);if(d.manual[id])delete d.manual[id][f]});S.ov=null;toast(`Wrote ${pl(p.cells,'value')} into the grid. They're marked ↑.`);render();break}
   case'copy':{const ta=$('#ov-ta');const txt=ta.value;const fb=()=>{ta.focus();ta.select();toast('Selected. Press Ctrl+C or ⌘C to copy.')};try{navigator.clipboard.writeText(txt).then(()=>toast('Copied.'),fb)}catch(_){fb()}break}
 }}
-function parseAI(t){const s=t.toLowerCase();const m=s.match(/(\d+(?:\.\d+)?)\s*%/);if(!m)return null;const pct=+m[1];const bonus=/bonus/.test(s);let where=null;
-  for(const[k,v]of[['partially','Partially meets'],['exceed','Exceeds'],['below','Below'],['meets','Meets']])if(s.includes(k)){where={f:'rating',v:[v]};break}
-  const lm=s.match(/\bl([1-8])\b/);if(!where&&lm){const n=+lm[1];where={f:'level',v:/and above|or above|\+|and up/.test(s)?LEVELS.filter(l=>lvlN(l)>=n):['L'+n]}}
-  if(!where)for(const dp of DEPTS)if(s.includes(dp.toLowerCase())){where={f:'department',v:[dp]};break}
-  if(!where)for(const lc of LOCS)if(s.includes(lc.toLowerCase())){where={f:'location',v:[lc]};break}
-  return{field:bonus?'bonus':'compensation',pct,where,cap:/band max|maximum|cap/.test(s)?'max':/mid/.test(s)?'mid':null,ai:true,accepted:false}}
-
+function aiTargeting(text){const parts=String(text||'').split(/\s+or\s+/i);const groups=[];
+  for(const p of parts){const s2=p.toLowerCase();const conds=[];let m;
+    const deps=DEPTS.filter(x=>s2.includes(x.toLowerCase()));if(deps.length)conds.push({f:'department',op:'anyof',v:deps});
+    if(/\b(us|u\.s\.|united states)\b/.test(s2))conds.push({f:'location',op:'noneof',v:['Toronto']});else if(/\b(canada|canadian)\b/.test(s2))conds.push({f:'location',op:'anyof',v:['Toronto']});else{const locs=LOCS.filter(x=>s2.includes(x.toLowerCase()));if(locs.length)conds.push({f:'location',op:'anyof',v:locs})}
+    const tms=ALLTEAMS.filter(x=>s2.includes(x.toLowerCase()+' team')||s2.includes('team '+x.toLowerCase()));if(tms.length)conds.push({f:'team',op:'anyof',v:tms});
+    if((m=s2.match(/\bl([1-8])\b\s*(and above|\+|or above|and up|or higher)?/)))conds.push(m[2]?{f:'level',op:'gte',v:['L'+m[1]]}:{f:'level',op:'anyof',v:['L'+m[1]]});
+    const rts=RATINGS.filter(x=>new RegExp('\\b'+x.toLowerCase()+'\\b').test(s2));if(rts.length)conds.push({f:'rating',op:'anyof',v:rts});
+    if(/contractor/.test(s2))conds.push({f:'etype',op:'anyof',v:['Contractor']});else if(/full[- ]time/.test(s2))conds.push({f:'etype',op:'anyof',v:['Full-time']});
+    if(/on leave/.test(s2))conds.push({f:'status',op:'anyof',v:['On leave']});if(/\bhourly\b/.test(s2))conds.push({f:'per',op:'anyof',v:['Hourly']});else if(/\bsalaried\b/.test(s2))conds.push({f:'per',op:'anyof',v:['Salaried']});
+    if((m=s2.match(/(?:hired|joined|started)\s+(?:in\s+)?the\s+(?:past|last)\s+(week|month|year)/)))conds.push({f:'startDate',op:'on',v:['past'+m[1]]});
+    if((m=s2.match(/(?:hired|joined|started)\s+(before|after)\s+([0-9a-z\/ -]+?)(?:,|$|\s+and\s)/))&&parseDateStr(m[2].trim()))conds.push({f:'startDate',op:m[1],v:['exact',parseDateStr(m[2].trim())]});
+    if((m=s2.match(/reports?\s+to\s+([a-z]+\s+[a-z]+)/))&&NAMEIDX[m[1]])conds.push({f:'manager',op:'reportsAll',v:[NAMEIDX[m[1]]]});
+    const langs=['Spanish','French'].filter(x=>s2.includes(x.toLowerCase()));if(langs.length&&/speak/.test(s2))conds.push({f:'languages',op:'hasall',v:langs});
+    if((m=s2.match(/(?:base pay|pay|salary|compensation)\s+(?:over|above|more than|>)\s*\$?(\d[\d,.]*)\s*(k)?\s*(usd|cad)?/)))conds.push({f:'compensation',op:'gt',v:[String(parseFloat(m[1].replace(/,/g,''))*(m[2]?1000:1))],cur:(m[3]||'usd').toUpperCase()});
+    if((m=s2.match(/quota[^0-9]*?(?:over|above|at least|>=?)\s*(\d+)/)))conds.push({f:'quota',op:'gte',v:[m[1]]});
+    if((m=s2.match(/(?:on|in)\s+teams?\s+(?:with|of)\s+(?:more than|over)\s+(\d+)/)))conds.push({f:'teamHeadcount',op:'gt',v:[m[1]]});
+    if((m=s2.match(/departments?\s+(?:spending|with total (?:base )?pay)\s+(?:over|above|more than)\s*\$?(\d[\d,.]*)\s*(k|m)?/)))conds.push({f:'deptPay',op:'gt',v:[String(parseFloat(m[1].replace(/,/g,''))*(m[2]==='m'?1e6:m[2]==='k'?1e3:1))]});
+    for(const sg of SEGS){const nm=sg.name.toLowerCase();if(s2.includes('not in '+nm)||s2.includes('excluding '+nm))conds.push({f:'empid',op:'notinseg',v:[sg.id]});else if(s2.includes(nm))conds.push({f:'empid',op:'inseg',v:[sg.id]})}
+    if(conds.length)groups.push({mode:'all',conds,ai:true})}
+  return groups.length?groups:null}
+const aiBar=ctx=>`<div class="aibar"><span class="badge b-ai">✦ AI</span><input class="box" id="aiwho-${ctx}" data-in="aiwho" data-ctx="${ctx}" value="${esc((S.aiWho||{})[ctx]||'')}" placeholder="Describe who, e.g. Engineering in the US at L5 and above, hired in the past year"><button class="btn2 sm" data-act="aiwho" data-ctx="${ctx}">Draft conditions</button></div>`;
+function parseAI(t){const s2=t.toLowerCase();let where=null;
+  for(const[k,v]of[['partially','Partially meets'],['exceed','Exceeds'],['below','Below'],['meets','Meets']])if(s2.includes(k)){where={f:'rating',op:'anyof',v:[v]};break}
+  const lm=s2.match(/\bl([1-8])\b/);if(!where&&lm){const n=+lm[1];where=/and above|or above|\+|and up/.test(s2)?{f:'level',op:'gte',v:['L'+n]}:{f:'level',op:'anyof',v:['L'+n]}}
+  if(!where)for(const tm of ALLTEAMS)if(s2.includes(tm.toLowerCase()+' team')||s2.includes('team '+tm.toLowerCase())){where={f:'team',op:'anyof',v:[tm]};break}
+  if(!where)for(const dp of DEPTS)if(s2.includes(dp.toLowerCase())){where={f:'department',op:'anyof',v:[dp]};break}
+  if(!where)for(const lc of LOCS)if(s2.includes(lc.toLowerCase())){where={f:'location',op:'anyof',v:[lc]};break}
+  const field=/one[- ]time|spot|launch bonus|bonus of/.test(s2)?'spotBonus':/bonus/.test(s2)?'bonus':'compensation';
+  const am=s2.match(/(\d[\d,]*(?:\.\d+)?)\s*(k)?\s*(usd|cad|dollars?)\b/)||s2.match(/\$\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?/);
+  if(am){const amt=parseFloat(am[1].replace(/,/g,''))*(am[2]?1000:1);return{field,kind:field==='compensation'&&/raise|increase|add/.test(s2)?'add':'set',amt,cur:/cad/.test(s2)?'CAD':'USD',where,cap:null,ai:true,accepted:false}}
+  const m=s2.match(/(\d+(?:\.\d+)?)\s*%/);if(!m)return null;return{field,kind:'pct',pct:+m[1],where,cap:/band max|maximum|cap/.test(s2)?'max':/mid/.test(s2)?'mid':null,ai:true,accepted:false}}
 /* ================= events ================= */
 let PREV={};
 function closePopups(){PREV={pop:S.pop,menu:S.menu,hm:S.hm,segMenu:S.segMenu,newMenu:S.newMenu,dd:S.dd};const any=!!(S.pop||S.menu||S.hm||S.segMenu||S.newMenu||S.dd);
@@ -1165,9 +1359,10 @@ const ddBtn=(key,label,ph,cls='')=>`<button type="button" class="ddt ${cls} ${la
 const condAt=(ctx,g,c)=>{const G2=groupsOf(ctx);return G2&&G2[+g]?G2[+g].conds[+c]:null};
 function peopleGroups(filter){const by={};EMP.forEach(e=>{if(filter&&!filter(e))return;(by[e.department]=by[e.department]||[]).push({v:e.id,label:e.name,sub:`${e.id} · ${e.title}`,q:e.email})});return Object.keys(by).sort().map(k=>({label:k,items:by[k]}))}
 function ddSpec(key){const p=key.split(':');const t=p[0];
+  if(t==='bcur'){const cond=condAt(p[1],p[2],p[3]);if(!cond)return null;return{kind:'single',search:false,w:140,groups:[{label:'',items:Object.keys(FX).map(x=>({v:x,label:x}))}],value:cond.cur||'USD',apply:v=>{cond.cur=v}}}
   if(['bf','bo','bv','bseg','bppl','bpp1','brel','bvl'].includes(t)){const[,ctx,g,c,i]=p;const cond=condAt(ctx,g,c);if(!cond)return null;const F=fieldOf(cond);
     switch(t){
-      case'bf':{const by={};Object.entries(CF).forEach(([k,x])=>(by[x.grp]=by[x.grp]||[]).push({v:k,label:x.label,sub:TYPE_LABEL[x.type]}));return{kind:'single',ph:'Search fields',groups:Object.entries(by).map(([l,items])=>({label:l,items})),value:cond.f,apply:v=>{cond.f=v;const ty=CF[v].type;cond.op=ty==='id'?'inseg':OPS[ty][0][0];cond.v=[]}}}
+      case'bf':{const by={};Object.entries(CF).forEach(([k,x])=>(by[x.grp]=by[x.grp]||[]).push({v:k,label:x.label,sub:TYPE_LABEL[x.type]+(x.src?' · from '+x.src:'')+(x.agg?' · computed from current data':'')+(x.money?' · compared in the currency you pick':'')}));return{kind:'single',ph:'Search fields',groups:Object.entries(by).map(([l,items])=>({label:l,items})),value:cond.f,apply:v=>{cond.f=v;const ty=CF[v].type;cond.op=ty==='id'?'inseg':OPS[ty][0][0];cond.v=[]}}}
       case'bo':return{kind:'single',search:false,groups:[{label:'',items:OPS[F.type].map(([o,l])=>({v:o,label:l}))}],value:cond.op,apply:v=>{cond.op=v;cond.v=[]}};
       case'bv':{const counts={};EMP.forEach(e=>{const x=F.get(e);(Array.isArray(x)?x:[x]).forEach(y=>counts[y]=(counts[y]||0)+1)});let groups;
         if(cond.f==='team')groups=Object.entries(TEAMS).map(([d2,ts])=>({label:d2,items:ts.map(x=>({v:x,label:x,count:counts[x]||0}))}));
@@ -1194,6 +1389,15 @@ function ddSpec(key){const p=key.split(':');const t=p[0];
   if(t==='keycol'){const f=S.se&&S.se.file;if(!f)return null;return{kind:'single',search:false,groups:[{label:'',items:f.header.map((h,i)=>({v:String(i),label:h||'Column '+(i+1)}))}],value:String(f.keyCol),apply:v=>{f.keyCol=+v;if(f.raw)reparse(S.se)}}}
   if(t==='ctype'){const f=S.se&&S.se.file;if(!f)return null;const col=f.cols.find(x=>x.key===p[1]);return{kind:'single',search:false,w:160,groups:[{label:'',items:['text','num','date','bool','pick'].map(x=>({v:x,label:TYPE_LABEL[x]}))}],value:col.type,
     apply:v=>{f.types[col.key]=v;if(f.raw)reparse(S.se);else col.type=v;delete S.se.tf[col.key]}}}
+  if(t==='rtf'){const d=S.d;return{kind:'single',search:false,groups:[{label:'',items:['compensation','bonus','spotBonus'].filter(x=>d.fields.includes(x)).map(x=>({v:x,label:FIELDS[x].label}))}],value:S.rt.field,apply:v=>{S.rt.field=v;S.rt.kind=RKINDS[v][0][0]}}}
+  if(t==='rtk')return{kind:'single',search:false,w:240,groups:[{label:'',items:RKINDS[S.rt.field].map(([v,l])=>({v,label:l}))}],value:S.rt.kind,apply:v=>{S.rt.kind=v}};
+  if(t==='rtc'||t==='setcur'||t.startsWith('samecur')){const loc=t==='setcur';const items=[...(loc?[{v:'local',label:"Each person's currency",sub:'No conversion'}]:[]),...Object.keys(FX).map(x=>({v:x,label:x,sub:x==='USD'?'Converted to CAD for people in Toronto':'Converted to USD for people in the US'}))];
+    return{kind:'single',search:false,w:260,groups:[{label:'',items}],value:t==='rtc'?S.rt.cur:t==='setcur'?(S.setCur||'local'):((S.d.sameCur||{})[p[1]]||'USD'),apply:v=>{if(t==='rtc')S.rt.cur=v;else if(t==='setcur')S.setCur=v;else{S.d.sameCur=S.d.sameCur||{};S.d.sameCur[p[1]]=v}}}}
+  if(t==='rtcap')return{kind:'single',search:false,w:180,groups:[{label:'',items:[['max','band maximum'],['mid','band midpoint'],['','no cap']].map(([v,l])=>({v,label:l}))}],value:S.rt.cap,apply:v=>{S.rt.cap=v}};
+  if(t==='setf'){const d=S.d;return{kind:'single',ph:'Search fields',groups:[{label:'',items:d.fields.filter(f=>d.modes[f]!=='same').map(f=>({v:f,label:FIELDS[f].label}))}],value:S.setF,apply:v=>{S.setF=v;S.setV=''}}}
+  if(t==='setv'){const F=FIELDS[S.setF];const opts=F.type==='team'?Object.entries(TEAMS).map(([dp,ts])=>({label:dp,items:ts.map(x=>({v:x,label:x}))})):[{label:'',items:F.opts().map(x=>({v:x,label:x}))}];return{kind:'single',ph:'Search values',groups:opts,value:S.setV,apply:v=>{S.setV=v}}}
+  if(t.startsWith('same:')){const f=p[1];const F=FIELDS[f];const d=S.d;const opts=F.type==='team'?Object.entries(TEAMS).filter(([dp])=>!d.same.department||dp===d.same.department).map(([dp,ts])=>({label:dp,items:ts.map(x=>({v:x,label:x}))})):[{label:'',items:F.opts().map(x=>({v:x,label:x}))}];
+    return{kind:'single',ph:'Search values',groups:opts,value:d.same[f],apply:v=>{d.same[f]=v;if(f==='department'&&d.modes.team==='same'&&d.same.team&&!TEAMS[v]?.includes(d.same.team))d.same.team=TEAMS[v]?.[0]||''}}}
   if(t==='sample')return{kind:'single',search:false,w:300,groups:[{label:'',items:[['promotion-nominations-fy26.csv','Promotion nominations','Employee ID key · Yes/No, number, date and picklist columns'],['austin-office-movers.csv','Austin office movers','Work Email key · move date, relocation and parking columns']].map(([v,l,sb])=>({v,label:l,sub:sb}))}],value:null,apply:v=>{loadFile(S.se,v,SAMPLES[v]())}};
   return null}
 function renderDD(){const el=$('#pop2');if(!S.dd){el.innerHTML='';return}const sp=ddSpec(S.dd.key);if(!sp){S.dd=null;el.innerHTML='';return}
@@ -1253,6 +1457,8 @@ document.addEventListener('input',ev=>{const t=ev.target;const k=t.dataset.in;co
   if(k==='ddq'){S.dd.q=t.value;S.dd.focus=true;renderDD()}
   else if(k==='hfx'){S.hmd.v=[t.value];const m=MT[S.hm.t];const c=compileFormula(t.value,m.allCols);const el=$('#fxmsg');if(el){const cnt=c.ok?m.base.filter(e=>{try{return!!c.fn(e)}catch(_){return false}}).length:0;el.className=!t.value?'muted':c.ok?'done-t':'loss';el.textContent=!t.value?'Write a formula or describe it below.':c.ok?`Valid · ${pl(cnt,'row')} match`:c.err}}
   else if(k==='hai'){S.hmd.ai=t.value}
+  else if(k==='aiwho'){S.aiWho=S.aiWho||{};S.aiWho[t.dataset.ctx]=t.value}
+  else if(k==='rtv'){S.rt.val=t.value}
   else if(k==='popq'){S.popQ=t.value;S.focus='pop-q';render()}
   else if(k==='whatq'){S.whatQ=t.value;S.focus='what-q';render()}
   else if(k==='empq'){S.empQ=t.value;S.focus='emp-q';render()}
@@ -1276,8 +1482,8 @@ window.addEventListener('resize',()=>{if(S.hm){S.hm=null;renderHM()}if(S.dd){S.d
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(['bulk','segments','people'].includes(h)&&S.route!==h){S.route=h;render()}});
 
 /* ================= boot ================= */
-build(S.size);makeSeeds();S.d=demoDraft();
+build(S.size);makeSeeds();S.d=demoDraft();S.parked=extraDrafts();
 const h0=location.hash.slice(1);if(['bulk','segments','people'].includes(h0))S.route=h0;
 render();
-window.__app={S,act,render,SEGS:()=>SEGS,members,MT,cohort,testVal,evalGroups,EMP:()=>EMP,segById,SAMPLES,compileFormula,aiFormula,testSheet};
+window.__app={rowApprovals,aiTargeting,parseAI,conv,whyIssue,ISS,analyze,impact,S,act,render,SEGS:()=>SEGS,members,MT,cohort,testVal,evalGroups,EMP:()=>EMP,segById,SAMPLES,compileFormula,aiFormula,testSheet};
 })();
