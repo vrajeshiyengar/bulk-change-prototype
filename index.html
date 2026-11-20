@@ -597,6 +597,18 @@ body.is-busy #app,body.is-busy #snav{opacity:.6;transition:opacity .2s}
 .fnode.chk::after{content:'Checking…';position:absolute;right:12px;top:9px;font-size:12px;color:var(--blue);animation:chkout .2s ease forwards;animation-delay:calc(var(--d) + 450ms)}
 @keyframes chkin{to{opacity:1}}@keyframes chkout{to{opacity:0;visibility:hidden}}
 @media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}.skel i{animation:none}}
+
+/* v12 workflows & rules */
+.stages4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.stages4 div{border:1px solid var(--rule);border-top:3px solid var(--plum);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;font-size:12.5px;background:var(--card)}.stages4 b{font-size:13.5px}.stages4 span{color:var(--label)}
+.t.wfb td{vertical-align:middle}tr.offrow td{opacity:.5}
+.switch{position:relative;display:inline-block;width:36px;height:20px}.switch input{opacity:0;width:0;height:0}.switch span{position:absolute;inset:0;background:#D0D0D6;border-radius:999px;transition:.15s;cursor:pointer}
+.switch span::before{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}.switch input:checked+span{background:var(--ok)}.switch input:checked+span::before{transform:translateX(16px)}
+.switch input:focus-visible+span{outline:2px solid var(--blue);outline-offset:2px}
+.cond-x{display:block;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--nav);border:1px solid var(--rule);border-radius:6px;padding:10px 12px;white-space:pre-wrap}
+.callout-i{border:1px solid #CFDAF8;background:#F3F6FE;border-radius:8px;padding:10px 14px;font-size:13.5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{border:1px solid var(--rule2);background:var(--card);border-radius:999px;padding:2px 9px;font:12px ui-monospace,Menlo,monospace;color:var(--label);cursor:pointer}.chip:hover{border-color:var(--blue);color:var(--blue)}
+@media (max-width:860px){.stages4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.rows .v .seg2{display:inline-flex;width:auto;align-self:flex-start}
 </style>
 </head>
 <body>
