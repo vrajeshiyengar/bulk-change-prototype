@@ -17,7 +17,7 @@ a.btn{align-self:flex-start;border:1px solid var(--plum);color:var(--plum);backg
 .links{display:flex;gap:10px;flex-wrap:wrap}@media (max-width:860px){.seq{grid-template-columns:repeat(2,minmax(0,1fr))}}.foot{max-width:none}</style></head><body><article class="doc">
 <div class="dochead"><img src="assets/logo.png" alt="Rippling"><span class="dh-m">Bulk change · product case study · Vrajesh Iyengar</span></div>
 <h2><span class="circ">1</span>How I chose the approach</h2>
-<p><b>The user:</b> a non-technical HR admin who does this a few times a year: a comp cycle, a reorg, an office move, a laptop refresh. Every edit touches someone's pay or access and is audited. <b>Also involved:</b> the Finance and People approvers, and the IT owner of each connected app. <b>Range:</b> a dozen people at a 10-person company up to thousands at a 5,000-person one, across more than one country and currency.</p>
+<p><b>The user:</b> a non-technical HR admin who does this a few times a year: a comp cycle, a reorg, an office move, a laptop refresh. Every edit touches someone's pay or access and is audited. <b>Also involved:</b> the Finance and People approvers, and the IT owner of each connected app. <b>Range:</b> a dozen people at a 10-person company up to 100,000 at the largest, across more than one country and currency. The flow is the same at every size; only the waiting changes.</p>
 <div class="tw"><table><thead><tr><th>Option</th><th>Pros</th><th>Cons for this user</th></tr></thead><tbody>
 <tr><td><b>CSV round-trip</b></td><td>Familiar from Excel; any scale; comp is planned offline anyway</td><td>No validation or impact preview until upload; error loops</td></tr>
 <tr class="pick"><td><b>In-product workspace</b></td><td>Live validation and a diff; one place to review; works at 12 rows and at 5,000</td><td>Harder to build; has to hold thousands of rows and hundreds of fields</td></tr>
@@ -31,6 +31,7 @@ a.btn{align-self:flex-start;border:1px solid var(--plum);color:var(--plum);backg
 <tr><td>Values</td><td>To what</td><td>One <b>Change values</b> operation (field, operation, who) previews and then executes into a grid that looks like the profile's Edit mode. Cell edits, CSV and AI are other ways in. Everything is undoable and logged</td></tr>
 <tr><td>Review &amp; confirm</td><td>Is it right</td><td>A deterministic change list is the record; an AI summary cites it line by line; every number opens the people behind it</td></tr>
 <tr><td>Impact &amp; approvals</td><td>What it sets off</td><td>A flowchart of every system that re-verifies, the decisions only the admin can make, and approvals routed per row by thresholds</td></tr>
+<tr><td>Settings › Workflows and rules</td><td>What the checks are</td><td>Every block, warning and approval comes from a rule attached to the workflow. Owners tune thresholds, see the impact on in-flight changes, and activate a new version (Appendix 1)</td></tr>
 </tbody></table></div>
 <div class="callout"><b>Where I changed my mind</b><span>In my last round I rejected an in-product grid outright. I was wrong. Review needs a grid anyway, because nobody can approve 400 comp changes inside a CSV. So CSV became one way into the grid, not a separate path.</span>
 <span>While building it, I also merged "set a value" and "apply a rule" into one operation. Both mean "these people, this field, this value", and two tools for one idea made people ask which one wins.</span></div>
@@ -44,6 +45,8 @@ a.btn{align-self:flex-start;border:1px solid var(--plum);color:var(--plum);backg
 <div><b>Every flag says why and who owns it</b><span>Error recovery</span><small>The reason, the fix, and the rule's owner, one click from the cell.</small></div>
 <div><b>Show approval needs while editing</b><span>Feedforward</span><small>Which rows wait for Finance is known before submit, not after.</small></div>
 <div><b>Every number opens its people</b><span>Trust calibration</span><small>Counts are verified, not believed.</small></div>
+<div><b>Rules are configuration, owned and versioned</b><span>Single source of truth</span><small>One rule, many workflows; every flag points at the version that raised it.</small></div>
+<div><b>Show the wait, never hide it</b><span>Visibility of system status</span><small>At 100,000 rows, loaders say what is running and pause only what depends on it.</small></div>
 <div><b>Manage by exception</b><span>Von Restorff</span><small>Hundreds of rows are past what anyone can scan.</small></div>
 <div><b>AI drafts, people commit</b><span>Automation bias</span><small>An auditable pay change needs a person who checked it.</small></div>
 <div><b>Defaults fail safe</b><span>Default effect</span><small>No change, no email, no app sync before the effective date.</small></div></div>
