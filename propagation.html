@@ -45,13 +45,13 @@ a.btn{align-self:flex-start;border:1px solid var(--plum);color:var(--plum);backg
 <tr><td>Third-party failure</td><td><b>Never blocks or rolls back</b></td><td>The app owner by name, plus one digest to the submitter</td></tr>
 <tr><td>Employees</td><td>Never for sync</td><td>Only business events, opt-in, on the effective date</td></tr></tbody></table></div></div>
 <h3>The hard parts</h3><div class="pgrid">
-<div><b>Payroll cutoff</b><span>First-party</span><small>Late approvals choose next run with retro pay, or off-cycle, before submit.</small></div>
+<div><b>Payroll cutoff</b><span>First-party</span><small>If a change misses a locked pay run, everyone is still paid on time at their current pay; the difference follows as retro pay, an off-cycle run, or an exported register.</small></div>
 <div><b>Currencies</b><span>First-party</span><small>Amounts entered in one currency are paid in each person's own, at Finance's rate, cited on the cell.</small></div>
 <div><b>Location changes</b><span>First-party</span><small>Tax state, leave policy and benefits region move with the work location. A new country is a transfer, not a bulk edit.</small></div>
 <div><b>Partial approval</b><span>First-party</span><small>Rows apply together, or each as it clears; sent-back rows never block the rest.</small></div>
 <div><b>Dynamic segments</b><span>First-party</span><small>Membership is frozen at submit, so approvers sign off on named people.</small></div>
 <div><b>Rate limits</b><span>Third-party</span><small>Batch and throttle; show an ETA instead of an error.</small></div>
-<div><b>App rejects a value</b><span>Third-party</span><small>Route the app's own message to its owner. Rippling's value stands.</small></div>
+<div><b>App rejects a value</b><span>Third-party</span><small>Ten automatic retries, each wait doubling (1 min up to 8 h). Then the app's owner at the company is notified with the fix for their app admin, and a Rippling Support ticket opens with the failed rows. Rippling's value stands.</small></div>
 <div><b>Irreversible effects</b><span>Third-party</span><small>Access removals and email renames are framed as losses and wait for the effective date.</small></div>
 <div><b>A rule changes mid-flight</b><span>First-party</span><small>In-flight drafts are re-evaluated and the owner sees the impact before activating. Flags already raised keep the version that raised them.</small></div>
 <div><b>Something changes before the effective date</b><span>First-party</span><small>Rules run again before commit. A manager who got a termination date after approval blocks only that row.</small></div>
