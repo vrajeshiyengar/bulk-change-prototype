@@ -13,19 +13,40 @@ p,li{max-width:74ch}p{margin:0}.circ{width:30px;height:30px;border-radius:50%;ba
 .quote{font-size:16px;border-left:4px solid var(--plum);padding:4px 0 4px 16px;margin:0}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.pgrid div{border:1px solid var(--rule);border-radius:8px;padding:10px 12px;font-size:13.5px;display:flex;flex-direction:column;gap:2px}.pgrid b{font-size:14px}.pgrid span{color:var(--plum);font-size:12.5px;font-weight:500}.pgrid small{color:var(--label)}
 a.btn{align-self:flex-start;border:1px solid var(--plum);color:var(--plum);background:#FBF3F7;border-radius:999px;padding:7px 14px;font-weight:600;text-decoration:none}
-.foot{font-size:12px;color:var(--label);text-align:center;margin-top:16px}</style></head><body><article class="doc">
+.foot{font-size:12px;color:var(--label);text-align:center;margin-top:16px}.seq{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.seq div{border:1px solid var(--rule);border-top:3px solid var(--plum);border-radius:8px;padding:8px 10px;font-size:12.5px;display:flex;flex-direction:column;gap:2px}.seq b{font-size:13.5px}.seq span{color:var(--label)}
+.links{display:flex;gap:10px;flex-wrap:wrap}@media (max-width:860px){.seq{grid-template-columns:repeat(2,minmax(0,1fr))}}.foot{max-width:none}</style></head><body><article class="doc">
 <div class="dochead"><img src="assets/logo.png" alt="Rippling"><span class="dh-m">Bulk change · product case study · Vrajesh Iyengar</span></div>
 <h2><span class="circ">1</span>How I chose the approach</h2>
-<p><b>The user:</b> a non-technical HR admin who does this a few times a year: a comp cycle, a reorg, an office move. Every edit touches someone's pay or access and is audited. <b>Also involved:</b> the Finance approver, and the IT owner of each connected app. <b>Range:</b> a dozen people at a 10-person company up to thousands at a 5,000-person one.</p>
+<p><b>The user:</b> a non-technical HR admin who does this a few times a year: a comp cycle, a reorg, an office move, a laptop refresh. Every edit touches someone's pay or access and is audited. <b>Also involved:</b> the Finance and People approvers, and the IT owner of each connected app. <b>Range:</b> a dozen people at a 10-person company up to thousands at a 5,000-person one, across more than one country and currency.</p>
 <div class="tw"><table><thead><tr><th>Option</th><th>Pros</th><th>Cons for this user</th></tr></thead><tbody>
 <tr><td><b>CSV round-trip</b></td><td>Familiar from Excel; any scale; comp is planned offline anyway</td><td>No validation or impact preview until upload; error loops</td></tr>
-<tr class="pick"><td><b>In-product grid</b></td><td>Live validation and a diff; one place to review; fine at 12 rows</td><td>Harder to build; has to hold thousands of rows</td></tr>
+<tr class="pick"><td><b>In-product workspace</b></td><td>Live validation and a diff; one place to review; works at 12 rows and at 5,000</td><td>Harder to build; has to hold thousands of rows and hundreds of fields</td></tr>
 <tr><td><b>API / MCP</b></td><td>Automatable</td><td>Wrong persona; no human review step</td></tr>
 <tr><td><b>Copilot</b></td><td>Fastest way to state intent</td><td>Nobody can approve pay they can't see row by row</td></tr></tbody></table></div>
 <h3>The pick</h3>
-<p>One bulk-change workspace. <b>Segments</b> say who: saved dynamic rules or static lists of employee IDs, referenced or built right inside the change. One grid, which looks like the profile's Edit mode across many rows, holds every value. CSV is a way into that grid. The copilot drafts into it and never submits. An API can come later on the same engine.</p>
-<div class="callout"><b>Where I changed my mind</b><span>In my last round I rejected an in-product grid outright. I was wrong. Review needs a grid anyway, because nobody can approve 400 comp changes inside a CSV. So CSV became one way into the grid, not a separate path.</span></div>
-<h3>Principles every screen answers to</h3><div class="pgrid"><div><b>Rippling commits; apps catch up</b><span>Mental-model match</span><small>A Slack failure must never look like it undid a raise.</small></div><div><b>The grid is the profile, multiplied</b><span>Jakob's law</span><small>Nothing new to learn for a task done once a year.</small></div><div><b>Segments are reusable objects</b><span>Recognition over recall</span><small>A vetted group is referenced, not rebuilt from memory.</small></div><div><b>One grid, many doors</b><span>Tesler's law</span><small>Filter, CSV and AI share one set of safety checks.</small></div><div><b>Prevent before commit</b><span>Norman: forcing functions</span><small>Pay already run can't be undone cleanly.</small></div><div><b>Manage by exception</b><span>Von Restorff</span><small>Hundreds of rows are past what anyone can scan.</small></div><div><b>AI drafts, people commit</b><span>Automation bias</span><small>An auditable pay change needs a person who checked it.</small></div><div><b>Defaults fail safe</b><span>Default effect</span><small>No change, no email, no app sync before the effective date.</small></div></div>
+<p>One bulk-change workspace in seven steps: <b>Details → Segments → Fields → Values → Review &amp; confirm → Impact &amp; approvals → Submit &amp; track.</b></p>
+<div class="tw"><table><thead><tr><th>Step</th><th>What it decides</th><th>The core decision</th></tr></thead><tbody>
+<tr><td>Segments</td><td>Exactly who</td><td>Reusable dynamic or static segments, one condition builder for everything, a live count with a labelled delta</td></tr>
+<tr><td>Fields</td><td>What changes</td><td>Picked from a searchable catalogue of every field (standard, custom, app and connector), with descriptions and when each was last used</td></tr>
+<tr><td>Values</td><td>To what</td><td>One <b>Change values</b> operation (field, operation, who) previews and then executes into a grid that looks like the profile's Edit mode. Cell edits, CSV and AI are other ways in. Everything is undoable and logged</td></tr>
+<tr><td>Review &amp; confirm</td><td>Is it right</td><td>A deterministic change list is the record; an AI summary cites it line by line; every number opens the people behind it</td></tr>
+<tr><td>Impact &amp; approvals</td><td>What it sets off</td><td>A flowchart of every system that re-verifies, the decisions only the admin can make, and approvals routed per row by thresholds</td></tr>
+</tbody></table></div>
+<div class="callout"><b>Where I changed my mind</b><span>In my last round I rejected an in-product grid outright. I was wrong. Review needs a grid anyway, because nobody can approve 400 comp changes inside a CSV. So CSV became one way into the grid, not a separate path.</span>
+<span>While building it, I also merged "set a value" and "apply a rule" into one operation. Both mean "these people, this field, this value", and two tools for one idea made people ask which one wins.</span></div>
+<h3>Principles every screen answers to</h3><div class="pgrid">
+<div><b>Rippling commits; apps catch up</b><span>Mental-model match</span><small>A Slack failure must never look like it undid a raise.</small></div>
+<div><b>The grid is the profile, multiplied</b><span>Jakob's law</span><small>Nothing new to learn for a task done once a year.</small></div>
+<div><b>Segments are reusable objects</b><span>Recognition over recall</span><small>A vetted group is referenced, not rebuilt from memory.</small></div>
+<div><b>One operation, many doors</b><span>Tesler's law</span><small>Change values, cell edits, CSV and AI share one set of checks.</small></div>
+<div><b>No attribute is special</b><span>Consistency</span><small>Rules, filters and grouping work on every field type.</small></div>
+<div><b>Prevent before commit</b><span>Norman: forcing functions</span><small>Pay already run can't be undone cleanly.</small></div>
+<div><b>Every flag says why and who owns it</b><span>Error recovery</span><small>The reason, the fix, and the rule's owner, one click from the cell.</small></div>
+<div><b>Show approval needs while editing</b><span>Feedforward</span><small>Which rows wait for Finance is known before submit, not after.</small></div>
+<div><b>Every number opens its people</b><span>Trust calibration</span><small>Counts are verified, not believed.</small></div>
+<div><b>Manage by exception</b><span>Von Restorff</span><small>Hundreds of rows are past what anyone can scan.</small></div>
+<div><b>AI drafts, people commit</b><span>Automation bias</span><small>An auditable pay change needs a person who checked it.</small></div>
+<div><b>Defaults fail safe</b><span>Default effect</span><small>No change, no email, no app sync before the effective date.</small></div></div>
 <p style="color:var(--label);font-size:14px"><b>Deliberately not used:</b> goal-gradient, endowed progress and social proof. They push motivation, and this admin isn't short of motivation. They're short of confidence.</p>
-<a class="btn" href="index.html">Open the prototype →</a></article><a class="btn" href="user-stories.html">User stories and acceptance criteria ↗</a>
-<p class="foot">Concept prototype for a Rippling product case study. Fictional company and data. Not a Rippling product.</p></body></html>
+<div class="links"><a class="btn" href="index.html">Open the prototype →</a><a class="btn" href="user-stories.html">User stories and acceptance criteria →</a><a class="btn" href="propagation.html">Propagating the change →</a></div></article>
+<p class="foot">Concept prototype for a Rippling product case study. Acme Corp and all data are fictional. Not a Rippling product.</p></body></html>

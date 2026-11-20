@@ -13,22 +13,47 @@ p,li{max-width:74ch}p{margin:0}.circ{width:30px;height:30px;border-radius:50%;ba
 .quote{font-size:16px;border-left:4px solid var(--plum);padding:4px 0 4px 16px;margin:0}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.pgrid div{border:1px solid var(--rule);border-radius:8px;padding:10px 12px;font-size:13.5px;display:flex;flex-direction:column;gap:2px}.pgrid b{font-size:14px}.pgrid span{color:var(--plum);font-size:12.5px;font-weight:500}.pgrid small{color:var(--label)}
 a.btn{align-self:flex-start;border:1px solid var(--plum);color:var(--plum);background:#FBF3F7;border-radius:999px;padding:7px 14px;font-weight:600;text-decoration:none}
-.foot{font-size:12px;color:var(--label);text-align:center;margin-top:16px}</style></head><body><article class="doc">
+.foot{font-size:12px;color:var(--label);text-align:center;margin-top:16px}.seq{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.seq div{border:1px solid var(--rule);border-top:3px solid var(--plum);border-radius:8px;padding:8px 10px;font-size:12.5px;display:flex;flex-direction:column;gap:2px}.seq b{font-size:13.5px}.seq span{color:var(--label)}
+.links{display:flex;gap:10px;flex-wrap:wrap}@media (max-width:860px){.seq{grid-template-columns:repeat(2,minmax(0,1fr))}}.foot{max-width:none}</style></head><body><article class="doc">
 <div class="dochead"><img src="assets/logo.png" alt="Rippling"><span class="dh-m">Bulk change · product case study · Vrajesh Iyengar</span></div>
 <h2><span class="circ">3</span>Propagating the change</h2>
 <p class="quote">Rippling is the system of record. A change commits once it's approved and its effective date arrives. Each downstream system syncs as its own job. A third-party failure never blocks or rolls back the Rippling change, and never blocks payroll.</p>
+<h3>The order of events</h3>
+<div class="seq"><div><b>1 · Submit</b><span>Errors fixed or moved out; warnings acknowledged</span></div><div><b>2 · Approve</b><span>Per row, by threshold; sent-back rows become a follow-up draft</span></div><div><b>3 · Effective date</b><span>All rows together, or each as its approvals clear</span></div><div><b>4 · Rippling commits</b><span>The record changes; this is the point of truth</span></div><div><b>5 · Products read it</b><span>Payroll, benefits, time off, devices, workflows re-verify</span></div><div><b>6 · Apps sync</b><span>One job per app; retried, never rolled back</span></div></div>
 <h3>How we know which systems to update</h3>
-<p>Each integration subscribes to profile fields. The changed fields, crossed with those subscriptions and the people who have an account in each app, give exactly the Integrated Apps list on the Impact &amp; approvals step. The IT owner sets the mapping up once; the HR admin never does.</p>
-<div class="tw"><table><thead><tr><th>Field</th><th>Slack</th><th>Google Workspace</th><th>GitHub</th></tr></thead><tbody>
-<tr><td>Title</td><td>Profile title</td><td>Directory title</td><td>—</td></tr><tr><td>Department, Team</td><td>User groups</td><td>Org unit, Groups</td><td>Team membership</td></tr>
-<tr><td>Manager</td><td>Profile manager</td><td>Directory manager</td><td>—</td></tr><tr><td>Work Email</td><td>Account email</td><td>Primary email (renames sign-in)</td><td>SSO identity</td></tr></tbody></table></div>
+<p>Each integration subscribes to profile fields. The changed fields, crossed with those subscriptions and the people who have an account in each app, give exactly the systems on the Impact &amp; approvals flowchart: what each one re-verifies, and which ones aren't affected at all. The IT owner sets the mapping up once; the HR admin never does.</p>
+<div class="tw"><table><thead><tr><th>Field</th><th>Slack</th><th>Google Workspace</th><th>GitHub</th><th>PagerDuty</th></tr></thead><tbody>
+<tr><td>Title</td><td>Profile title</td><td>Directory title</td><td>—</td><td>—</td></tr>
+<tr><td>Department, Team</td><td>User groups</td><td>Org unit, Groups</td><td>Team membership</td><td>—</td></tr>
+<tr><td>Manager</td><td>Profile manager</td><td>Directory manager</td><td>—</td><td>Escalation policy</td></tr>
+<tr><td>Work location</td><td>Time zone</td><td>Building</td><td>—</td><td>Time zone</td></tr>
+<tr><td>Work email</td><td>Account email</td><td>Primary email (renames sign-in)</td><td>SSO identity</td><td>Login</td></tr>
+<tr><td>On-call rotation</td><td>On-call group</td><td>—</td><td>—</td><td>Schedule</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>Rippling product at Acme Corp</th><th>What it re-verifies</th></tr></thead><tbody>
+<tr><td>Payroll</td><td>Re-runs the payroll preview for the run the effective date lands in; Finance checks it before the cutoff. Pay is in each person's currency.</td></tr>
+<tr><td>Benefits</td><td>Re-checks eligibility; recalculates salary-linked coverage; opens enrollment when the class or region changes</td></tr>
+<tr><td>Time off</td><td>Recalculates policies, accruals and balances on the effective date</td></tr>
+<tr><td>Device Management</td><td>Orders devices or re-applies the device policy before the effective date</td></tr>
+<tr><td>Approval workflows</td><td>Re-routes pending time off and expense approvals to new managers</td></tr></tbody></table></div>
 <div class="callout"><b>Block or notify</b><div class="tw"><table><thead><tr><th>Event</th><th>Blocks?</th><th>Who hears</th></tr></thead><tbody>
-<tr><td>Validation error, missing permission</td><td>Blocks submit</td><td>Submitter, inline</td></tr>
-<tr><td>Approval pending or rejected</td><td>Holds those rows only</td><td>Approver, then submitter</td></tr>
+<tr><td>Validation error, missing permission</td><td>Blocks submit, unless the rows are moved to a follow-up draft</td><td>Submitter, on the cell, with the rule and its owner</td></tr>
+<tr><td>Warning (unusual but valid)</td><td>Needs an acknowledgement, with an optional note</td><td>Submitter; the note goes to the audit log</td></tr>
+<tr><td>Approval pending or sent back</td><td>Holds those rows only</td><td>Approver, then the submitter, with the reason</td></tr>
 <tr><td>Approval lands after the payroll cutoff</td><td>Choice made before submit</td><td>Payroll admin, if off-cycle</td></tr>
-<tr><td>First-party effect (benefits, leave, devices)</td><td>Never: they read the record</td><td>That product's admin, as a digest</td></tr>
+<tr><td>Access will be removed in an app</td><td>Must be acknowledged before submit</td><td>Submitter now; app owner on the day</td></tr>
+<tr><td>First-party effect (benefits, time off, devices)</td><td>Never: they read the record</td><td>That product's admin, as a digest</td></tr>
 <tr><td>Third-party failure</td><td><b>Never blocks or rolls back</b></td><td>The app owner by name, plus one digest to the submitter</td></tr>
 <tr><td>Employees</td><td>Never for sync</td><td>Only business events, opt-in, on the effective date</td></tr></tbody></table></div></div>
-<h3>The hard parts</h3><div class="pgrid"><div><b>Payroll cutoff</b><span>First-party</span><small>Late approvals choose next run with retro pay, or off-cycle, before submit.</small></div><div><b>Location changes</b><span>First-party</span><small>Tax state, leave policy and benefits region move with the work location.</small></div><div><b>Dynamic segments</b><span>First-party</span><small>Membership is frozen at submit, so approvers sign off on named people.</small></div><div><b>Rate limits</b><span>Third-party</span><small>Batch and throttle; show an ETA instead of an error.</small></div><div><b>App rejects a value</b><span>Third-party</span><small>Route the app's own message to its owner. Rippling's value stands.</small></div><div><b>Irreversible effects</b><span>Third-party</span><small>Access removals and email renames are framed as losses and wait for the effective date.</small></div></div>
+<h3>The hard parts</h3><div class="pgrid">
+<div><b>Payroll cutoff</b><span>First-party</span><small>Late approvals choose next run with retro pay, or off-cycle, before submit.</small></div>
+<div><b>Currencies</b><span>First-party</span><small>Amounts entered in one currency are paid in each person's own, at Finance's rate, cited on the cell.</small></div>
+<div><b>Location changes</b><span>First-party</span><small>Tax state, leave policy and benefits region move with the work location. A new country is a transfer, not a bulk edit.</small></div>
+<div><b>Partial approval</b><span>First-party</span><small>Rows apply together, or each as it clears; sent-back rows never block the rest.</small></div>
+<div><b>Dynamic segments</b><span>First-party</span><small>Membership is frozen at submit, so approvers sign off on named people.</small></div>
+<div><b>Rate limits</b><span>Third-party</span><small>Batch and throttle; show an ETA instead of an error.</small></div>
+<div><b>App rejects a value</b><span>Third-party</span><small>Route the app's own message to its owner. Rippling's value stands.</small></div>
+<div><b>Irreversible effects</b><span>Third-party</span><small>Access removals and email renames are framed as losses and wait for the effective date.</small></div>
+<div><b>Reversal</b><span>Both</span><small>A new draft pre-filled with the old values, through the same checks and approvals, linked in the audit log.</small></div></div>
 <p class="quote">Your payroll run never depends on GitHub being up.</p>
-<a class="btn" href="index.html">Back to the prototype →</a></article><p class="foot">Concept prototype for a Rippling product case study. Fictional company and data. Not a Rippling product.</p></body></html>
+<div class="links"><a class="btn" href="index.html">Back to the prototype →</a><a class="btn" href="approach.html">How I chose the approach →</a><a class="btn" href="user-stories.html">User stories →</a></div></article>
+<p class="foot">Concept prototype for a Rippling product case study. Acme Corp and all data are fictional. Not a Rippling product.</p></body></html>
