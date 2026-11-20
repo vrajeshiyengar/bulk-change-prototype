@@ -147,7 +147,7 @@ const OPS={
   pick:[['anyof','is any of'],['noneof','is none of'],['empty','is empty'],['nempty','is not empty']],
   ord:[['anyof','is any of'],['noneof','is none of'],['gte','is at least'],['lte','is at most'],['between','is between']],
   num:[['eq','='],['ne','≠'],['gt','>'],['gte','≥'],['lt','<'],['lte','≤'],['between','is between'],['nbetween','is not between'],['empty','is empty'],['nempty','is not empty']],
-  date:[['on','is'],['before','is before'],['after','is after'],['onbefore','is on or before'],['onafter','is on or after'],['between','is between'],['pastN','is in the past N days'],['nextN','is in the next N days'],['empty','is empty']],
+  date:[['on','is'],['before','is before'],['after','is after'],['between','is between'],['empty','is empty'],['nempty','is not empty']],
   person:[['is','is'],['isnot','is not'],['reports','reports directly to'],['reportsAll','reports to (any level)'],['empty','is empty']],
   multi:[['hasany','has any of'],['hasall','has all of'],['hasnone','has none of'],['empty','is empty']],
   bool:[['yes','is Yes'],['no','is No']]
@@ -156,7 +156,14 @@ const TYPE_LABEL={text:'Text',num:'Number',date:'Date',bool:'Yes / No',pick:'Pic
 const NOVAL=new Set(['empty','nempty','yes','no']),TWO=new Set(['between','nbetween']),LISTOP=new Set(['anyof','noneof','hasany','hasall','hasnone']);
 const opLabel=(t,o)=>((OPS[t]||[]).find(x=>x[0]===o)||[0,o])[1];
 const isEmpty=v=>v===undefined||v===null||v===''||(Array.isArray(v)&&!v.length);
-function complete(c){if(NOVAL.has(c.op))return true;const v=c.v||[];const ok=x=>x!==undefined&&x!==null&&x!=='';if(TWO.has(c.op))return ok(v[0])&&ok(v[1]);if(LISTOP.has(c.op))return v.length>0;return ok(v[0])}
+function complete(c){if(NOVAL.has(c.op))return true;const v=c.v||[];const ok=x=>x!==undefined&&x!==null&&x!=='';const F=CF[c.f];
+  if(F&&F.type==='date'&&['on','before','after'].includes(c.op))return ok(v[0])&&(v[0]!=='exact'||ok(v[1]));
+  if(TWO.has(c.op))return ok(v[0])&&ok(v[1]);if(LISTOP.has(c.op))return v.length>0;return ok(v[0])}
+const REL=[['today','Today'],['tomorrow','Tomorrow'],['yesterday','Yesterday'],['pastweek','In the past week'],['pastmonth','In the past month'],['pastyear','In the past year'],['exact','Exact date']];
+const relLabel=t=>(REL.find(x=>x[0]===t)||[0,''])[1];
+function relRange(tok,ex){const T=TODAY;switch(tok){case'today':return[T,T];case'tomorrow':return[addDays(T,1),addDays(T,1)];case'yesterday':return[addDays(T,-1),addDays(T,-1)];
+  case'pastweek':return[addDays(T,-7),T];case'pastmonth':{const a=new Date(T);a.setMonth(a.getMonth()-1);return[a,T]}case'pastyear':{const a=new Date(T);a.setFullYear(a.getFullYear()-1);return[a,T]}
+  case'exact':{const d=fromIso(ex);return d?[d,d]:null}}return null}
 function testVal(t,val,c,e){const v=c.v||[];const op=c.op;
   if(op==='empty')return isEmpty(val);if(op==='nempty')return!isEmpty(val);
   switch(t){
@@ -166,26 +173,29 @@ function testVal(t,val,c,e){const v=c.v||[];const op=c.op;
     case'pick':return op==='anyof'?v.includes(val):op==='noneof'?!v.includes(val):false;
     case'ord':{const n=lvlN(val);if(op==='anyof')return v.includes(val);if(op==='noneof')return!v.includes(val);if(op==='gte')return n>=lvlN(v[0]);if(op==='lte')return n<=lvlN(v[0]);if(op==='between'){const a=lvlN(v[0]),b=lvlN(v[1]);return n>=Math.min(a,b)&&n<=Math.max(a,b)}return false}
     case'num':{if(isEmpty(val))return op==='ne'||op==='nbetween';const n=+val,a=+v[0],b=+v[1];switch(op){case'eq':return n===a;case'ne':return n!==a;case'gt':return n>a;case'gte':return n>=a;case'lt':return n<a;case'lte':return n<=a;case'between':return n>=Math.min(a,b)&&n<=Math.max(a,b);case'nbetween':return n<Math.min(a,b)||n>Math.max(a,b)}return false}
-    case'date':{if(isEmpty(val))return false;const s=String(val),a=String(v[0]||''),b=String(v[1]||'');switch(op){case'on':return s===a;case'before':return s<a;case'after':return s>a;case'onbefore':return s<=a;case'onafter':return s>=a;case'between':return s>=(a<b?a:b)&&s<=(a<b?b:a);
-      case'pastN':return s<=iso(TODAY)&&s>=iso(addDays(TODAY,-(+v[0]||0)));case'nextN':return s>=iso(TODAY)&&s<=iso(addDays(TODAY,+v[0]||0))}return false}
+    case'date':{if(isEmpty(val))return false;const s=String(val);if(op==='between'){const a=String(v[0]||''),b=String(v[1]||'');return s>=(a<b?a:b)&&s<=(a<b?b:a)}
+      const r=relRange(v[0],v[1]);if(!r)return false;const a=iso(r[0]),b=iso(r[1]);return op==='on'?s>=a&&s<=b:op==='before'?s<a:op==='after'?s>b:false}
     case'person':{if(op==='is')return val===v[0];if(op==='isnot')return val!==v[0];if(op==='reports')return e.manager===v[0];if(op==='reportsAll')return under(e,v[0]);return false}
     case'multi':{const arr=Array.isArray(val)?val:[];if(op==='hasany')return v.some(x=>arr.includes(x));if(op==='hasall')return v.every(x=>arr.includes(x));if(op==='hasnone')return!v.some(x=>arr.includes(x));return false}
     case'bool':{const y=val===true||/^(yes|y|true|1)$/i.test(String(val??'').trim());return op==='yes'?y:!y}}
   return false}
 const fieldOf=c=>CF[c.f]||{label:c.f,type:'text',get:()=>''};
 const testCond=(c,e)=>{const F=fieldOf(c);return testVal(F.type,F.get(e),c,e)};
-function evalGroups(groups,e){for(let i=0;i<groups.length;i++){const g=groups[i];const cs=g.conds.filter(complete);if(!cs.length)continue;
-  if(g.mode==='all'?cs.every(c=>testCond(c,e)):cs.some(c=>testCond(c,e)))return i}return-1}
+function groupMatch(g,e){const cs=g.conds.filter(complete);if(!cs.length)return false;const m=g.mode||'all';
+  if(m==='all')return cs.every(c=>testCond(c,e));if(m==='any')return cs.some(c=>testCond(c,e));
+  let k=0;for(const c of cs)if(testCond(c,e))k++;const n=+g.n||1;return m==='atleast'?k>=n:m==='atmost'?k<=n:k===n}
+function evalGroups(groups,e){for(let i=0;i<groups.length;i++){if(!groups[i].conds.some(complete))continue;if(groupMatch(groups[i],e))return i}return-1}
 function names(ids){const n=ids.map(id=>EMPI[id]?.name||id);return n.length>3?n.slice(0,3).join(', ')+` and ${n.length-3} more`:n.join(', ')}
 function fmtCV(t,x){if(t==='num')return isFinite(+x)?fmtN(+x):String(x);if(t==='date')return fmtIso(x)||String(x);return String(x)}
 function condTxt(c){const F=fieldOf(c);const v=c.v||[];let vt='';
   if(!NOVAL.has(c.op)){if(F.type==='id'){vt=(c.op==='inseg'||c.op==='notinseg')?`"${segName(v[0])}"`:['eq','ne','anyof','noneof'].includes(c.op)?names(v):`"${v[0]||''}"`}
-    else if(F.type==='person')vt=EMPI[v[0]]?.name||'…';else if(TWO.has(c.op))vt=`${fmtCV(F.type,v[0])} and ${fmtCV(F.type,v[1])}`;else if(c.op==='pastN'||c.op==='nextN')vt=`${v[0]} days`;
-    else if(LISTOP.has(c.op))vt=v.join(', ');else if(F.type==='text')vt=`"${v[0]||''}"`;else vt=fmtCV(F.type,v[0])}
+    else if(F.type==='person')vt=EMPI[v[0]]?.name||'…';else if(F.type==='date'&&c.op!=='between')vt=v[0]==='exact'?fmtIso(v[1]):relLabel(v[0]).toLowerCase();
+    else if(TWO.has(c.op))vt=`${fmtCV(F.type,v[0])} and ${fmtCV(F.type,v[1])}`;else if(LISTOP.has(c.op))vt=v.join(', ');else if(F.type==='text')vt=`"${v[0]||''}"`;else vt=fmtCV(F.type,v[0])}
   return`${F.label} ${opLabel(F.type,c.op)}${vt?' '+vt:''}`}
 function groupsTxt(groups){const live=groups.filter(g=>g.conds.some(complete));if(!live.length)return'';
-  return live.map(g=>{const cs=g.conds.filter(complete);const s=cs.map(condTxt).join(g.mode==='all'?' and ':' or ');return live.length>1&&cs.length>1?`(${s})`:s}).join(', or ')}
-
+  return live.map(g=>{const cs=g.conds.filter(complete);const m=g.mode||'all';let s;
+    if(m==='all'||m==='any')s=cs.map(condTxt).join(m==='all'?' and ':' or ');else s=`${{atleast:'at least',atmost:'at most',exactly:'exactly'}[m]} ${g.n||1} of: ${cs.map(condTxt).join('; ')}`;
+    return live.length>1&&cs.length>1?`(${s})`:s}).join(', or ')}
 /* ================= segments store ================= */
 let SEGS=[],SEGN=110;const SEGC=new Map();const SEGSTACK=[];
 const segById=id=>SEGS.find(s=>s.id===id);
@@ -225,18 +235,32 @@ function sampleNominations(){const r=rng(EMP.length+77);const pool=EMP.filter(e=
     lines.push(csvLine([i%9===4?e.email:e.id,e.name,EMPI[e.manager]?.name||'',yes?'Strong':(r()<.5?'Solid':'Developing'),flag,'L'+Math.min(8,lvlN(e.level)+(yes?1:0)),i%3===0?inc+'%':String(inc),date]))});
   lines.push(csvLine(['E9991','Left in October','','','No','','','']),csvLine(['E9874','Typo row','','','Yes','','','']),csvLine(['jordan.smith@metzhand.com','Not in Rippling','','','Yes','','','']));
   return lines.join('\n')}
+function sampleMovers(){const r=rng(EMP.length+31);const pool=EMP.filter(e=>e.location!=='Austin'&&e.location!=='Toronto'&&['Sales','Customer Support','Marketing'].includes(e.department)&&e.etype==='Full-time');
+  const pick=pool.filter(()=>r()<.25).slice(0,Math.max(5,Math.round(EMP.length*.05)));
+  const lines=[csvLine(['Work Email','Employee name','Desk','Move date','Relocation package','Parking needed','Notes'])];
+  pick.forEach((e,i)=>{const dd=4+Math.floor(r()*24);lines.push(csvLine([i%5===2?' '+e.email.toUpperCase()+' ':e.email,e.name,`${'ABC'[i%3]}-${String(10+Math.floor(r()*40))}`,`${String(dd).padStart(2,'0')}/01/2027`,r()<.6?'Yes':'No',r()<.4?'Y':'N',i%4===0?'Needs a standing desk':'']))});
+  lines.push(csvLine(['casey.nguyen@metzhand.com','Not in Rippling','B-11','11/01/2027','Yes','N','']),csvLine(['old.contractor@agency.com','External','C-02','18/01/2027','No','N','']));
+  return lines.join('\n')}
+function sampleCompChanges(){const r=rng(EMP.length+5);const rows=EMP.filter(e=>e.etype==='Full-time'&&e.status==='Active'&&e.rating!=='Below'&&e.department!=='Executive').filter(()=>r()<.2).slice(0,400);
+  const lines=[csvLine(['Employee ID','Name','Compensation (new)','Level (new)','Title (new)','Manager notes'])];let k=0;
+  rows.forEach(e=>{const promo=e.rating==='Exceeds'&&lvlN(e.level)<7&&r()<.35;const nl=promo?'L'+(lvlN(e.level)+1):'';const b=band(e,nl||e.level,e.per);
+    let v=roundComp(promo?Math.max(e.compensation*1.08,b.min+(b.mid-b.min)*.5):e.compensation*(1.03+r()*.05),e.per);k++;
+    const amt=e.per==='Hour'?'$'+v.toFixed(2):[`$${fmtN(v)}`,String(v),(v/1000).toFixed(1)+'k',v.toString().replace(/(\d)(?=(\d\d)+\d{3}$)/g,'$1,').replace(/(\d)(\d{3})$/,'$1,$2')][k%4];
+    lines.push(csvLine([e.id,e.name,amt,nl,promo?ladder(e.department,nl):'',promo?'Promotion approved in calibration':(r()<.08?'Hold for mid-year':'')]))});
+  lines.push(csvLine(['E9991','Former employee','$90,000','','','']),csvLine(['E9992','Typo row','abc','','','']));return lines.join('\n')}
+const SAMPLES={'promotion-nominations-fy26.csv':()=>sampleNominations(),'austin-office-movers.csv':()=>sampleMovers(),'fy26-comp-changes.csv':()=>sampleCompChanges()};
 function makeSeeds(){SEGS=[];SEGN=110;SEGC.clear();
   const dyn=(id,name,desc,groups,owner,updated,usedSeed)=>({id,name,desc,type:'dynamic',source:'conditions',groups,owner,updated,created:updated,usedSeed:usedSeed||[],version:1});
   SEGS.push(dyn('SEG-101','All full-time employees','Everyone on a full-time contract.',[{mode:'all',conds:[{f:'etype',op:'anyof',v:['Full-time']}]}],'Dana Okuneva','12 Nov 2026'));
-  const se=newEditor({type:'static',source:'csv'});loadFile(se,'promotion-nominations-fy26.csv',sampleNominations());const pf=se.file.cols.find(c=>c.label==='Promo flag');
-  se.tf={[pf.key]:{cond:{op:'yes',v:[]},vals:null}};const keep=tableRows(se,edBase(se),edColsAll(se));
+  const se=newEditor({type:'static',source:'csv'});loadFile(se,'promotion-nominations-fy26.csv',SAMPLES['promotion-nominations-fy26.csv']());const pf=se.file.cols.find(c=>c.label==='Promo flag');
+  se.tf={[pf.key]:{cond:null,vals:['Yes']}};const keep=tableRows(se,edBase(se),edColsAll(se));
   SEGS.push({id:'SEG-104',name:'FY26 promotion nominees',desc:'Calibration nominations with Promo flag = Yes.',type:'static',source:'csv',members:keep.map(e=>e.id),columns:clone(se.file.cols),
     values:Object.fromEntries(keep.map(e=>[e.id,se.file.values[e.id]])),file:{name:se.file.name,rows:se.file.rowsN,matched:se.file.matched.length,unmatched:se.file.unmatched.slice()},
     provenance:{filters:['Promo flag is Yes'],excluded:[],search:''},snapshotAt:'14 Nov 2026, 18:40 IST',owner:'Priya Shah',updated:'14 Nov 2026',created:'14 Nov 2026',usedSeed:[],version:1});
   SEGS.push(dyn('SEG-102','Engineering · US · L5 and above','Senior engineers outside Canada.',[{mode:'all',conds:[{f:'department',op:'anyof',v:['Engineering']},{f:'location',op:'noneof',v:['Toronto']},{f:'level',op:'gte',v:['L5']}]}],'Dana Okuneva','3 Nov 2026',['Q4 reorg · Platform']));
   SEGS.push(dyn('SEG-103','L7s in San Francisco, or Marketing in Austin who speak Spanish and French','Bilingual go-to-market leads for the LATAM and Quebec launch.',[{mode:'all',conds:[{f:'level',op:'anyof',v:['L7']},{f:'location',op:'anyof',v:['San Francisco']}]},{mode:'all',conds:[{f:'department',op:'anyof',v:['Marketing']},{f:'location',op:'anyof',v:['Austin']},{f:'languages',op:'hasall',v:['Spanish','French']}]}],'You','19 Nov 2026'));
   SEGS.push(dyn('SEG-106','On leave or leaving','People on leave or with a scheduled termination.',[{mode:'any',conds:[{f:'status',op:'anyof',v:['On leave','Scheduled termination']}]}],'Dana Okuneva','1 Nov 2026'));
-  const ag=[{mode:'all',conds:[{f:'location',op:'anyof',v:['Austin']},{f:'startDate',op:'before',v:['2026-07-01']}]}];
+  const ag=[{mode:'all',conds:[{f:'location',op:'anyof',v:['Austin']},{f:'startDate',op:'before',v:['exact','2026-07-01']}]}];
   SEGS.push({id:'SEG-105',name:'Austin office movers · Q3',desc:'Austin-based people at the time of the Q3 move.',type:'static',source:'conditions',groups:ag,members:EMP.filter(e=>evalGroups(ag,e)>=0).slice(0,Math.max(3,Math.round(EMP.length*.03))).map(e=>e.id),
     snapshotAt:'22 Sep 2026, 16:05 IST',owner:'You',updated:'22 Sep 2026',created:'22 Sep 2026',usedSeed:['Austin office move'],version:1})}
 
@@ -359,23 +383,32 @@ const ICON={bulk:'<path d="M2 5l6-3 6 3-6 3z M2 8l6 3 6-3 M2 11l6 3 6-3" fill="n
 const ic=k=>`<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">${ICON[k]}</svg>`;
 const NAV=[['bulk','Bulk change'],['segments','Segments'],['people','People'],'sep',['payroll','Payroll'],['benefits','Benefits'],['time','Time'],['devices','Devices'],['apps','Apps'],['reports','Reports'],['settings','Settings']];
 function navKey(){return S.route==='draft'?'bulk':(S.route==='segment'||S.route==='segedit')?'segments':S.route==='module'?S.modName:S.route}
-function renderNav(){const k=navKey();$('#gnav').innerHTML=`<div class="nh">Workforce</div>`+NAV.map(x=>x==='sep'?'<div class="sep"></div><div class="nh">Products</div>':`<button class="${x[0]===k?'on':''}" data-act="nav" data-k="${x[0]}">${ic(x[0])}${x[1]}</button>`).join('')}
+function renderNav(){const k=navKey();const tier=S.route==='draft'&&!!S.d;$('#frame').classList.toggle('tier',tier);
+  $('#gnav').innerHTML=`<div class="nh">Workforce</div>`+NAV.map(x=>x==='sep'?'<div class="sep"></div><div class="nh">Products</div>':`<button class="${x[0]===k?'on':''}" data-act="nav" data-k="${x[0]}" title="${x[1]}">${ic(x[0])}<span class="lbl">${x[1]}</span></button>`).join('');
+  $('#snav').innerHTML=tier?snavHtml():''}
+function snavHtml(){const d=S.d;const locked=!!d.run;
+  const steps=STEPS.map((s,i)=>{const can=locked?s.k==='status':d.visited.has(s.k)&&s.k!=='status';const on=s.k===S.step&&!S.approver;const done=d.visited.has(s.k)&&!on&&!locked;return navBtn(s.t,on,`data-act="step" data-k="${s.k}"`,!can,done?'✓':String(i+1),done?'done':'')}).join('');
+  return`<div class="sh"><button class="crumbback" data-act="nav" data-k="bulk">← All bulk changes</button><b>${esc(d.name||'New bulk change')}</b><small class="muted">${esc(d.id)}${locked?' · submitted':' · draft'}</small></div>${steps}${S.approver?navBtn('Approval · Priya Shah',true,'',false,'•'):''}<div class="side-foot">${locked?'Submitted changes are read-only. Use Create reversal to change them.':'Autosaved · 11:20 IST'}</div>`}
 function render(){dirty();let h='';
   switch(S.route){case'bulk':h=bulkList();break;case'draft':h=draftPage();break;case'segments':h=segList();break;case'segment':h=segDetail();break;
     case'segedit':h=`<div class="crumbs"><button data-act="nav" data-k="segments">Segments</button><span>/</span><span>${S.se.segId?'Edit segment':'New '+(S.se.type==='static'?'static':'dynamic')+' segment'}</span></div>`+segEditor(S.se);break;
     case'people':h=peoplePage();break;default:h=placeholder()}
   $('#app').innerHTML=h+`<p class="disclaimer">Concept prototype by Vrajesh Iyengar for a Rippling product case study. Metzhand, its people and all data are fictional. Not a Rippling product.</p>`;
-  renderNav();renderSheet();renderOverlay();renderNotes();renderDemo();renderHM();afterRender()}
+  renderNav();renderSheet();renderOverlay();renderNotes();renderDemo();renderDrawer();renderHM();renderDD();afterRender()}
 function renderSheet(){const on=!!(S.se&&S.se.inSheet);$('#sheet').classList.toggle('on',on);$('#sheetbg').classList.toggle('on',on);
   $('#sheet').innerHTML=on?`<div class="sheet-h"><b>Create segment</b><span class="muted" style="font-size:13px">Your bulk change stays open behind this. Saving adds the segment to its targeting.</span><span class="sp"></span><button class="btn2 sm" data-act="sheetclose">Close X</button></div><div class="sheet-b">${segEditor(S.se)}</div>`:''}
 function renderDemo(){$('#demo').innerHTML=(S.demo?`<div class="dpanel pp"><span class="demo-l">Demo controls · not part of the product</span>
   <div><div class="muted" style="margin-bottom:4px">Company size</div><div class="seg2">${[12,412,5000].map(n=>`<button class="${S.size===n?'on':''}" data-act="size" data-n="${n}">${fmtN(n)}</button>`).join('')}</div></div>
   <label class="tg"><input type="checkbox" data-act="notes" ${S.notes?'checked':''}> Show "Why this?" notes</label>
-  <div style="display:flex;flex-direction:column;gap:4px"><a href="approach.html" target="_blank" rel="noopener">Approach (presentation page) ↗</a><a href="propagation.html" target="_blank" rel="noopener">Propagation (presentation page) ↗</a></div></div>`:'')+`<button class="fab" data-act="demo">${S.demo?'Close':'Demo controls'}</button>`}
-let TT=0;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(TT);TT=setTimeout(()=>t.classList.remove('on'),3400)}
+  <div style="display:flex;flex-direction:column;gap:4px"><span class="muted">Presentation pages</span><a href="approach.html" target="_blank" rel="noopener">Approach ↗</a><a href="propagation.html" target="_blank" rel="noopener">Propagation ↗</a></div>
+  <div style="display:flex;flex-direction:column;gap:4px"><span class="muted">Sample CSV files (match the ${fmtN(412)}-person company)</span>${Object.keys(SAMPLES).map(f=>`<a href="samples/${f}" download>${f}</a>`).join('')}</div></div>`:'')+`<button class="fab" data-act="demo">${S.demo?'Close':'Demo controls'}</button>`}
+function toast(m,type){if(!type)type=/^(Name the|Add at least|No one would|Enter |Pick |Fill in|Choose an|None of|Try a|Add a reason|No one called|Give the|Fix the formula)/.test(m)||/isn't an amount/.test(m)?'error':/^(Not part|This is Dana|Change the date|Selected\.|A reversal)/.test(m)?'info':'success';
+  const el=document.createElement('div');el.className='toast t-'+type;el.setAttribute('role',type==='error'?'alert':'status');
+  el.innerHTML=`<span class="ti">${{success:'✓',error:'!',warning:'!',info:'i'}[type]}</span><div><b>${{success:'Done',error:"Can't continue",warning:'Check this',info:'Note'}[type]}</b><div>${esc(m)}</div></div><button class="tx" aria-label="Dismiss">×</button><i class="tbar" style="animation-duration:${type==='error'?8:5}s"></i>`;
+  el.querySelector('.tx').onclick=()=>el.remove();el.querySelector('.tbar').addEventListener('animationend',()=>el.remove());const box=$('#toasts');box.prepend(el);while(box.children.length>4)box.lastChild.remove()}
 const navBtn=(label,on,attrs='',dis=false,n='',cls='')=>`<button class="nav-i ${on?'on':''} ${cls}" ${attrs} ${dis?'disabled':''}>${n?`<span class="n">${n}</span>`:''}${esc(label)}</button>`;
 const kv=(l,v,c='')=>`<div class="kv"><span>${esc(l)}</span><b class="${c}" title="${esc(String(v).replace(/<[^>]+>/g,''))}">${v}</b></div>`;
-const row=(l,v)=>`<div class="r"><div class="l">${esc(l)}</div><div class="v">${v}</div></div>`;
+const row=(l,v,req)=>`<div class="r"><div class="l ${req?'req':''}">${esc(l)}</div><div class="v">${v}</div></div>`;
 const person=(e,sub)=>`<span class="person"><span class="av">${initials(e.name)}</span><span><b>${esc(e.name)}</b>${sub?`<br><small class="muted">${esc(sub)}</small>`:''}</span></span>`;
 function renderSearch(){const q=S.gq.trim().toLowerCase();const el=$('#gres');if(q.length<2){el.innerHTML='';return}
   const ppl=EMP.filter(e=>e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q)).slice(0,5);const segs=SEGS.filter(s=>s.name.toLowerCase().includes(q)).slice(0,4);
@@ -385,35 +418,34 @@ function renderSearch(){const q=S.gq.trim().toLowerCase();const el=$('#gres');if
     (drs.length?'<h6>Bulk changes</h6>'+drs.map(d=>`<button data-act="gsd" data-id="${d.id}"><span>${esc(d.name)}</span><span class="muted">${d.id}</span></button>`).join(''):''))||'<h6>No results</h6>'}
 
 /* ================= pages: bulk list, people, placeholder ================= */
-function bulkList(){const rows=[];
-  for(const d of [S.d,...S.parked].filter(Boolean)){const A=analyze(d);const st=d.run?(d.run.phase==='approval'?'<span class="badge b-warn">Awaiting approval</span>':d.run.phase==='scheduled'?'<span class="badge b-appr">Scheduled</span>':'<span class="badge b-ok">Committed</span>'):`<span class="badge b-lock">Draft · ${esc(STEPS.find(s=>s.k===lastStep(d)).t)}</span>`;
-    const segs=[...new Set(d.who.groups.flatMap(g=>g.conds.filter(c=>c.f==='empid'&&c.op==='inseg'&&c.v[0]).map(c=>segName(c.v[0]))))];
-    rows.push(`<tr class="click" data-act="resume" data-id="${d.id}"><td><b>${esc(d.name||'Untitled change')}</b><br><small class="muted">${d.id} · You · edited today</small></td><td>${st}</td><td>${segs.length?esc(segs.join(', ')):'<span class="muted">Custom conditions</span>'}</td><td class="num">${fmtN(A.rows.length)}</td><td>${d.fields.map(f=>FIELDS[f].label).join(', ')||'—'}</td><td>${d.date?fmtD(d.date,true):'—'}</td></tr>`)}
-  if(S.followups)rows.push(`<tr><td><b>${esc((S.d&&S.d.name)||'FY26 annual review')} · follow-ups</b><br><small class="muted">Rows moved out of the main change</small></td><td><span class="badge b-lock">Draft</span></td><td class="muted">Named employees</td><td class="num">${fmtN(S.followups)}</td><td>Compensation, Title, Level</td><td>${fmtD(NEXTP,true)}</td></tr>`);
-  rows.push(`<tr class="click" data-act="q4"><td><b>Q4 reorg · Platform</b><br><small class="muted">BC-2037 · Dana Okuneva · edited 2 days ago</small></td><td><span class="badge b-lock">Draft · Values</span></td><td>Engineering · US · L5 and above</td><td class="num">${EMP.filter(e=>CONFLICT.has(e.id)).length}</td><td>Department, Team, Manager</td><td>${fmtD(D(2027,0,1),true)}</td></tr>`);
-  rows.push(`<tr><td><b>Austin office move</b><br><small class="muted">BC-2019 · You · completed</small></td><td><span class="badge b-ok">Committed</span></td><td>Austin office movers · Q3</td><td class="num">${members('SEG-105').size}</td><td>Work location, Manager</td><td>${fmtD(D(2026,8,22),true)}</td></tr>`);
+function bulkList(){const rows=[];const iso2=d=>d?iso(d):'';
+  for(const d of [S.d,...S.parked].filter(Boolean)){const A=analyze(d);const st=d.run?(d.run.phase==='approval'?'Awaiting approval':d.run.phase==='scheduled'?'Scheduled':'Committed'):`Draft · ${STEPS.find(s=>s.k===lastStep(d)).t}`;
+    rows.push({id:d.id,act:'resume',name:d.name||'Untitled change',sub:`${d.id} · You · edited today`,status:st,segs:[...new Set(d.who.groups.flatMap(g=>g.conds.filter(c=>c.f==='empid'&&c.op==='inseg'&&c.v[0]).map(c=>segName(c.v[0]))))].join(', ')||'Custom conditions',people:A.rows.length,fields:d.fields.map(f=>FIELDS[f].label).join(', '),eff:iso2(d.date)})}
+  if(S.followups)rows.push({id:'fu',name:`${(S.d&&S.d.name)||'FY26 annual review'} · follow-ups`,sub:'Rows moved out of the main change',status:'Draft',segs:'Named employees',people:S.followups,fields:'Compensation, Title, Level',eff:iso(NEXTP)});
+  rows.push({id:'BC-2037',act:'q4',name:'Q4 reorg · Platform',sub:'BC-2037 · Dana Okuneva · edited 2 days ago',status:'Draft · Values',segs:'Engineering · US · L5 and above',people:EMP.filter(e=>CONFLICT.has(e.id)).length,fields:'Department, Team, Manager',eff:'2027-01-01'});
+  rows.push({id:'BC-2019',name:'Austin office move',sub:'BC-2019 · You · completed',status:'Committed',segs:'Austin office movers · Q3',people:members('SEG-105').size,fields:'Work location, Manager',eff:'2026-09-22'});
+  const badge=st=>st.startsWith('Draft')?`<span class="badge b-lock">${esc(st)}</span>`:st==='Committed'?`<span class="badge b-ok">${st}</span>`:st==='Scheduled'?`<span class="badge b-appr">${st}</span>`:`<span class="badge b-warn">${esc(st)}</span>`;
+  const cols=[{key:'name',label:'Change',type:'text',get:r=>r.name,render:r=>`<b>${esc(r.name)}</b><br><small class="muted">${esc(r.sub)}</small>`},{key:'status',label:'Status',type:'pick',get:r=>r.status,render:r=>badge(r.status)},
+    {key:'segs',label:'Segments',type:'text',get:r=>r.segs,wrap:true},{key:'people',label:'People',type:'num',get:r=>r.people},{key:'fields',label:'Fields',type:'text',get:r=>r.fields,wrap:true},{key:'eff',label:'Effective',type:'date',get:r=>r.eff}];
   return`<div class="ph"><div><h1>Bulk change</h1><p>Change attributes for many employees at once. Drafts save as you go.</p></div><div class="pa"><button class="btn2" data-act="nav" data-k="segments">Manage segments</button><button class="btn" data-act="newdraft">New bulk change</button></div></div>
-  <div class="pcard" style="padding:6px 8px"><div class="tw"><table class="t"><thead><tr><th>Change</th><th>Status</th><th>Segments</th><th>People</th><th>Fields</th><th>Effective</th></tr></thead><tbody>${rows.join('')}</tbody></table></div></div>`}
+  ${dataTable('bulk',tsOf('bulk'),rows,cols,{searchPh:'Search bulk changes',rowAttrs:r=>r.act?`data-act="${r.act}" data-id="${r.id}"`:''})}`}
 function lastStep(d){let k='setup';STEPS.forEach(s=>{if(d.visited.has(s.k)&&(s.k!=='status'||d.run))k=s.k});return k}
-function peoplePage(){const q=(S.pq||'').toLowerCase();const list=EMP.filter(e=>!q||e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q)||e.title.toLowerCase().includes(q)).slice(0,100);
-  return`<div class="ph"><div><h1>People</h1><p>${fmtN(EMP.length)} employees at Metzhand. Open anyone to see the single-employee profile.</p></div></div>
-  <div class="pcard"><div class="mtool"><input class="search" id="pq" data-in="pq" value="${esc(S.pq||'')}" placeholder="Search by name, ID or title"><span class="muted">Showing ${fmtN(list.length)}${list.length===100?'+':''}</span></div>
-  <div class="tw"><table class="t"><thead><tr><th>Name</th><th>Employee ID</th><th>Title</th><th>Department</th><th>Work location</th><th>Start date</th></tr></thead><tbody>${list.map(e=>`<tr class="click" data-act="profile" data-id="${e.id}"><td>${person(e)}</td><td class="num">${e.id}</td><td>${esc(e.title)}</td><td>${esc(e.department)}</td><td>${esc(e.location)}</td><td class="num">${fmtIso(e.startDate)}</td></tr>`).join('')}</tbody></table></div></div>`}
+function peoplePage(){const cols=[{key:'name',label:'Name',type:'text',get:e=>e.name,render:e=>person(e)},{key:'id',label:'Employee ID',type:'text',get:e=>e.id},{key:'title',label:'Title',type:'text',get:e=>e.title},{key:'department',label:'Department',type:'pick',get:e=>e.department},
+    {key:'location',label:'Work location',type:'pick',get:e=>e.location},{key:'level',label:'Level',type:'ord',get:e=>e.level},{key:'startDate',label:'Start date',type:'date',get:e=>e.startDate}];
+  return`<div class="ph"><div><h1>People</h1><p>${fmtN(EMP.length)} employees at Metzhand. Open anyone to see the single-employee profile.</p></div></div>${dataTable('people',tsOf('people'),EMP,cols,{searchPh:'Search people',rowAttrs:e=>`data-act="profile" data-id="${e.id}"`})}`}
 function placeholder(){const n=(NAV.find(x=>x[0]===S.modName)||[0,'Module'])[1];return`<div class="ph"><div><h1>${esc(n)}</h1></div></div><div class="pcard"><div class="empty"><b>Not part of this prototype</b><span>Bulk change, Segments and People are built. ${esc(n)} reads the same employee record they change.</span><button class="btn2" data-act="nav" data-k="bulk">Go to Bulk change</button></div></div>`}
 
 /* ================= draft (bulk change editor) ================= */
 function draftPage(){if(S.approver)return`<div class="crumbs"><button data-act="nav" data-k="bulk">Bulk change</button><span>/</span><span>${esc(S.d.name)}</span><span>/</span><span>Approval</span></div>`+approverView();
   return`<div class="crumbs"><button data-act="nav" data-k="bulk">Bulk change</button><span>/</span><span>${esc(S.d.name||'New bulk change')}</span></div>`+draftView()}
 function draftView(){const d=S.d;const st=STEPS.find(s=>s.k===S.step);const A=analyze(d);const locked=!!d.run;
-  const nav=STEPS.map((s,i)=>{const can=locked?s.k==='status':d.visited.has(s.k)&&(s.k!=='status');const done=d.visited.has(s.k)&&s.k!==S.step&&!locked;return navBtn(s.t,s.k===S.step,`data-act="step" data-k="${s.k}"`,!can,done?'✓':String(i+1),done?'done':'')}).join('');
   const head=`<header class="bar"><h2>${esc(st.h)}</h2><div class="bar-act">${locked?`<button data-act="nav" data-k="bulk">Back to Bulk change</button>`:`<button data-act="saveexit">Save &amp; exit</button><button data-act="menu" aria-label="More">⋯</button>`}</div>${S.menu?`<div class="menu pp"><button data-act="discard">Discard draft</button></div>`:''}</header>`;
   let body='';switch(S.step){case'setup':body=setupView(d);break;case'who':body=segStepView(d);break;case'what':body=whatView(d);break;case'values':body=valuesView(d);break;case'review':body=reviewView(d);break;case'impact':body=impactView(d);break;case'status':body=statusView(d);break}
-  return`<div class="card"><nav class="side" aria-label="Steps"><div class="side-h">${esc(d.id)} · bulk change</div>${nav}<div class="side-foot">${locked?'Submitted changes are read-only. Use Create reversal to change them.':'Autosaved · 11:20 IST'}</div></nav>
-  <section class="main">${head}${summary(d,A)}<div class="content">${body}</div>${footer(d,A)}</section></div>`}
+  return`<div class="card nos"><section class="main">${head}${summary(d,A)}<div class="content">${body}</div>${footer(d,A)}</section></div>`}
 function summary(d,A){A=A||analyze(d);return`<div class="strip" id="summary">${kv('Change',esc(d.name||'Untitled'))}${kv('Effective',d.date?fmtD(d.date,true):'Not set')}${kv('People',fmtN(A.rows.length))}${kv('Fields',d.fields.length)}${kv('Changes',fmtN(A.changes))}${kv('Errors',fmtN(A.err),A.err?'err':'')}${kv('Warnings',fmtN(A.warn),A.warn?'warn':'')}</div>`}
 function footer(d,A){const i=STEPS.findIndex(s=>s.k===S.step);if(['status','impact','review'].includes(S.step))return'';
   let ok=true,why='';
-  if(S.step==='setup'){if(!d.name.trim()){ok=false;why='Name the change to continue.'}else if(!d.date){ok=false;why='Pick an effective date. It decides which payroll run picks this up.'}}
+  if(S.step==='setup'){if(!d.name.trim()){ok=false;why='Name the change to continue.'}else if(!d.reason.trim()){ok=false;why='Add a reason. Approvers and the audit log need it.'}else if(!d.date){ok=false;why='Pick an effective date. It decides which payroll run picks this up.'}}
   if(S.step==='who'&&!A.rows.length){ok=false;why='Target at least one employee to continue.'}
   if(S.step==='what'&&!d.fields.length){ok=false;why='Choose at least one field.'}
   if(S.step==='values'&&!A.changes){ok=false;why='Enter at least one new value.'}
@@ -424,177 +456,228 @@ function setupView(d){const pi=d.date?payInfo(d.date):null;
   let pt='Required. Nothing is pre-filled, because this date decides which payroll run picks the change up.';
   if(pi){pt=pi.retro?`<span style="color:var(--warn)">${fmtD(d.date)} is in a period that's already been paid. Payroll will compute retro pay in the <b>${fmtD(pi.run)}</b> run (cutoff ${fmtD(pi.cutoff)}).</span>`:`Lands in the <b>${fmtD(pi.run)}</b> payroll run if approved by the <b>${fmtD(pi.cutoff)}</b> cutoff.${pi.prorated?' Mid-period, so pay for this period is prorated.':''}`}
   return`<div class="rows">
-  ${row('Name',`<input id="f-name" class="in" data-in="name" value="${esc(d.name)}" placeholder="e.g. FY26 annual review" autocomplete="off">`)}
-  ${row('Reason',`<input id="f-reason" class="in" data-in="reason" value="${esc(d.reason)}" placeholder="Shown to approvers and kept in the audit log" autocomplete="off">`)}
-  ${row('Effective date',`<div class="chips">${chip('next','Start of next pay period · '+fmtD(NEXTP))}${chip('today','Today · '+fmtD(TODAY))}${chip('custom','Custom date')}</div>${d.dateKind==='custom'?`<input type="date" id="f-date" class="in date" data-in="date" value="${d.date?iso(d.date):''}">`:''}<div class="hint">${pt}</div>`)}
+  ${row('Name',`<input id="f-name" class="in" data-in="name" value="${esc(d.name)}" placeholder="e.g. FY26 annual review" autocomplete="off">`,true)}
+  ${row('Reason',`<input id="f-reason" class="in" data-in="reason" value="${esc(d.reason)}" placeholder="Shown to approvers and kept in the audit log" autocomplete="off">`,true)}
+  ${row('Effective date',`<div class="chips">${chip('next','Start of next pay period · '+fmtD(NEXTP))}${chip('today','Today · '+fmtD(TODAY))}${chip('custom','Custom date')}</div>${d.dateKind==='custom'?`<input type="date" id="f-date" class="in date" data-in="date" value="${d.date?iso(d.date):''}">`:''}<div class="hint">${pt}</div>`,true)}
   </div>`}
 const TPL={blank:{f:[],m:{}},comp:{f:['compensation','title','level'],m:{}},reorg:{f:['department','team','manager'],m:{department:'same',team:'same',manager:'same'}},office:{f:['location','manager'],m:{location:'same'}}};
 
 /* ================= condition builder (shared) ================= */
 const groupsOf=ctx=>ctx==='d'?S.d.who.groups:S.se.groups;
-function builder(ctx,groups){const exclude=ctx==='se'&&S.se.segId;
-  return groups.map((g,gi)=>`<div class="grp"><div class="grp-h">${gi===0?'Employees':'or employees'} where <select class="sel" data-in="bgmode" data-ctx="${ctx}" data-g="${gi}" aria-label="Match mode"><option value="all" ${g.mode==='all'?'selected':''}>all</option><option value="any" ${g.mode==='any'?'selected':''}>any</option></select> of these are true:${gi>0?` <button class="x" data-act="bdelgroup" data-ctx="${ctx}" data-g="${gi}" aria-label="Remove group" style="margin-left:auto">×</button>`:''}</div>
-    ${g.conds.map((c,ci)=>condRow(ctx,c,gi,ci,exclude)).join('')||`<p class="sub" style="padding:6px 0">No conditions yet.</p>`}<div style="padding-top:8px"><button class="lnk" data-act="baddcond" data-ctx="${ctx}" data-g="${gi}">+ Add condition</button></div></div>`).join('<div class="or">OR</div>')
-    +(groups[0].conds.length?`<div><button class="lnk" data-act="baddgroup" data-ctx="${ctx}">+ Add condition group (OR)</button></div>`:'')}
-function condRow(ctx,c,gi,ci,exclude){const F=fieldOf(c);const da=`data-ctx="${ctx}" data-g="${gi}" data-c="${ci}"`;const key=`${ctx}-${gi}-${ci}`;
-  const byG={};Object.entries(CF).forEach(([k,x])=>(byG[x.grp]=byG[x.grp]||[]).push([k,x]));
-  const fsel=`<select class="sel" data-in="bf" ${da} aria-label="Field">${Object.entries(byG).map(([g,xs])=>`<optgroup label="${esc(g)}">${xs.map(([k,x])=>`<option value="${k}" ${k===c.f?'selected':''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>`;
-  const osel=`<select class="sel" data-in="bo" ${da} aria-label="Operator">${OPS[F.type].map(([o,l])=>`<option value="${o}" ${o===c.op?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
-  return`<div class="cond">${fsel}${osel}${valueCtl(ctx,c,gi,ci,F,exclude)}<button class="x" data-act="bdelcond" ${da} aria-label="Remove condition">×</button>${S.pop===key?condPop(ctx,c,gi,ci,F):''}</div>`}
-function valueCtl(ctx,c,gi,ci,F,exclude){const v=c.v||[];const da=`data-ctx="${ctx}" data-g="${gi}" data-c="${ci}"`;const op=c.op,t=F.type;const key=`${ctx}-${gi}-${ci}`;
-  if(NOVAL.has(op))return'<span></span>';
-  if(t==='id'&&(op==='inseg'||op==='notinseg'))return`<select class="sel" data-in="bv" ${da} data-i="0" aria-label="Segment"><option value="">Choose a segment</option>${SEGS.filter(s=>s.id!==exclude).map(s=>`<option value="${s.id}" ${v[0]===s.id?'selected':''}>${esc(s.name)} · ${s.type==='static'?'Static':'Dynamic'} · ${fmtN(members(s.id).size)}</option>`).join('')}</select>`;
-  if((t==='id'&&(op==='eq'||op==='ne'))||t==='person')return`<input class="in" list="${t==='person'?'dl-mgr':'dl-people'}" data-in="bvp" ${da} value="${v[0]&&EMPI[v[0]]?esc(EMPI[v[0]].name+' · '+v[0]):''}" placeholder="Type a name or ID" autocomplete="off">`;
-  if(t==='id'&&(op==='anyof'||op==='noneof'))return`<button class="valbtn ${v.length?'':'ph'}" data-act="openpop" data-key="${key}">${v.length?esc(pl(v.length,'person','people')+': '+names(v)):'Paste or pick people'}</button>`;
-  if(LISTOP.has(op))return`<button class="valbtn ${v.length?'':'ph'}" data-act="openpop" data-key="${key}">${v.length?esc(v.join(', ')):'Choose values'}</button>`;
-  if(t==='ord'){const sel=i=>`<select class="sel" data-in="bv" ${da} data-i="${i}"><option value="">Level</option>${LEVELS.map(l=>`<option ${v[i]===l?'selected':''}>${l}</option>`).join('')}</select>`;return TWO.has(op)?`<span class="twov">${sel(0)} and ${sel(1)}</span>`:sel(0)}
-  const typ=(t==='date'&&op!=='pastN'&&op!=='nextN')?'date':(t==='num'||op==='pastN'||op==='nextN')?'number':'text';
-  const inp=i=>`<input class="in" type="${typ}" data-in="bv" ${da} data-i="${i}" value="${esc(v[i]??'')}" placeholder="${op==='pastN'||op==='nextN'?'Days':'Value'}" ${typ==='date'?'style="max-width:150px"':''}>`;
-  return TWO.has(op)?`<span class="twov">${inp(0)} and ${inp(1)}</span>`:inp(0)}
-function condPop(ctx,c,gi,ci,F){const v=c.v||[];const da=`data-ctx="${ctx}" data-g="${gi}" data-c="${ci}"`;
-  if(F.type==='id'){if(!['anyof','noneof'].includes(c.op))return'';}if(F.type==='id')return`<div class="pop pp"><b style="font-size:13px">Paste employee IDs, work emails or names</b><textarea class="ta" id="pop-ta" style="min-height:90px" placeholder="E1003, jason.lee@metzhand.com&#10;Fleda Pfannerstill"></textarea>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn sm" data-act="bpaste" ${da}>Add to list</button><input class="in" list="dl-people" data-in="bpick" ${da} placeholder="or pick one person" style="max-width:170px;font-size:13px"></div>
-    ${v.length?`<div class="pills">${v.slice(0,30).map(id=>`<span class="pill">${esc(EMPI[id]?.name||id)} <button class="x" data-act="bunpick" ${da} data-id="${id}" aria-label="Remove">×</button></span>`).join('')}${v.length>30?`<span class="muted">+${v.length-30} more</span>`:''}</div>`:''}</div>`;
-  if(!F.opts||!LISTOP.has(c.op))return'';const q=(S.popQ||'').toLowerCase();const counts={};EMP.forEach(e=>{const x=F.get(e);(Array.isArray(x)?x:[x]).forEach(y=>counts[y]=(counts[y]||0)+1)});
-  return`<div class="pop pp"><input type="search" id="pop-q" data-in="popq" placeholder="Search" value="${esc(S.popQ||'')}"><div class="pop-l">${F.opts().filter(o=>o.toLowerCase().includes(q)).map(o=>`<label><input type="checkbox" data-act="bpopv" ${da} data-v="${esc(o)}" ${v.includes(o)?'checked':''}>${esc(o)}<span>${fmtN(counts[o]||0)}</span></label>`).join('')}</div></div>`}
-
+function builder(ctx,groups){return groups.map((g,gi)=>{const m=g.mode||'all';const quant=['atleast','atmost','exactly'].includes(m);const lbl={all:'all',any:'any',atleast:'at least',atmost:'at most',exactly:'exactly'}[m];
+  return`<div class="grp"><div class="grp-h"><span>${gi===0?'Employees where':'Or employees where'}</span>${ddBtn(`bm:${ctx}:${gi}`,lbl,'','mini')}${quant?`<input class="nin" type="number" min="1" max="${Math.max(1,g.conds.length)}" data-in="bgn" data-ctx="${ctx}" data-g="${gi}" value="${g.n||1}" aria-label="How many conditions">`:''}<span>of these ${g.conds.length===1?'is':'are'} true</span>
+    ${quant&&(g.n||1)>g.conds.length?`<span class="warn-t">This group has only ${pl(g.conds.length,'condition')}</span>`:''}${gi>0?`<button class="x" data-act="bdelgroup" data-ctx="${ctx}" data-g="${gi}" aria-label="Remove group" style="margin-left:auto">×</button>`:''}</div>
+    ${g.conds.map((c,ci)=>condRow(ctx,c,gi,ci)).join('')||`<p class="sub" style="padding:6px 0">No conditions yet.</p>`}<div style="padding-top:8px"><button class="lnk" data-act="baddcond" data-ctx="${ctx}" data-g="${gi}">+ Add condition</button></div></div>`}).join('<div class="or">OR</div>')
+  +(groups[0].conds.length?`<div><button class="lnk" data-act="baddgroup" data-ctx="${ctx}">+ Add condition group (OR)</button></div>`:'')}
+function condRow(ctx,c,gi,ci){const F=fieldOf(c);const k=`${ctx}:${gi}:${ci}`;
+  return`<div class="cond">${ddBtn('bf:'+k,F.label,'Field')}${ddBtn('bo:'+k,opLabel(F.type,c.op),'Operator')}<div class="cv">${valueCtl(ctx,c,gi,ci,F)}</div><button class="x" data-act="bdelcond" data-ctx="${ctx}" data-g="${gi}" data-c="${ci}" aria-label="Remove condition">×</button></div>`}
+function valueCtl(ctx,c,gi,ci,F){const v=c.v||[];const op=c.op,t=F.type;const k=`${ctx}:${gi}:${ci}`;const da=`data-ctx="${ctx}" data-g="${gi}" data-c="${ci}"`;
+  if(NOVAL.has(op))return'';
+  if(t==='id'&&(op==='inseg'||op==='notinseg'))return ddBtn('bseg:'+k,v[0]?segName(v[0]):'','Choose a segment');
+  if(t==='id'&&(op==='anyof'||op==='noneof'))return ddBtn('bppl:'+k,v.length?`${pl(v.length,'person','people')}: ${names(v)}`:'','Pick or paste people');
+  if((t==='id'&&(op==='eq'||op==='ne'))||t==='person')return ddBtn('bpp1:'+k,v[0]&&EMPI[v[0]]?`${EMPI[v[0]].name} · ${v[0]}`:'',t==='person'?'Pick a manager':'Pick a person');
+  if(LISTOP.has(op))return ddBtn('bv:'+k,v.length?v.join(', '):'','Choose values');
+  if(t==='ord')return TWO.has(op)?`<span class="twov">${ddBtn('bvl:'+k+':0',v[0]||'','Level')}<span>and</span>${ddBtn('bvl:'+k+':1',v[1]||'','Level')}</span>`:ddBtn('bvl:'+k+':0',v[0]||'','Level');
+  if(t==='date'){if(op==='between')return`<span class="twov"><input class="box" type="date" data-in="bv" ${da} data-i="0" value="${esc(v[0]||'')}"><span>and</span><input class="box" type="date" data-in="bv" ${da} data-i="1" value="${esc(v[1]||'')}"></span>`;
+    return`<span class="twov">${ddBtn('brel:'+k,v[0]?relLabel(v[0]):'','Choose')}${v[0]==='exact'?`<input class="box" type="date" data-in="bv" ${da} data-i="1" value="${esc(v[1]||'')}">`:''}</span>`}
+  const typ=t==='num'?'number':'text';const inp=i=>`<input class="box" type="${typ}" data-in="bv" ${da} data-i="${i}" value="${esc(v[i]??'')}" placeholder="Value">`;
+  return TWO.has(op)?`<span class="twov">${inp(0)}<span>and</span>${inp(1)}</span>`:inp(0)}
+function condPop(){return''}
 /* ================= bulk change: Segments step ================= */
 function segStepView(d){const w=d.who;const C=cohort(d);const n=C.list.length;if(n!==w.cnt){w.prev=w.cnt;w.cnt=n}
   const delta=w.prev!==null&&w.prev!==undefined&&w.prev!==n?`<span class="delta">(${n-w.prev>0?'+':''}${fmtN(n-w.prev)})</span>`:'';
-  const qa=`<div class="qa"><div class="ddw"><button class="btn2" data-act="insmenu">Insert saved segment ▾</button>${S.insOpen?`<div class="ddm left pp">${SEGS.map(s=>`<button data-act="insseg" data-id="${s.id}"><b>${esc(s.name)}</b><span>${s.type==='static'?'Static':'Dynamic'} · ${pl(members(s.id).size,'person','people')} · ${esc(segDef(s).slice(0,90))}</span></button>`).join('')}</div>`:''}</div>
-    <button class="btn2" data-act="createseg">Create segment</button><button class="btn2" data-act="pasteids">Paste employee IDs</button></div>`;
+  const exs=[];if(!w.incTerm&&C.auto.term)exs.push(pl(C.auto.term,'scheduled termination'));if(!w.incContract&&C.auto.contract)exs.push(pl(C.auto.contract,'contractor'));if(!w.incLeave&&C.auto.leave)exs.push(pl(C.auto.leave,'person on leave','people on leave'));
+  const card=`<div class="tsum"><div class="tsum-n"><span class="big">${fmtN(n)}</span><span class="muted">${n===1?'person':'people'} targeted</span>${delta}</div>
+    <div class="tsum-r"><div class="clamp2">${esc(groupsTxt(w.groups)||'No targeting yet. Insert a saved segment or add a condition.')}</div>${exs.length?`<div class="tsum-x">Leaves out ${exs.join(', ')}.</div>`:''}</div>
+    <button class="btn2" data-act="drawer" data-k="target" ${n?'':'disabled'}>View breakdown</button></div>`;
+  const qa=`<div class="qa">${ddBtn('ins','','Insert saved segment','btnlike')}<button class="btn2 icb" data-act="createseg">${PLUS} Create segment</button><button class="btn2" data-act="pasteids">Paste employee IDs</button></div>`;
   const paste=w.pasteOpen?`<div class="pastecard"><b style="font-size:13.5px">Paste employee IDs, work emails or names</b><span class="sub">Any mix, one per line or comma-separated. They're added as an "Employee ID is any of" group, so they join the people you already target.</span>
     <textarea class="ta" id="paste-ta" data-in="paste">${esc(w.paste)}</textarea><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sm" data-act="pasteadd">Add people</button><button class="txt" data-act="pastesample">Paste a sample list</button><button class="txt" data-act="pasteids">Cancel</button></div></div>`:'';
-  const autoRow=(k,label,n2,on)=>`<div><span>${esc(label)}: <b class="num">${fmtN(n2)}</b> · ${on?'included':'excluded'}</span><button class="lnk" data-act="autotg" data-k="${k}">${on?'Exclude':'Include'}</button></div>`;
-  const samp=spread(C.list,5).map(e=>`<tr><td>${person(e,e.title)}</td><td><span class="badge b-lock">${esc(C.why.get(e.id))}</span></td></tr>`).join('');
-  const rb=groupsTxt(w.groups);const ex=[];if(!w.incTerm)ex.push('scheduled terminations');if(!w.incContract)ex.push('contractors');if(!w.incLeave)ex.push('people on leave');
-  return`<div class="two"><div class="sec">${qa}${paste}${builder('d',w.groups)}</div>
-  <aside class="panel" aria-live="polite"><div><span class="big">${fmtN(n)}</span><span class="muted"> ${n===1?'person':'people'} targeted</span>${delta}</div>
-    <div class="readback"><b>${fmtN(n)}</b> = ${esc(rb||'Add a condition, or insert a segment')}${ex.length?`. Leaves out ${ex.join(' and ')}.`:'.'}</div>
+  return`${card}${qa}${paste}<div class="sec">${builder('d',w.groups)}</div>`}
+function renderDrawer(){const el=$('#drawer'),bg=$('#drawerbg');const on=S.drawer==='target'&&S.route==='draft'&&S.step==='who'&&S.d&&!S.se;el.classList.toggle('on',!!on);bg.classList.toggle('on',!!on);if(!on){el.innerHTML='';return}
+  const d=S.d,w=d.who;const C=cohort(d);const n=C.list.length;
+  const autoRow=(k,label,n2,o)=>`<div><span>${esc(label)}: <b class="num">${fmtN(n2)}</b> · ${o?'included':'excluded'}</span><button class="lnk" data-act="autotg" data-k="${k}">${o?'Exclude':'Include'}</button></div>`;
+  const samp=spread(C.list,8).map(e=>`<tr><td>${person(e,e.title)}</td><td><span class="badge b-lock">${esc(C.why.get(e.id))}</span></td></tr>`).join('');
+  el.innerHTML=`<div class="drh"><div><b>Targeting breakdown</b><div class="muted" style="font-size:13px">${pl(n,'person','people')} in ${esc(d.name||'this bulk change')}</div></div><button class="btn2 sm" data-act="drawerclose">Close X</button></div>
+  <div class="drb"><div class="readback"><b>${fmtN(n)}</b> = ${esc(groupsTxt(w.groups)||'No conditions')}</div>
+    <div class="sec"><span class="h3" style="font-size:13px">Always left out unless you include them</span><div class="auto">${autoRow('leave','On leave',C.auto.leave,w.incLeave)}${autoRow('term','Scheduled termination',C.auto.term,w.incTerm)}${autoRow('contract','Contractors',C.auto.contract,w.incContract)}</div></div>
     ${n?`<div class="sec"><span class="h3" style="font-size:13px">By department</span><div class="bars">${topN(C.list,'department').map(([k,c])=>bar(k,c,n)).join('')}</div></div>
     <div class="sec"><span class="h3" style="font-size:13px">By work location</span><div class="bars">${topN(C.list,'location').map(([k,c])=>bar(k,c,n)).join('')}</div></div>
-    <div class="sec"><span class="h3" style="font-size:13px">Sample, and why each person is included</span><div class="tw"><table class="t">${samp}</table></div><div style="display:flex;gap:14px;flex-wrap:wrap"><button class="lnk" data-act="exportlist">Export the full list</button><button class="lnk" data-act="saveastarget">Save this targeting as a segment</button></div></div>`:''}
-    <div class="auto">${autoRow('leave','On leave',C.auto.leave,w.incLeave)}${autoRow('term','Scheduled termination',C.auto.term,w.incTerm)}${autoRow('contract','Contractors',C.auto.contract,w.incContract)}</div>
-    <p class="note">Dynamic segments stay live while you draft and are frozen when you submit, so approvers sign off on named people. Static segments are already fixed.</p>
-  </aside></div>`}
+    <div class="sec"><span class="h3" style="font-size:13px">Sample, and why each person is included</span><div class="tw"><table class="t">${samp}</table></div></div>`:''}
+    <div style="display:flex;gap:14px;flex-wrap:wrap"><button class="btn2 sm" data-act="exportlist">Export the full list</button><button class="btn2 sm" data-act="saveastarget">Save this targeting as a segment</button></div>
+    <p class="note">Dynamic segments are computed when you submit, so approvers sign off on named people. Static segments always hold the same employees.</p></div>`}
 function topN(list,f){const m={};list.forEach(e=>m[e[f]]=(m[e[f]]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5)}
 const bar=(k,c,n)=>`<div class="barrow"><span title="${esc(k)}">${esc(k)}</span><i style="width:${Math.max(2,c/n*100)}%"></i><span>${fmtN(c)}</span></div>`;
 function spread(list,k){if(list.length<=k)return list;const out=[];const step=list.length/k;for(let i=0;i<k;i++)out.push(list[Math.floor(i*step+step/2)]);return out}
 function addTargetCond(d,cond){const g=d.who.groups;if(!g[0].conds.length)g[0].conds.push(cond);else g.push({mode:'all',conds:[cond]})}
 
 /* ================= segments: list ================= */
-function segList(){const q=S.slQ.toLowerCase();let list=SEGS.filter(s=>(!q||s.name.toLowerCase().includes(q)||(s.desc||'').toLowerCase().includes(q))&&(S.slType==='all'||s.type===S.slType));
-  if(S.slSort){const{k,dir}=S.slSort;list=list.slice().sort((a,b)=>(k==='members'?members(a.id).size-members(b.id).size:String(a[k]).localeCompare(String(b[k])))*dir)}
-  const th=(k,l)=>`<th><button data-act="slsort" data-k="${k}">${l}${S.slSort&&S.slSort.k===k?(S.slSort.dir>0?' ↑':' ↓'):''}</button></th>`;
-  return`<div class="ph"><div><h1>Segments</h1><p>Reusable groups of employees. Dynamic segments follow rules; static segments are fixed lists of employee IDs.</p></div>
-    <div class="pa"><div class="ddw"><button class="btn" data-act="newmenu">New segment ▾</button>${S.newMenu?`<div class="ddm pp"><button data-act="newseg" data-t="dynamic"><b>Dynamic segment</b><span>Rules. Membership updates as people change.</span></button><button data-act="newseg" data-t="static"><b>Static segment</b><span>A fixed list of employee IDs, from conditions or a CSV file.</span></button></div>`:''}</div></div></div>
-  <div class="pcard"><div class="mtool"><input class="search" id="slq" data-in="slq" value="${esc(S.slQ)}" placeholder="Search segments"><div class="seg2">${[['all','All'],['dynamic','Dynamic'],['static','Static']].map(([k,l])=>`<button class="${S.slType===k?'on':''}" data-act="sltype" data-k="${k}">${l}</button>`).join('')}</div><span class="muted">${pl(list.length,'segment')}</span></div>
-  <div class="tw"><table class="t"><thead><tr>${th('name','Name')}<th>Type</th>${th('members','Members')}<th>Definition</th><th>Used in</th>${th('owner','Owner')}${th('updated','Last updated')}</tr></thead><tbody>
-  ${list.map(s=>{const u=usedIn(s);return`<tr class="click" data-act="openseg" data-id="${s.id}"><td><b>${esc(s.name)}</b><br><small class="muted">${esc(s.desc||'')}</small></td><td>${typeBadge(s)}</td><td class="num">${fmtN(members(s.id).size)}</td><td style="max-width:340px;white-space:normal"><small>${esc(segDef(s))}</small></td><td>${u.length?esc(u.join(', ')):'<span class="muted">—</span>'}</td><td>${esc(s.owner)}</td><td class="num">${esc(s.updated)}</td></tr>`}).join('')||'<tr><td colspan="7"><div class="empty">No segments match.</div></td></tr>'}
-  </tbody></table></div></div>`}
-
+function segList(){const cols=[{key:'name',label:'Name',type:'text',get:s=>s.name,render:s=>`<b>${esc(s.name)}</b><br><small class="muted">${esc(s.desc||'')}</small>`,wrap:true},{key:'type',label:'Type',type:'pick',get:s=>s.type==='dynamic'?'Dynamic':'Static',render:s=>typeBadge(s)},
+    {key:'members',label:'Members',type:'num',get:s=>members(s.id).size},{key:'def',label:'Definition',type:'text',get:s=>segDef(s),render:s=>`<small>${esc(segDef(s))}</small>`,wrap:true},{key:'used',label:'Used in',type:'text',get:s=>usedIn(s).join(', ')},
+    {key:'owner',label:'Owner',type:'pick',get:s=>s.owner},{key:'updated',label:'Last updated',type:'date',get:s=>parseDateStr(s.updated)||''}];
+  return`<div class="ph"><div><h1>Segments</h1><p>Reusable groups of employees. A static segment always holds the same employees, even when their attributes change. A dynamic segment is computed from its rules each time it's used.</p></div>
+    <div class="pa"><div class="ddw"><button class="btn" data-act="newmenu">New segment ▾</button>${S.newMenu?`<div class="ddm pp"><button data-act="newseg" data-t="dynamic"><b>Dynamic segment</b><span>Rules, computed each time the segment is used.</span></button><button data-act="newseg" data-t="static"><b>Static segment</b><span>The same employees every time, from conditions or a CSV file.</span></button></div>`:''}</div></div></div>
+  ${dataTable('segs',tsOf('segs'),SEGS,cols,{searchPh:'Search segments',rowAttrs:s=>`data-act="openseg" data-id="${s.id}"`})}`}
 /* ================= segments: editor ================= */
 function newEditor(o={}){return{segId:o.segId||null,name:o.name||'',desc:o.desc||'',type:o.type||'dynamic',source:o.source||'conditions',groups:o.groups||[{mode:'all',conds:[]}],file:o.file||null,
-  tf:{},sort:null,excluded:new Set(o.excluded||[]),hidden:new Set(),q:'',inSheet:!!o.inSheet,locked:!!o.segId,scroll:0,pasteOpen:false,pasteText:''}}
-const RCOLS=[{key:'_emp',label:'Employee',type:'text',get:e=>e.name},{key:'_id',label:'Employee ID',type:'text',get:e=>e.id},{key:'department',label:'Department',type:'pick',get:e=>e.department},
+  tf:{},sort:null,excluded:new Set(o.excluded||[]),hidden:new Set(),q:'',page:1,size:25,inSheet:!!o.inSheet,target:o.target||null,locked:!!o.segId,pasteOpen:false,pasteText:''}}
+const RCOLS=[{key:'_emp',label:'Employee',type:'text',get:e=>e.name,render:e=>`<button class="lnk plain" data-act="profile" data-id="${e.id}">${person(e)}</button>`},{key:'_id',label:'Employee ID',type:'text',get:e=>e.id},{key:'department',label:'Department',type:'pick',get:e=>e.department},
   {key:'title',label:'Title',type:'text',get:e=>e.title},{key:'location',label:'Work location',type:'pick',get:e=>e.location},{key:'level',label:'Level',type:'ord',get:e=>e.level},{key:'startDate',label:'Start date',type:'date',get:e=>e.startDate}];
 function edBase(se){if(se.type==='static'&&se.source==='csv')return se.file?se.file.matched.map(id=>EMPI[id]).filter(Boolean):[];
   if(!se.groups.some(g=>g.conds.some(complete)))return[];return EMP.filter(e=>evalGroups(se.groups,e)>=0)}
 function edColsAll(se){const fc=(se.type==='static'&&se.source==='csv'&&se.file)?se.file.cols.map(c=>({key:c.key,label:c.label,type:c.type,file:true,get:e=>se.file.values[e.id]?.[c.key]})):[];return[...RCOLS,...fc]}
 function dispVal(col,v){if(isEmpty(v)&&v!==false)return'(Blanks)';if(col.type==='bool')return v?'Yes':'No';if(col.type==='num'){const s=Number.isInteger(+v)?fmtN(+v):(+v).toFixed(1);return /%/.test(col.label)?s+'%':s}if(col.type==='date')return fmtIso(v);return String(v)}
 function cmpv(col,a,b){if(isEmpty(a))return 1;if(isEmpty(b))return-1;if(col.type==='num')return a-b;if(col.type==='ord')return lvlN(a)-lvlN(b);if(col.type==='bool')return(a?1:0)-(b?1:0);return String(a).localeCompare(String(b))}
-function tableRows(ts,base,cols){let rows=base;const q=(ts.q||'').trim().toLowerCase();if(q)rows=rows.filter(e=>e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q));
-  for(const[k,f]of Object.entries(ts.tf||{})){const col=cols.find(c=>c.key===k);if(!col)continue;if(f.cond&&complete(f.cond))rows=rows.filter(e=>testVal(col.type,col.get(e),f.cond,e));if(f.vals)rows=rows.filter(e=>f.vals.includes(dispVal(col,col.get(e))))}
+function tableRows(ts,base,cols){let rows=base;const q=(ts.q||'').trim().toLowerCase();
+  if(q)rows=rows.filter(r=>cols.some(c=>{const v=c.get(r);return!isEmpty(v)&&dispVal(c,v).toLowerCase().includes(q)}));
+  for(const[k,f]of Object.entries(ts.tf||{})){const col=cols.find(c=>c.key===k);if(!col)continue;if(f.cond&&completeSheet(f.cond))rows=rows.filter(e=>testSheet(col,col.get(e),f.cond,e,cols));if(f.vals)rows=rows.filter(e=>f.vals.includes(dispVal(col,col.get(e))))}
   if(ts.sort){const col=cols.find(c=>c.key===ts.sort.key);if(col)rows=rows.slice().sort((a,b)=>cmpv(col,col.get(a),col.get(b))*ts.sort.dir)}return rows}
-function filtersTxt(ts,cols){return Object.entries(ts.tf||{}).map(([k,f])=>{const col=cols.find(c=>c.key===k);if(!col)return'';const p=[];if(f.cond&&complete(f.cond)){const v=f.cond.v||[];p.push(`${col.label} ${opLabel(col.type,f.cond.op)}${NOVAL.has(f.cond.op)?'':' '+(TWO.has(f.cond.op)?v.join(' and '):v[0])}`)}if(f.vals)p.push(`${col.label} is one of ${f.vals.slice(0,4).join(', ')}${f.vals.length>4?'…':''}`);return p.join('; ')}).filter(Boolean)}
+const SOPS=[['Blanks',[['empty','Is empty'],['nempty','Is not empty']]],['Text',[['t_contains','Text contains'],['t_ncontains','Text does not contain'],['t_starts','Text starts with'],['t_ends','Text ends with'],['t_eq','Text is exactly']]],
+  ['Dates',[['d_is','Date is'],['d_before','Date is before'],['d_after','Date is after']]],['Numbers',[['n_gt','Greater than'],['n_gte','Greater than or equal to'],['n_lt','Less than'],['n_lte','Less than or equal to'],['n_eq','Is equal to'],['n_ne','Is not equal to'],['n_between','Is between'],['n_nbetween','Is not between']]],['Custom',[['formula','Custom formula is']]]];
+const sopLabel=o=>{for(const[,xs]of SOPS)for(const[k,l]of xs)if(k===o)return l;return o};
+function completeSheet(c){const v=c.v||[];const ok=x=>x!==undefined&&x!==null&&x!=='';const o=c.op;if(!o)return false;if(o==='empty'||o==='nempty')return true;
+  if(o.startsWith('d_'))return ok(v[0])&&(v[0]!=='exact'||ok(v[1]));if(o==='n_between'||o==='n_nbetween')return ok(v[0])&&ok(v[1]);if(o==='formula')return ok(v[0]);return ok(v[0])}
+function testSheet(col,val,c,e,cols){const op=c.op,v=c.v||[];const blank=isEmpty(val)&&val!==false;if(op==='empty')return blank;if(op==='nempty')return!blank;
+  if(op.startsWith('t_')){const s=blank?'':dispVal(col,val).toLowerCase(),q=String(v[0]||'').toLowerCase();return op==='t_contains'?s.includes(q):op==='t_ncontains'?!s.includes(q):op==='t_starts'?s.startsWith(q):op==='t_ends'?s.endsWith(q):s===q}
+  if(op.startsWith('d_')){const s=col.type==='date'?val:parseDateStr(String(val??''));if(!s)return false;const r=relRange(v[0],v[1]);if(!r)return false;const a=iso(r[0]),b=iso(r[1]);return op==='d_is'?s>=a&&s<=b:op==='d_before'?s<a:s>b}
+  if(op.startsWith('n_')){if(blank)return false;const n=col.type==='num'?+val:col.type==='ord'?lvlN(val):col.type==='bool'?(val?1:0):parseMoney(val);if(!isFinite(n))return false;const a=+v[0],b=+v[1];
+    switch(op){case'n_gt':return n>a;case'n_gte':return n>=a;case'n_lt':return n<a;case'n_lte':return n<=a;case'n_eq':return n===a;case'n_ne':return n!==a;case'n_between':return n>=Math.min(a,b)&&n<=Math.max(a,b);case'n_nbetween':return n<Math.min(a,b)||n>Math.max(a,b)}return false}
+  if(op==='formula'){const f=compileFormula(v[0],cols);return f.ok?!!f.fn(e):false}return true}
+/* custom formula: allowed functions and operators only */
+const FX_FN={AND:(...a)=>a.every(Boolean),OR:(...a)=>a.some(Boolean),NOT:a=>!a,IF:(c,a,b)=>c?a:b,ISBLANK:a=>isEmpty(a)&&a!==false,
+  CONTAINS:(a,b)=>String(a??'').toLowerCase().includes(String(b??'').toLowerCase()),STARTSWITH:(a,b)=>String(a??'').toLowerCase().startsWith(String(b??'').toLowerCase()),ENDSWITH:(a,b)=>String(a??'').toLowerCase().endsWith(String(b??'').toLowerCase()),
+  LEN:a=>String(a??'').length,LOWER:a=>String(a??'').toLowerCase(),UPPER:a=>String(a??'').toUpperCase(),VALUE:a=>typeof a==='number'?a:parseMoney(a),TODAY:()=>iso(TODAY),
+  DAYS:(a,b)=>{const x=fromIso(a),y=fromIso(b);return x&&y?Math.round((x-y)/864e5):NaN},YEAR:a=>fromIso(a)?.getFullYear()};
+const FX_HELP='Functions: AND, OR, NOT, IF, ISBLANK, CONTAINS, STARTSWITH, ENDSWITH, LEN, LOWER, UPPER, VALUE, TODAY, DAYS, YEAR. Columns go in square brackets, e.g. [Promo flag]. Operators: = <> > >= < <= + - * / &. TRUE and FALSE for Yes/No columns.';
+const FXC=new Map();
+function lexFx(src){const out=[];const re=/\s*(?:(\[[^\]]+\])|("(?:[^"]|"")*")|(\d+(?:\.\d+)?)|([A-Za-z_][A-Za-z0-9_]*)|(<>|>=|<=|[=<>+\-*/&(),]))/y;let m;re.lastIndex=0;
+  while(re.lastIndex<src.length){const at=re.lastIndex;m=re.exec(src);if(!m){if(src.slice(at).trim()==='')break;throw Error(`Can't read "${src.slice(at).trim().slice(0,12)}"`)}
+    if(m[1])out.push({t:'col',v:m[1].slice(1,-1)});else if(m[2])out.push({t:'str',v:m[2].slice(1,-1).replace(/""/g,'"')});else if(m[3])out.push({t:'num',v:+m[3]});else if(m[4])out.push({t:'id',v:m[4]});else if(m[5])out.push({t:'op',v:m[5]})}return out}
+function cmpOp(o,a,b){if(typeof a==='boolean'||typeof b==='boolean'){a=a===true||/^(true|yes)$/i.test(String(a));b=b===true||/^(true|yes)$/i.test(String(b));return o==='='?a===b:o==='<>'?a!==b:false}
+  if(typeof a==='number'||typeof b==='number'){const x=+a,y=+b;if(!isFinite(x)||!isFinite(y))return o==='<>';return o==='='?x===y:o==='<>'?x!==y:o==='>'?x>y:o==='>='?x>=y:o==='<'?x<y:x<=y}
+  const x=String(a??'').toLowerCase(),y=String(b??'').toLowerCase();return o==='='?x===y:o==='<>'?x!==y:o==='>'?x>y:o==='>='?x>=y:o==='<'?x<y:x<=y}
+const fxNum=x=>typeof x==='boolean'?(x?1:0):typeof x==='number'?x:parseMoney(x);
+function compileFormula(src,cols){const key=String(src)+'|'+cols.map(c=>c.key).join(',');if(FXC.has(key))return FXC.get(key);let res;
+  try{const toks=lexFx(String(src||'').trim().replace(/^=/,''));if(!toks.length)throw Error('Write a formula first');let i=0;const peek=()=>toks[i],next=()=>toks[i++];
+    const expect=v=>{const t=next();if(!t||t.v!==v)throw Error(`Expected "${v}"`)};
+    const primary=()=>{const t=next();if(!t)throw Error('The formula ends too early');
+      if(t.t==='num'||t.t==='str')return()=>t.v;
+      if(t.t==='col'){const col=cols.find(c=>c.label.toLowerCase()===t.v.toLowerCase());if(!col)throw Error(`No column called [${t.v}]`);return e=>{const v=col.get(e);return col.type==='ord'?lvlN(v):v}}
+      if(t.t==='id'){const nm=t.v.toUpperCase();if(nm==='TRUE')return()=>true;if(nm==='FALSE')return()=>false;
+        if(peek()&&peek().v==='('){next();const args=[];if(!(peek()&&peek().v===')')){args.push(cmp());while(peek()&&peek().v===','){next();args.push(cmp())}}expect(')');const f=FX_FN[nm];if(!f)throw Error(`${nm} isn't an allowed function`);return e=>f(...args.map(a=>a(e)))}
+        throw Error(`"${t.v}" isn't a column or function. Put column names in [ ]`)}
+      if(t.v==='('){const x=cmp();expect(')');return x}if(t.v==='-'){const x=primary();return e=>-fxNum(x(e))}throw Error(`Unexpected "${t.v}"`)};
+    const mul=()=>{let l=primary();while(peek()&&(peek().v==='*'||peek().v==='/')){const o=next().v,r=primary(),L=l;l=o==='*'?e=>fxNum(L(e))*fxNum(r(e)):e=>fxNum(L(e))/fxNum(r(e))}return l};
+    const add=()=>{let l=mul();while(peek()&&['+','-','&'].includes(peek().v)){const o=next().v,r=mul(),L=l;l=o==='&'?e=>String(L(e)??'')+String(r(e)??''):o==='+'?e=>fxNum(L(e))+fxNum(r(e)):e=>fxNum(L(e))-fxNum(r(e))}return l};
+    function cmp(){let l=add();while(peek()&&['=','<>','>','>=','<','<='].includes(peek().v)){const o=next().v,r=add(),L=l;l=e=>cmpOp(o,L(e),r(e))}return l}
+    const f=cmp();if(i<toks.length)throw Error(`Unexpected "${toks[i].v}"`);res={ok:true,fn:f}}catch(err){res={ok:false,err:err.message}}FXC.set(key,res);return res}
+function aiFormula(text,cols){const parts=String(text||'').split(/\s+(and|or)\s+/i);const clauses=[],joins=[];parts.forEach((p,i)=>i%2?joins.push(p.toLowerCase()):clauses.push(p));
+  const findCol=c=>{const t=c.toLowerCase();let best=null,score=0;cols.forEach(col=>{const words=col.label.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2);const hit=words.filter(w=>t.includes(w)).length;const sc=hit/Math.max(1,words.length)+(t.includes(col.label.toLowerCase())?1:0);if(hit&&sc>score){score=sc;best=col}});return best};
+  const out=[];for(const c of clauses){const col=findCol(c);if(!col)return null;const R=`[${col.label}]`;const t=c.toLowerCase();let m;
+    if(col.type==='bool'){out.push(/\b(no|false|not)\b/.test(t)?`${R}=FALSE`:`${R}=TRUE`);continue}
+    if((m=t.match(/between\s+(-?[\d.]+)\s+(?:and|to)\s+(-?[\d.]+)/))){out.push(`AND(${R}>=${m[1]},${R}<=${m[2]})`);continue}
+    if((m=t.match(/(?:last|past)\s+(\d+)\s+days?/))){out.push(`DAYS(TODAY(),${R})<=${m[1]}`);continue}
+    if((m=t.match(/(after|since|before)\s+(.+)$/))&&parseDateStr(m[2].trim())){out.push(`${R}${m[1]==='before'?'<':'>'}"${parseDateStr(m[2].trim())}"`);continue}
+    if((m=t.match(/(at least|>=)\s*(-?[\d.]+)/))){out.push(`${R}>=${m[2]}`);continue}if((m=t.match(/(at most|<=)\s*(-?[\d.]+)/))){out.push(`${R}<=${m[2]}`);continue}
+    if((m=t.match(/(more than|greater than|above|over|>)\s*(-?[\d.]+)/))){out.push(`${R}>${m[2]}`);continue}if((m=t.match(/(less than|below|under|<)\s*(-?[\d.]+)/))){out.push(`${R}<${m[2]}`);continue}
+    if((m=t.match(/(starts with|begins with)\s+"?([^"]+)"?/))){out.push(`STARTSWITH(${R},"${m[2].trim()}")`);continue}
+    if((m=t.match(/(contains|includes|mentions)\s+"?([^"]+)"?/))){out.push(`CONTAINS(${R},"${m[2].trim()}")`);continue}
+    if((m=t.match(/\b(?:is not|isn't|not)\s+"?([^"]+)"?$/))){out.push(`${R}<>"${m[1].trim()}"`);continue}
+    if((m=t.match(/\b(?:is|=|equals)\s+"?([^"]+)"?$/))){const val=m[1].trim();out.push(/^-?[\d.]+$/.test(val)?`${R}=${val}`:`${R}="${val}"`);continue}
+    return null}
+  if(out.length===1)return'='+out[0];const fn=joins.every(j=>j==='or')?'OR':'AND';return`=${fn}(${out.join(', ')})`}
+function filtersTxt(ts,cols){return Object.entries(ts.tf||{}).map(([k,f])=>{const col=cols.find(c=>c.key===k);if(!col)return'';const p=[];
+  if(f.cond&&completeSheet(f.cond)){const v=f.cond.v||[];const o=f.cond.op;p.push(o==='formula'?`Custom formula ${v[0]}`:`${col.label}: ${sopLabel(o).toLowerCase()}${o==='empty'||o==='nempty'?'':' '+(o.startsWith('d_')?(v[0]==='exact'?fmtIso(v[1]):relLabel(v[0]).toLowerCase()):(o==='n_between'||o==='n_nbetween')?v.join(' and '):v[0])}`)}
+  if(f.vals)p.push(`${col.label} is one of ${f.vals.slice(0,4).join(', ')}${f.vals.length>4?'…':''}`);return p.join('; ')}).filter(Boolean)}
 const MT={};
-function memberTable(id,ts,base,allCols,opts){const cols=allCols.filter(c=>!ts.hidden.has(c.key));const rows=tableRows(ts,base,allCols);MT[id]={ts,base,cols,allCols,rows,opts};
+function dataTable(id,ts,base,allCols,opts){const cols=allCols.filter(c=>!ts.hidden.has(c.key));const rows=tableRows(ts,base,allCols);
+  const size=ts.size||25;const pages=Math.max(1,Math.ceil(rows.length/size));if(!ts.page||ts.page>pages)ts.page=Math.min(ts.page||1,pages);const st=(ts.page-1)*size;const pr=rows.slice(st,st+size);
+  MT[id]={ts,base,cols,allCols,rows,opts};
   const chk=opts.static&&opts.editable;const fcols=cols.filter(c=>c.file),rcols=cols.filter(c=>!c.file);const firstF=fcols[0]&&fcols[0].key;
+  const nf=Object.values(ts.tf).filter(f=>(f.cond&&completeSheet(f.cond))||f.vals).length;const exN=ts.excluded?rows.filter(e=>ts.excluded.has(e.id)).length:0;
   const band=fcols.length?`<tr><th class="band-r" colspan="${rcols.length+(chk?1:0)}">Rippling fields</th><th class="band-f" colspan="${fcols.length}">From ${esc(opts.fileName||'file')}</th></tr>`:'';
-  const head=`<tr>${chk?'<th class="mchk"><span class="muted" title="Included">✓</span></th>':''}${cols.map(c=>{const f=ts.tf[c.key];const on=f&&((f.cond&&complete(f.cond))||f.vals);const so=ts.sort&&ts.sort.key===c.key?(ts.sort.dir>0?' ↑':' ↓'):'';
-    return`<th class="${c.file?'fcol':''} ${c.key===firstF?'first':''}"><span class="hcell"><button class="hlab" data-act="hsortq" data-t="${id}" data-k="${c.key}" title="Sort">${esc(c.label)}${so}</button><button class="hfil ${on?'on':''}" data-act="hmenu" data-t="${id}" data-k="${c.key}" aria-label="Sort and filter ${esc(c.label)}">${FUNNEL}</button></span></th>`}).join('')}</tr>`;
-  return`<div class="mwrap" id="${id}"><table class="g ${band?'hasband':''}"><thead>${band}${head}</thead><tbody id="${id}-body"></tbody></table></div>`}
-function renderMemberRows(id){const wrap=document.getElementById(id);const m=MT[id];if(!wrap||!m)return;const RHM=44;const{rows,cols,ts,opts}=m;const chk=opts.static&&opts.editable;const n=cols.length+(chk?1:0);
-  const st=Math.max(0,Math.floor(wrap.scrollTop/RHM)-6),en=Math.min(rows.length,st+Math.ceil((wrap.clientHeight||520)/RHM)+14);const firstF=(cols.find(c=>c.file)||{}).key;
-  let h=st?`<tr class="spacer"><td colspan="${n}" style="height:${st*RHM}px"></td></tr>`:'';
-  for(let i=st;i<en;i++){const e=rows[i];const ex=ts.excluded&&ts.excluded.has(e.id);
-    h+=`<tr class="${ex?'exrow':''}">${chk?`<td class="mchk"><input type="checkbox" data-act="mexcl" data-t="${id}" data-id="${e.id}" ${ex?'':'checked'} aria-label="Include ${esc(e.name)}"></td>`:''}${cols.map(c=>{const v=c.get(e);const cls=(c.file?'fcol':'')+(c.key===firstF?' first':'');
-      if(c.key==='_emp')return`<td><button class="lnk" style="color:var(--ink);font-weight:400" data-act="profile" data-id="${e.id}">${person(e)}</button></td>`;return`<td class="${cls} ${c.type==='num'?'num':''}">${esc(isEmpty(v)&&v!==false?'':dispVal(c,v))}</td>`}).join('')}</tr>`}
-  if(rows.length>en)h+=`<tr class="spacer"><td colspan="${n}" style="height:${(rows.length-en)*RHM}px"></td></tr>`;
-  if(!rows.length)h=`<tr><td colspan="${n}" style="padding:24px;text-align:center;height:auto" class="muted">${esc(opts.emptyText||'No rows match these filters.')}</td></tr>`;
-  document.getElementById(id+'-body').innerHTML=h}
-function membersCard(id,ts,base,allCols,opts){const rows=tableRows(ts,base,allCols);const nf=Object.values(ts.tf).filter(f=>(f.cond&&complete(f.cond))||f.vals).length;const exN=ts.excluded?rows.filter(e=>ts.excluded.has(e.id)).length:0;
-  return`<div class="pcard"><div class="sec-h"><h3 class="h3">${esc(opts.title||'Members')}</h3><span class="muted num">${fmtN(rows.length)} of ${fmtN(base.length)} rows${exN?` · ${fmtN(exN)} excluded`:''}</span></div>
-  <div class="mtool"><input class="search" id="${id}-q" data-in="mq" data-t="${id}" value="${esc(ts.q)}" placeholder="Search name or employee ID">
-    <div class="ddw"><button class="btn2 sm" data-act="colsmenu" data-t="${id}">Columns ▾</button>${S.colsOpen===id?`<div class="ddm left pp">${allCols.map(c=>`<label><input type="checkbox" data-act="colshow" data-t="${id}" data-k="${c.key}" ${ts.hidden.has(c.key)?'':'checked'} ${c.key==='_emp'?'disabled':''}>${esc(c.label)}${c.file?' <span class="badge b-file">File</span>':''}</label>`).join('')}</div>`:''}</div>
-    ${nf||ts.q||ts.sort?`<button class="btn2 sm" data-act="mclear" data-t="${id}">Clear filters${nf?` (${nf})`:''}</button>`:''}</div>
-  ${memberTable(id,ts,base,allCols,opts)}${opts.hint?`<p class="note">${esc(opts.hint)}</p>`:''}</div>`}
+  const pageAll=chk&&pr.length&&pr.every(e=>!ts.excluded.has(e.id));
+  const head=`<tr>${chk?`<th class="mchk"><input type="checkbox" data-act="mexclpage" data-t="${id}" ${pageAll?'checked':''} aria-label="Include everyone on this page"></th>`:''}${cols.map(c=>{const f=ts.tf[c.key];const on=f&&((f.cond&&completeSheet(f.cond))||f.vals);const so=ts.sort&&ts.sort.key===c.key?`<span class="sorti">${ts.sort.dir>0?'▲':'▼'}</span>`:'';
+    return`<th class="sortable ${c.file?'fcol':''} ${c.key===firstF?'first':''}" data-act="hsortq" data-t="${id}" data-k="${c.key}" title="Sort by ${esc(c.label)}"><span class="hcell"><span>${esc(c.label)}</span>${so}<button class="hfil ${on?'on':''}" data-act="hmenu" data-t="${id}" data-k="${c.key}" aria-label="Sort and filter ${esc(c.label)}">${FUNNEL}</button></span></th>`}).join('')}</tr>`;
+  const body=pr.map(e=>{const ex=chk&&ts.excluded.has(e.id);return`<tr class="${opts.rowAttrs&&opts.rowAttrs(e)?'click':''} ${ex?'exrow':''}" ${opts.rowAttrs?opts.rowAttrs(e)||'':''}>${chk?`<td class="mchk"><input type="checkbox" data-act="mexcl" data-t="${id}" data-id="${e.id}" ${ex?'':'checked'} aria-label="Include ${esc(e.name)}"></td>`:''}${cols.map(c=>{const v=c.get(e);const cls=(c.file?'fcol':'')+(c.key===firstF?' first':'')+(c.type==='num'?' num':'')+(c.wrap?' wrap':'');
+    return`<td class="${cls}">${c.render?c.render(e):esc(isEmpty(v)&&v!==false?'':dispVal(c,v))}</td>`}).join('')}</tr>`}).join('')||`<tr><td colspan="${cols.length+(chk?1:0)}" class="muted" style="padding:28px;text-align:center;height:auto">${esc(rows.length?'':(base.length?'No rows match these filters.':(opts.emptyText||'Nothing here yet.')))}</td></tr>`;
+  const pager=`<div class="pager"><span>Rows per page</span>${ddBtn('rows:'+id,String(size),'','mini')}<span class="num">${rows.length?st+1:0}–${Math.min(st+size,rows.length)} of ${fmtN(rows.length)}</span>
+    <button class="pg" data-act="pg" data-t="${id}" data-p="1" ${ts.page===1?'disabled':''} aria-label="First page">«</button><button class="pg" data-act="pg" data-t="${id}" data-p="${ts.page-1}" ${ts.page===1?'disabled':''} aria-label="Previous page">‹</button>
+    <span class="num">Page ${ts.page} of ${pages}</span><button class="pg" data-act="pg" data-t="${id}" data-p="${ts.page+1}" ${ts.page===pages?'disabled':''} aria-label="Next page">›</button><button class="pg" data-act="pg" data-t="${id}" data-p="${pages}" ${ts.page===pages?'disabled':''} aria-label="Last page">»</button></div>`;
+  return`<div class="${opts.bare?'sec':'pcard'}">${opts.title?`<div class="sec-h"><h3 class="h3">${esc(opts.title)}</h3><span class="muted num">${fmtN(rows.length)} of ${fmtN(base.length)} rows${exN?` · ${fmtN(exN)} excluded`:''}</span></div>`:''}
+  <div class="mtool"><input class="search" id="${id}-q" data-in="mq" data-t="${id}" value="${esc(ts.q)}" placeholder="${esc(opts.searchPh||'Search')}">${ddBtn('cols:'+id,'','Columns','btnlike sm')}
+    ${nf||ts.q||ts.sort?`<button class="btn2 sm" data-act="mclear" data-t="${id}">Clear filters${nf?` (${nf})`:''}${ts.sort?' and sort':''}</button>`:''}${opts.toolbarExtra||''}</div>
+  <div class="mwrap"><table class="g ${band?'hasband':''}"><thead>${band}${head}</thead><tbody>${body}</tbody></table></div>${pager}${opts.hint?`<p class="note">${esc(opts.hint)}</p>`:''}</div>`}
+
+
 function segEditor(se){const allCols=edColsAll(se);const base=edBase(se);const rows=tableRows(se,base,allCols);const keep=se.type==='static'?rows.filter(e=>!se.excluded.has(e.id)):rows;
   const isCsv=se.type==='static'&&se.source==='csv';const f=se.file;
-  const head=`<div class="pcard" style="gap:10px"><div class="ph" style="align-items:flex-start"><div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:4px">
-      <input class="nameIn" id="se-name" data-in="sename" value="${esc(se.name)}" placeholder="Name this segment" autocomplete="off" aria-label="Segment name">
-      <input class="descIn" id="se-desc" data-in="sedesc" value="${esc(se.desc)}" placeholder="Add a description (optional)" autocomplete="off" aria-label="Description"></div>
+  const head=`<div class="pcard edhead ${se.inSheet?'insheet':''}"><div class="edtop"><div class="edname"><label class="flabel req" for="se-name">Segment name</label>
+      <input class="nameIn" id="se-name" data-in="sename" value="${esc(se.name)}" placeholder="e.g. FY26 promotion nominees" autocomplete="off">
+      <input class="descIn" id="se-desc" data-in="sedesc" value="${esc(se.desc)}" placeholder="Description (optional)" autocomplete="off" aria-label="Description"></div>
     <div class="pa"><button class="btn2" data-act="secancel">Cancel</button><button class="btn" data-act="segsave">Save segment</button></div></div>
-    <div class="ctl"><div>Type <span class="seg2"><button class="${se.type==='dynamic'?'on':''}" data-act="setype" data-v="dynamic" ${se.locked?'disabled':''}>Dynamic</button><button class="${se.type==='static'?'on':''}" data-act="setype" data-v="static" ${se.locked?'disabled':''}>Static</button></span></div>
-    ${se.type==='static'?`<div>Source <span class="seg2"><button class="${se.source==='conditions'?'on':''}" data-act="sesrc" data-v="conditions" ${se.locked?'disabled':''}>Conditions</button><button class="${se.source==='csv'?'on':''}" data-act="sesrc" data-v="csv" ${se.locked?'disabled':''}>File upload</button></span></div>`:''}
-    ${se.locked?'<span>Type and source are fixed after the first save.</span>':''}</div></div>`;
+    <div class="ctl"><div><span class="req">Type</span><span class="seg2"><button class="${se.type==='dynamic'?'on':''}" data-act="setype" data-v="dynamic" ${se.locked?'disabled':''}>Dynamic</button><button class="${se.type==='static'?'on':''}" data-act="setype" data-v="static" ${se.locked?'disabled':''}>Static</button></span></div>
+    ${se.type==='static'?`<div><span class="req">Source</span><span class="seg2"><button class="${se.source==='conditions'?'on':''}" data-act="sesrc" data-v="conditions" ${se.locked?'disabled':''}>Conditions</button><button class="${se.source==='csv'?'on':''}" data-act="sesrc" data-v="csv" ${se.locked?'disabled':''}>File upload</button></span></div>`:''}
+    <span>${se.locked?'Type and source are fixed after the first save.':se.type==='dynamic'?'Computed from the rules each time the segment is used.':'Always the same employees, even when their attributes change later.'}</span></div></div>`;
   let def;
-  if(!isCsv)def=`<div class="pcard"><div class="sec-h"><h3 class="h3">Conditions</h3><span class="muted" style="font-size:13px">${se.type==='dynamic'?'Re-evaluated every time the segment is used.':'Evaluated once, when you save. The result is fixed.'}</span></div>${builder('se',se.groups)}</div>`;
-  else if(!f)def=`<div class="pcard"><h3>File</h3><div class="drop"><b>Upload a CSV of employees</b><span class="sub">Any columns you like. One column must identify the employee: Employee ID, ID or Work Email.</span><input type="file" id="seg-file" accept=".csv,text/csv" aria-label="Choose CSV file"><div style="display:flex;gap:14px"><button class="lnk" data-act="sepaste">Paste CSV instead</button><button class="lnk" data-act="sesample">Use a sample file</button></div></div>
+  if(!isCsv)def=`<div class="pcard"><div class="sec-h"><h3 class="h3 req">Conditions</h3><span class="muted" style="font-size:13px">${se.type==='dynamic'?'Computed each time the segment is used, including when a bulk change is submitted.':'Evaluated once, when you save. After that the segment keeps exactly these employees.'}</span></div>${builder('se',se.groups)}</div>`;
+  else if(!f)def=`<div class="pcard"><h3 class="req">File</h3><div class="drop"><b>Upload a CSV of employees</b><span class="sub">Any columns you like. One column must identify the employee: Employee ID, ID or Work Email.</span><input type="file" id="seg-file" accept=".csv,text/csv" aria-label="Choose CSV file">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center"><button class="btn2 sm" data-act="sepaste">Paste CSV instead</button>${ddBtn('sample','','Use a sample file','btnlike sm')}</div></div>
     ${se.pasteOpen?`<textarea class="ta" id="se-paste" data-in="sepastetxt" placeholder="Employee ID,Promo flag,Notes">${esc(se.pasteText)}</textarea><div><button class="btn sm" data-act="sepasteload">Load pasted CSV</button></div>`:''}</div>`;
   else def=`<div class="pcard"><div class="sec-h"><h3 class="h3">File</h3>${f.raw?`<button class="btn2 sm" data-act="sereplace">Replace file</button>`:''}</div>
-    <div class="rows">${row('File',`<span><b>${esc(f.name)}</b> · ${pl(f.rowsN,'row')} · <span class="done-t">${fmtN(f.matched.length)} matched</span>${f.unmatched.length?` · <button class="lnk" data-act="seunm" style="color:var(--err)">${fmtN(f.unmatched.length)} unmatched</button>`:''}</span>${f.showUnmatched?`<div class="mapping">Not found in Rippling: ${esc(f.unmatched.join(', '))}. These rows are left out.</div>`:''}${f.raw?'':'<span class="hint">Editing filters the saved members. Upload a new file in a new segment to add people.</span>'}`)}
-    ${f.raw?row('Employee key',`<select class="sel box" data-in="sekey" aria-label="Key column">${f.header.map((h,i)=>`<option value="${i}" ${i===f.keyCol?'selected':''}>${esc(h||'Column '+(i+1))}</option>`).join('')}</select><span class="hint">The column that identifies each person. IDs, work emails and names are all accepted.</span>`):''}
-    ${row('Your columns',`<div class="coltypes">${f.cols.map(c=>`<span class="ctype">${esc(c.label)}<select data-in="secoltype" data-k="${c.key}" aria-label="Type of ${esc(c.label)}">${['text','num','date','bool','pick'].map(t=>`<option value="${t}" ${c.type===t?'selected':''}>${TYPE_LABEL[t]}</option>`).join('')}</select></span>`).join('')}</div><span class="hint">Types were detected from the values. They decide which filters each column offers.</span>`)}</div></div>`;
-  const emptyText=isCsv?'Upload a file to see who is in it.':(!se.groups.some(g=>g.conds.some(complete))?'Add a condition to see who matches.':'No one matches these conditions.');
-  const members=membersCard('seed',se,base,allCols,{editable:true,static:se.type==='static',fileName:f&&f.name,emptyText,title:se.type==='static'?'Members to save':'Who matches right now',
-    hint:se.type==='static'?'Untick a row to leave that person out. Filter and sort with the column headers, as in a spreadsheet.':"Sort with the headers. To narrow a dynamic segment, use a header's \"Add as condition\", so the rules stay the only definition."});
+    <div class="rows">${row('File',`<span><b>${esc(f.name)}</b> · ${pl(f.rowsN,'row')} · <span class="done-t">${fmtN(f.matched.length)} matched</span>${f.unmatched.length?` · <button class="lnk" data-act="seunm" style="color:var(--err)">${fmtN(f.unmatched.length)} unmatched</button>`:''}</span>${f.showUnmatched?`<div class="mapping">Not found in Rippling: ${esc(f.unmatched.join(', '))}. These rows are left out.</div>`:''}${f.raw?'':'<span class="hint">Editing filters the saved members. To add people, upload a new file in a new segment.</span>'}`)}
+    ${f.raw?row('Employee key',`<div style="max-width:320px">${ddBtn('keycol',f.header[f.keyCol]||'Column '+(f.keyCol+1),'Choose a column')}</div><span class="hint">The column that identifies each person. IDs, work emails and names are all accepted.</span>`,true):''}
+    ${row('Your columns',`<div class="coltypes">${f.cols.map(c=>`<span class="ctype">${esc(c.label)}${ddBtn('ctype:'+c.key,TYPE_LABEL[c.type],'','chipdd')}</span>`).join('')}</div><span class="hint">Types were detected from the values. They decide how each column sorts and filters.</span>`)}</div></div>`;
+  const emptyText=isCsv?'Upload a file to see who is in it.':'Add a condition to see who matches.';
+  const table=dataTable('seed',se,base,allCols,{editable:true,static:se.type==='static',fileName:f&&f.name,emptyText,title:se.type==='static'?'Members to save':'Who matches right now',searchPh:'Search name or employee ID',
+    hint:se.type==='static'?'Untick a row to leave that person out. Click a header to sort; use its filter menu to filter, as in a spreadsheet.':'Sorting and filtering here only change your view. The conditions decide who is in the segment.'});
   const nfil=filtersTxt(se,allCols);
-  const saved=se.type==='dynamic'?'The conditions. Membership is worked out each time the segment is used.'
+  const saved=se.type==='dynamic'?'The rules. Membership is computed each time the segment is used.'
     :isCsv?`${pl(keep.length,'employee ID')} + ${pl(f?f.cols.length:0,'uploaded column')}.${nfil.length||se.excluded.size?` Your filters${se.excluded.size?' and '+pl(se.excluded.size,'exclusion'):''} are kept as a record of how you built it.`:''}`
     :`${pl(keep.length,'employee ID')}, fixed at ${NOWL}. The conditions are kept as a record of how you built it.`;
   const u=se.segId?usedIn(segById(se.segId)):[];
-  const rail=`<aside class="rail"><div class="pcard"><div><span class="big">${fmtN(keep.length)}</span><span class="muted"> ${se.type==='static'?'people will be saved':'people match now'}</span></div>
-    <p class="typeline">${se.type==='dynamic'?'<b>Dynamic.</b> Updates as people change. A bulk change freezes it when you submit.':'<b>Static.</b> These employee IDs stay fixed, whatever changes later.'}</p>
+  const rail=`<aside class="rail ${se.inSheet?'insheet':''}"><div class="pcard"><div><span class="big">${fmtN(keep.length)}</span><span class="muted"> ${se.type==='static'?'people will be saved':'people match now'}</span></div>
+    <p class="typeline">${se.type==='dynamic'?'<b>Dynamic.</b> Membership is computed from the rules each time the segment is used. A bulk change computes it when the change is submitted.':'<b>Static.</b> Always the same employees. Changes to their attributes later don\'t add or remove anyone.'}</p>
     ${keep.length?`<div class="sec"><span class="h3" style="font-size:13px">By department</span><div class="bars">${topN(keep,'department').map(([k,c])=>bar(k,c,keep.length)).join('')}</div></div><div class="sec"><span class="h3" style="font-size:13px">By work location</span><div class="bars">${topN(keep,'location').map(([k,c])=>bar(k,c,keep.length)).join('')}</div></div>`:''}</div>
     <div class="pcard"><h3>What gets saved</h3><span style="font-size:13.5px">${esc(saved)}</span>${nfil.length?`<ul style="margin:0;padding-left:18px;font-size:13px">${nfil.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</div>
     ${se.segId?`<div class="pcard"><h3>Used in</h3><span style="font-size:13.5px">${u.length?esc(u.join(', '))+'. Saving changes who those drafts target.':'Not used in any bulk change yet.'}</span></div>`:''}</aside>`;
-  return`${head}<div class="segl"><div class="sec">${def}${members}</div>${rail}</div>`}
-
+  return`${head}<div class="segl"><div class="sec">${def}${table}</div>${rail}</div>`}
 /* ================= segments: detail ================= */
 function segDetail(){const s=segById(S.segId);if(!s){S.route='segments';return segList()}
   const m=[...members(s.id)].map(id=>EMPI[id]).filter(Boolean);const cols=[...RCOLS,...(s.columns||[]).map(c=>({key:c.key,label:c.label,type:c.type,file:true,get:e=>s.values?.[e.id]?.[c.key]}))];const u=usedIn(s);
   const tabs=`<div class="tabsb">${[['members','Members'],['definition','Definition'],['used','Used in']].map(([k,l])=>`<button class="tab ${S.segTab===k?'on':''}" data-act="segtab" data-k="${k}">${l}</button>`).join('')}</div>`;
   let body='';
-  if(S.segTab==='members')body=membersCard('segv',S.sv,m,cols,{editable:false,static:s.type==='static',fileName:s.file&&s.file.name,title:'Members',hint:'Sorting and filtering here only changes your view. Edit the segment to change who is in it.'});
-  else if(S.segTab==='definition')body=`<div class="pcard"><div class="prov">${s.type==='dynamic'?`<b>Rules</b><div class="readback">${esc(groupsTxt(s.groups))}</div><span class="muted">Re-evaluated each time the segment is used. ${pl(m.length,'person','people')} match now.</span>`
+  if(S.segTab==='members')body=dataTable('segv',S.sv,m,cols,{editable:false,static:s.type==='static',fileName:s.file&&s.file.name,title:'Members',searchPh:'Search name or employee ID',hint:'Sorting and filtering here only change your view. Edit the segment to change who is in it.'});
+  else if(S.segTab==='definition')body=`<div class="pcard"><div class="prov">${s.type==='dynamic'?`<b>Rules</b><div class="readback">${esc(groupsTxt(s.groups))}</div><span class="muted">Computed from these rules each time the segment is used. ${pl(m.length,'person','people')} match now.</span>`
     :s.source==='csv'?`<b>Uploaded file</b><div class="rows">${row('File',esc(`${s.file.name} · ${pl(s.file.rows,'row')} · ${fmtN(s.file.matched)} matched · ${fmtN(s.file.unmatched.length)} unmatched`))}${row('Columns kept',s.columns.map(c=>`<span class="ctype">${esc(c.label)} · ${TYPE_LABEL[c.type]}</span>`).join(' '))}${row('Filters applied',esc((s.provenance.filters||[]).join('; ')||'None'))}${row('Excluded by hand',esc(s.provenance.excluded.length?names(s.provenance.excluded):'None'))}${row('Snapshot',esc(s.snapshotAt))}</div>`
-    :`<b>Snapshot of these conditions</b><div class="readback">${esc(groupsTxt(s.groups))}</div><span class="muted">Taken ${esc(s.snapshotAt)} (version ${s.version}). Use Refresh snapshot to re-run the conditions and see what changed.</span>`}</div></div>`;
+    :`<b>Snapshot of these conditions</b><div class="readback">${esc(groupsTxt(s.groups))}</div><span class="muted">Taken ${esc(s.snapshotAt)} (version ${s.version}). The segment keeps these exact employees. Use Refresh snapshot to re-run the conditions and review the difference.</span>`}</div></div>`;
   else body=`<div class="pcard">${u.length?`<div class="tw"><table class="t"><tbody>${u.map(x=>`<tr><td><b>${esc(x)}</b></td><td class="muted">Bulk change</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Not used in any bulk change yet.</div>'}</div>`;
   return`<div class="crumbs"><button data-act="nav" data-k="segments">Segments</button><span>/</span><span>${esc(s.name)}</span></div>
   <div class="ph"><div><h1>${esc(s.name)} ${typeBadge(s)}</h1><p>${pl(m.length,'member')} · Owner ${esc(s.owner)} · Updated ${esc(s.updated)}${s.desc?' · '+esc(s.desc):''}</p></div>
-    <div class="pa"><button class="btn2" data-act="segedit">Edit</button><div class="ddw"><button class="btn2" data-act="segmenu" aria-label="More actions">⋯</button>${S.segMenu?`<div class="ddm pp"><button data-act="segdup"><b>Duplicate</b><span>Start a new segment from this one</span></button>${s.type==='static'&&s.source==='conditions'?`<button data-act="segrefresh"><b>Refresh snapshot</b><span>Re-run the conditions and review the difference</span></button>`:''}<button data-act="segdel"><b style="color:var(--err)">Delete</b><span>Only possible when no bulk change uses it</span></button></div>`:''}</div><button class="btn" data-act="seguse">Use in bulk change</button></div></div>
+    <div class="pa"><button class="btn2" data-act="segedit">Edit</button><div class="ddw"><button class="btn2" data-act="segmenu" aria-label="More actions">⋯</button>${S.segMenu?`<div class="ddm pp"><button data-act="segdup"><b>Duplicate</b><span>Start a new segment from this one</span></button>${s.type==='static'&&s.source==='conditions'?`<button data-act="segrefresh"><b>Refresh snapshot</b><span>Re-run the conditions and review the difference</span></button>`:''}<button data-act="segdel"><b style="color:var(--err)">Delete</b><span>Only possible when no bulk change uses it</span></button></div>`:''}</div><button class="btn" data-act="seguse">Bulk change</button></div></div>
   ${tabs}${body}`}
-
 /* ================= header menu (spreadsheet-style column menu) ================= */
 const COL2CF={_id:'empid',department:'department',title:'title',location:'location',level:'level',startDate:'startDate'};
 function renderHM(){const el=$('#pop');if(!S.hm||!MT[S.hm.t]){el.innerHTML='';return}const m=MT[S.hm.t];const col=m.allCols.find(c=>c.key===S.hm.k);if(!col){el.innerHTML='';return}
-  const h=S.hmd;const dynAdd=S.hm.t==='seed'&&S.se&&S.se.type==='dynamic'&&!col.file;const cfKey=COL2CF[col.key];const opsT=dynAdd&&cfKey?CF[cfKey].type:col.type;
-  const ops=OPS[opsT];const x=Math.max(8,Math.min(S.hm.x,window.innerWidth-312)),y=Math.min(S.hm.y,window.innerHeight-160);
-  const valInputs=()=>{if(!h.op||NOVAL.has(h.op)||LISTOP.has(h.op)||['inseg','notinseg'].includes(h.op))return'';const typ=opsT==='date'&&!/N$/.test(h.op)?'date':(opsT==='num'||/N$/.test(h.op))?'number':'text';
-    const inp=i=>opsT==='ord'?`<select class="sel box" data-in="hv" data-i="${i}"><option value="">Level</option>${LEVELS.map(l=>`<option ${h.v[i]===l?'selected':''}>${l}</option>`).join('')}</select>`:`<input class="box" type="${typ}" data-in="hv" data-i="${i}" value="${esc(h.v[i]??'')}" style="width:${TWO.has(h.op)?110:240}px">`;
-    return`<div class="row">${inp(0)}${TWO.has(h.op)?' and '+inp(1):''}</div>`};
+  const h=S.hmd;const ts=tsOf(S.hm.t);const x=Math.max(8,Math.min(S.hm.x,window.innerWidth-332)),y=Math.min(S.hm.y,window.innerHeight-200);
+  let inputs='';const o=h.op||'';
+  if(o.startsWith('t_'))inputs=`<div class="row"><input class="box" style="flex:1" data-in="hv" data-i="0" value="${esc(h.v[0]??'')}" placeholder="Value"></div>`;
+  else if(o.startsWith('n_'))inputs=`<div class="row"><input class="box" type="number" style="flex:1" data-in="hv" data-i="0" value="${esc(h.v[0]??'')}" placeholder="Value">${o==='n_between'||o==='n_nbetween'?`<span>and</span><input class="box" type="number" style="flex:1" data-in="hv" data-i="1" value="${esc(h.v[1]??'')}" placeholder="Value">`:''}</div>`;
+  else if(o.startsWith('d_'))inputs=`<div class="row"><div style="flex:1">${ddBtn('hrel',relLabel(h.v[0]),'Choose')}</div>${h.v[0]==='exact'?`<input class="box" type="date" data-in="hv" data-i="1" value="${esc(h.v[1]||'')}">`:''}</div>`;
+  else if(o==='formula'){const c=compileFormula(h.v[0]||'',m.allCols);const cnt=c.ok?m.base.filter(e=>{try{return!!c.fn(e)}catch(_){return false}}).length:0;
+    inputs=`<div class="row" style="flex-direction:column;align-items:stretch"><textarea class="box fxin" data-in="hfx" rows="2" placeholder="=AND([Promo flag]=TRUE, [Proposed increase %]>5)">${esc(h.v[0]||'')}</textarea>
+      <span id="fxmsg" class="${!h.v[0]?'muted':c.ok?'done-t':'loss'}" style="font-size:12.5px">${!h.v[0]?'Write a formula or describe it below.':c.ok?`Valid · ${pl(cnt,'row')} match`:esc(c.err)}</span>
+      <div class="aibox"><span class="badge b-ai">✦ AI</span><input class="box" data-in="hai" value="${esc(h.ai||'')}" placeholder="Describe the filter, e.g. promo flag yes and increase above 5"><button class="btn2 sm" data-act="haigen">Draft formula</button></div>
+      <details class="fxhelp"><summary>Allowed functions and operators</summary><span>${esc(FX_HELP)}</span></details></div>`}
   const all=S.hmAll||[];const q=(h.vq||'').toLowerCase();const sel=h.vals;
-  const list=`<h6>Filter by values</h6><div class="row"><input class="box" type="search" data-in="hvq" value="${esc(h.vq||'')}" placeholder="Search values" style="flex:1"></div>
-    <div class="row"><button class="lnk" data-act="hvall">Select all</button><button class="lnk" data-act="hvnone">Clear</button><span class="muted" style="font-size:12px">${sel?fmtN(sel.length):fmtN(all.length)} of ${fmtN(all.length)}</span></div>
+  const list=`<h6>Filter by values</h6><div class="row"><input class="box" type="search" style="flex:1" data-in="hvq" value="${esc(h.vq||'')}" placeholder="Search values"></div>
+    <div class="row"><button class="lnk" data-act="hvall">Select all</button><button class="lnk" data-act="hvnone">Clear all</button><span class="muted" style="font-size:12px;margin-left:auto">${sel?fmtN(sel.length):fmtN(all.length)} of ${fmtN(all.length)}</span></div>
     <div class="hl">${all.filter(([v])=>v.toLowerCase().includes(q)).slice(0,300).map(([v,c])=>`<label><input type="checkbox" data-act="hval" data-v="${esc(v)}" ${!sel||sel.includes(v)?'checked':''}>${esc(v)}<span>${fmtN(c)}</span></label>`).join('')}</div>`;
-  el.innerHTML=`<div class="hmenu pp" style="left:${x}px;top:${y}px" role="menu"><button class="mi" data-act="hsort" data-dir="1">Sort A → Z</button><button class="mi" data-act="hsort" data-dir="-1">Sort Z → A</button><hr>
-    ${dynAdd?(cfKey?`<h6>Add as condition</h6><div class="row"><select class="sel box" data-in="hop"><option value="">Choose an operator</option>${ops.filter(([o])=>!['inseg','notinseg','anyof','noneof'].includes(o)||opsT!=='id').map(([o,l])=>`<option value="${o}" ${h.op===o?'selected':''}>${esc(l)}</option>`).join('')}</select></div>${valInputs()}${h.op&&LISTOP.has(h.op)?list:''}<div class="ft"><button class="btn sm" data-act="haddcond">Add as condition</button></div>`
-      :`<p class="sub" style="padding:0 8px">Sort only. Use the conditions above to change who matches.</p>`)
-    :`<h6>Filter by condition</h6><div class="row"><select class="sel box" data-in="hop"><option value="">None</option>${ops.filter(([o])=>!LISTOP.has(o)).map(([o,l])=>`<option value="${o}" ${h.op===o?'selected':''}>${esc(l)}</option>`).join('')}</select></div>${valInputs()}${list}
-      <div class="ft"><button class="btn2 sm" data-act="hclear">Clear</button><button class="btn sm" data-act="happly">Apply</button></div>`}
+  el.innerHTML=`<div class="hmenu pp" style="left:${x}px;top:${y}px" role="menu"><div class="hmt">${esc(col.label)}<span class="muted">${TYPE_LABEL[col.type]||''}</span></div>
+    <button class="mi" data-act="hsort" data-dir="1">Sort A → Z</button><button class="mi" data-act="hsort" data-dir="-1">Sort Z → A</button>${ts.sort&&ts.sort.key===col.key?`<button class="mi" data-act="hsort" data-dir="0">Remove sort</button>`:''}<hr>
+    <h6>Filter by condition</h6><div class="row"><div style="flex:1">${ddBtn('hop',o?sopLabel(o):'None','None')}</div></div>${inputs}${list}
+    <div class="ft"><button class="btn2 sm" data-act="hclear">Reset</button><button class="btn sm" data-act="happly">Apply</button></div>
     ${col.key!=='_emp'?`<hr><button class="mi" data-act="hhide">Hide column</button>`:''}</div>`}
-
 /* ================= fields, values, validation, impact, status, approver ================= */
 function whatView(d){const q=S.whatQ.toLowerCase();const sel=new Set(d.fields);const auto={team:sel.has('department'),compensation:sel.has('per')};
   const frow=k=>{const F=FIELDS[k];if(q&&!F.label.toLowerCase().includes(q))return'';const on=sel.has(k);const lk=auto[k]&&on;
@@ -781,8 +864,7 @@ function approverView(){const d=S.d;const A=analyze(d);const fs=['compensation',
   const tr=e=>{const iss=(A.rowIss.get(e.id)||[]).filter(k=>['raise15','above_mid','unit_switch'].includes(k));
     return`<tr><td><input type="checkbox" data-act="apsel" data-id="${e.id}" ${sel.has(e.id)?'checked':''} aria-label="Send ${esc(e.name)} back"></td><td>${person(e,e.title)}</td><td class="num">${esc(fmtVal(e,'compensation',e.compensation))} → <b>${esc(fmtVal(e,'compensation',nv(d,e,'compensation')))}</b></td><td class="num ${pct(e)>15?'loss':''}">${pct(e)>=0?'+':''}${pct(e).toFixed(1)}%</td><td>${iss.map(k=>`<span class="badge b-warn">${esc(ISS[k].label)}</span>`).join(' ')}</td>
       <td>${sel.has(e.id)?`<input class="notein" data-in="apreason" data-id="${e.id}" value="${esc(sel.get(e.id))}" placeholder="Reason (required)">`:''}</td></tr>`};
-  return`<div class="card"><nav class="side" aria-label="Approvals"><div class="side-h">Priya Shah · Finance</div>${navBtn('Approvals',true)}<div class="side-foot">Approver view of ${esc(d.id)}</div></nav>
-  <section class="main"><header class="bar"><h2>Approve: ${esc(d.name)}</h2><div class="bar-act"><button data-act="apback">Back to submitter view</button></div></header>
+  return`<div class="card nos"><section class="main"><header class="bar"><h2>Approve: ${esc(d.name)}</h2><div class="bar-act"><button data-act="apback">Back to submitter view</button></div></header>
   <div class="strip">${kv('Your fields',fs.map(f=>FIELDS[f].label).join(', '))}${kv('People',fmtN(rows.length))}${kv('Annual cost',`${I.delta>=0?'+':'−'}$${fmtN(Math.abs(I.delta))}`)}${kv('Merit budget',`$${fmtN(budget)}`)}${kv('Of budget',`${budget?(I.delta/budget*100).toFixed(0):0}%`,I.delta>budget?'err':'')}${kv('Effective',fmtD(d.date,true))}</div>
   <div class="content"><p class="sub">${I.delta<=budget?`Within budget: $${fmtN(budget-I.delta)} left`:`$${fmtN(I.delta-budget)} over budget`}. That's ${(I.delta/I.base*100).toFixed(1)}% of this group's base pay against a 6% merit budget.</p>
     <div class="sec"><div class="sec-h"><h3>Outliers first · ${fmtN(outs.length)}</h3><span class="muted">Raises above 15%, crossing the band midpoint, pay-type switches, equity grants</span></div>
@@ -817,6 +899,13 @@ function modal(){const o=S.ov;const d=S.d;const wrap=(t,b,f)=>`<div class="modal
     `<button class="btn2" data-act="closeov">Keep version ${s.version}</button><button class="btn" data-act="refreshyes">Save new snapshot</button>`)}
   if(o.type==='segdel'){const s=segById(S.segId);const u=usedIn(s);return wrap('Delete segment?',u.length?`<p><b>${esc(s.name)}</b> is used in ${esc(u.join(', '))}. Remove it from ${u.length===1?'that bulk change':'those bulk changes'} first, so nobody's targeting silently changes.</p>`:`<p><b>${esc(s.name)}</b> will be deleted. It isn't used in any bulk change.</p>`,
     u.length?`<button class="btn" data-act="closeov">OK</button>`:`<button class="btn2" data-act="closeov">Cancel</button><button class="btn danger" data-act="segdelyes">Delete segment</button>`)}
+  if(o.type==='usebulk'){const s=segById(S.segId);const ds=[S.d,...S.parked].filter(x=>x&&!x.run);const cond={f:'empid',op:'inseg',v:[s.id]};
+    const target=ds.find(x=>x.id===o.draft);let preview='';if(target){const g=o.mode==='replace'?[{mode:'all',conds:[cond]}]:[...target.who.groups.filter(x=>x.conds.length),{mode:'all',conds:[cond]}];const before=cohort(target).list.length;const after=cohort({...target,who:{...target.who,groups:g}}).list.length;preview=`Targeting goes from ${pl(before,'person','people')} to ${pl(after,'person','people')}.`}
+    return wrap(`Bulk change with "${s.name}"`,`<div class="sec"><b class="req">Which bulk change</b>${ds.map(x=>`<label class="opt"><input type="radio" name="ubd" data-act="ubd" value="${x.id}" ${o.draft===x.id?'checked':''}><span><b>${esc(x.name||'Untitled change')}</b><small class="muted">${x.id} · draft · ${pl(cohort(x).list.length,'person','people')} targeted now</small></span></label>`).join('')}
+      <label class="opt"><input type="radio" name="ubd" data-act="ubd" value="new" ${o.draft==='new'?'checked':''}><span><b>New bulk change</b><small class="muted">Starts a draft that targets this segment</small></span></label></div>
+      ${o.draft!=='new'?`<div class="sec"><b class="req">How to add it</b><label class="opt"><input type="radio" name="ubm" data-act="ubm" value="append" ${o.mode==='append'?'checked':''}><span><b>Add as a new condition group</b><small class="muted">People in this segment join the people already targeted (OR).</small></span></label>
+      <label class="opt"><input type="radio" name="ubm" data-act="ubm" value="replace" ${o.mode==='replace'?'checked':''}><span><b>Replace the current targeting</b><small class="muted">This segment becomes the only targeting. Existing conditions are removed.</small></span></label></div>`:''}
+      ${preview?`<div class="readback">${esc(preview)}</div>`:''}`,`<button class="btn2" data-act="closeov">Cancel</button><button class="btn" data-act="ubgo">${o.draft==='new'?'Start bulk change':'Add to bulk change'}</button>`)}
   if(o.type==='upload'){const p=o.preview;return wrap('Upload CSV',`<p class="sub">Upload the template your managers filled in, or paste it. Columns can be in any order. Amounts like $92,500, 92500, 92.5k or 1,20,000 are all read correctly.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input type="file" id="up-file" accept=".csv,text/csv"><button class="txt" data-act="upsample">Use a sample file from managers</button></div>
     <textarea class="ta" id="up-ta" data-in="uptext" placeholder="Employee ID,Compensation (new),Level (new)">${esc(o.text||'')}</textarea>
@@ -851,19 +940,19 @@ function sampleCSV(d){const r=rng(99);const A=analyze(d);const rows=A.rows.filte
 
 /* ================= notes ("Why this?") ================= */
 const NOTES={
-  shell:[['Global nav with Bulk change first',"Jakob's law","Admins already live in enterprise HRIS conventions: modules on the left, the task they came for at the top."],['Breadcrumbs on every page','Wayfinding','A deep editor never strands the admin; one click back to the list.'],['Demo controls kept apart in a dashed panel','Mental-model match',"Nothing that isn't product sits in the product chrome."]],
+  shell:[['Two-tier navigation inside a bulk change','Progressive disclosure; focus','Modules collapse to icons so the steps get the room; hovering brings the modules back without leaving the draft.'],['Toasts top-right, coloured by outcome, with a timer bar','Visibility of system status; von Restorff','Errors stand out in red where the eye scans first, and the bar shows how long the message stays.'],['Global nav with Bulk change first',"Jakob's law","Admins already live in enterprise HRIS conventions: modules on the left, the task they came for at the top."],['Breadcrumbs on every page','Wayfinding','A deep editor never strands the admin; one click back to the list.'],['Demo controls kept apart in a dashed panel','Mental-model match',"Nothing that isn't product sits in the product chrome."]],
   bulk:[['List of bulk changes, drafts first','Zeigarnik effect','Comp cycles run over days; an open draft stays visible until the cutoff.'],['Segments column on each change','Recognition over recall','Who a change targets is visible without opening it.'],["A colleague's overlapping draft is listed",'Error prevention (Norman: mistakes)','Two admins editing the same people gets caught before payroll, not after.']],
-  setup:[['Effective date required, nothing pre-filled','Forcing function','Pre-filling Today would make a prorated mid-period change the default.'],['"Start of next pay period" chip first','Serial position (primacy)','Steers to the clean option without choosing for them.'],['Payroll run and cutoff shown next to the date','Norman: mapping and feedback','Links the date to its money consequence at the moment of choosing.'],['Name and reason required','Mental model of an auditable object','“Who gave Sales a raise?” has an answer six months later.'],['Enterprise step names (Details, Segments, Fields…)',"Jakob's law",'They match the vocabulary of every admin tool the user already knows.']],
-  who:[['Targeting is one condition builder','Mental-model match','Segments, named people and attributes are all just conditions, so there is one thing to learn.'],["Employee ID belongs to / doesn't belong to segment",'Recognition over recall; reuse','A vetted segment is referenced, not rebuilt from memory.'],['Insert saved segment shows type and size','Recognition over recall','The admin picks by name and sees how big it is before adding it.'],['Create segment in a side sheet','Context preservation','The draft stays open behind it, so nothing has to be held in working memory.'],['Paste employee IDs, emails or names',"Postel's law",'Lists arrive from spreadsheets in any shape; be liberal in what you accept.'],['Operators match the data type','Error prevention','Only comparisons that make sense for a field are offered.'],['Live count with delta','Doherty threshold; feedback','They test one condition at a time against the number they already hold.'],['Sample with "why included"','Trust calibration','Explains a surprising inclusion, e.g. "In FY26 promotion nominees".'],['On leave, terminations, contractors shown','Norman: mistakes',"Hidden system rules create errors the admin can't see."]],
+  setup:[['Effective date required, nothing pre-filled','Forcing function','Pre-filling Today would make a prorated mid-period change the default.'],['"Start of next pay period" chip first','Serial position (primacy)','Steers to the clean option without choosing for them.'],['Payroll run and cutoff shown next to the date','Norman: mapping and feedback','Links the date to its money consequence at the moment of choosing.'],['Name and reason required','Mental model of an auditable object','“Who gave Sales a raise?” has an answer six months later.'],['Enterprise step names (Details, Segments, Fields…)',"Jakob's law",'They match the vocabulary of every admin tool the user already knows.'],['Required fields marked with *','Error prevention','The admin knows what is mandatory before submitting, not after an error.']],
+  who:[['Summary card with the count; breakdown in a side panel','Progressive disclosure; cognitive load','The builder stays in view; detail is one click away and scrolls on its own.'],['Group quantifiers: all, any, at least / at most / exactly N','Mental-model match','Eligibility policies are often "meets at least 2 of these 3"; all and any stay first because they are the common case.'],['Searchable, tiered dropdowns with Select all / Clear all',"Hick's law; recognition over recall",'Long value lists are searched, grouped (teams by department) and bulk-selected instead of scrolled.'],['"+ Create new segment" pinned to the bottom of the segment picker','Task continuity','The missing segment is created without losing the draft, then selected in place.'],['Targeting is one condition builder','Mental-model match','Segments, named people and attributes are all just conditions, so there is one thing to learn.'],["Employee ID belongs to / doesn't belong to segment",'Recognition over recall; reuse','A vetted segment is referenced, not rebuilt from memory.'],['Insert saved segment shows type and size','Recognition over recall','The admin picks by name and sees how big it is before adding it.'],['Create segment in a side sheet','Context preservation','The draft stays open behind it, so nothing has to be held in working memory.'],['Paste employee IDs, emails or names',"Postel's law",'Lists arrive from spreadsheets in any shape; be liberal in what you accept.'],['Operators match the data type','Error prevention','Only comparisons that make sense for a field are offered.'],['Live count with delta','Doherty threshold; feedback','They test one condition at a time against the number they already hold.'],['Sample with "why included"','Trust calibration','Explains a surprising inclusion, e.g. "In FY26 promotion nominees".'],['On leave, terminations, contractors shown','Norman: mistakes',"Hidden system rules create errors the admin can't see."]],
   what:[["Groups use the profile's tab names","Jakob's law",'Fields sit where the profile trained them to look.'],['Direct Reports, Documents, 2FA not offered',"Hick's law","They aren't attributes. Reporting lines change through Manager."],['"Needs approval" badge','Von Restorff',"Fields that move money or access stand out before they're chosen."],['Department auto-adds Team, locked','Forcing function',"A new department with an old team isn't a valid record."],['Same for all / Different per person','Progressive disclosure','An office move needs one value, not 400 cells.']],
   values:[["Cells use the profile's own controls","Jakob's law","Nothing new to learn: the profile's Edit mode, multiplied across rows."],["Empty New cell, today's value as grey text",'Default effect; von Restorff',"A filled cell is an edit and an empty one isn't."],['Current and New side by side',"Gestalt proximity; anchoring on today's value",'Reviewers judge the delta against what the person earns now.'],['% change, annualised when the unit switches','Norman: slips','Order-of-magnitude typos become obvious.'],['Rules write visible values','Trust calibration',"Admins don't trust results they can't see per row."],['AI drafts stay marked until accepted','Automation bias countermeasure','It never submits; approvers can see what a person checked.']],
   review:[["Error = can't commit a valid, permitted record",'Forcing function','One predictable rule: an invalid record never reaches payroll.'],['Warning = valid but unusual, acknowledged per group','Habituation / alarm fatigue','300 per-row confirmations train blind clicking.'],['Move error rows to a new draft','Loss aversion; Zeigarnik',"Nobody drops rows they'd lose; the open draft keeps them visible."]],
   impact:[['Inside Rippling vs Integrated Apps',"Gestalt common region; Jakob's law","Uses the profile's own term and sets up “these behave differently”."],['Payroll card first','Serial position (primacy)','The highest stakes go first.'],['Late-approval choice pre-selected, must be confirmed','Forcing function + default effect','Payroll timing is settled at the decision point.'],['Losses written as losses','Framing; loss aversion',"Removals phrased neutrally get underweighted, and they're hardest to undo."],['Employee letters off by default','Default effect; irreversibility',"A wrong comp letter can't be unsent."]],
   status:[['Rippling record band on top','Mental-model match; common region','The record is done and payroll reads from it, whatever Slack does.'],['No "Retry now" while auto-retries run','Illusion of control','Avoids pointless clicks and false confidence.'],['End state names what worked and who owns the rest','Peak-end rule','The memory of the last run decides whether they use bulk change next year.']],
   approver:[['Total against the merit budget, in $ and %','Anchoring on the right reference; framing','Finance judges against the plan, not a raw total.'],['Outliers first','Von Restorff','Limited attention goes to the exceptions.'],['Send rows back with a reason','Error recovery','Three disputes must not freeze 409 raises.']],
-  segments:[['Dynamic and Static type badges','Recognition over recall','Whether a segment moves or stays fixed is visible without opening it.'],['Static badge carries its snapshot date','Mental-model match','“Point in time” made literal, so nobody assumes it is current.'],['Used in column','Consequence visibility','Before editing a segment, the admin sees which bulk changes depend on it.']],
-  segedit:[['Type and source chosen up front, then locked','Forcing function','A segment that silently changed from fixed to live would retarget bulk changes.'],['Header bands: Rippling fields vs "From your file"','Gestalt common region','Uploaded data is never confused with the system of record.'],['Sheets-style sort and filter in every header',"Jakob's law",'Admins already slice lists this way in Excel and Google Sheets.'],["Filters offer operators for the column's type",'Recognition over recall; error prevention','Numbers get ≥ and between, dates get "in the past N days", Yes/No gets Yes and No.'],['Untick rows to exclude people','Direct manipulation','Hand-picked exceptions are explicit and visible.'],['Detected column types you can override',"Postel's law; Tesler's law",'The system does the detective work; the admin only corrects it.'],['"What gets saved" in the rail','Feedback and feedforward','The admin knows exactly what a save will store before committing.'],['Dynamic: "Add as condition" instead of filters','Single source of truth',"A dynamic segment's membership comes only from its rules."]],
-  segment:[['Use in bulk change as the primary action',"Fitts's law; task continuity",'The most common next step is the biggest, nearest target.'],['Refresh snapshot shows joined and left first','Feedback; error prevention','Nobody updates a fixed list without seeing who moves.'],['Delete blocked while a bulk change uses it','Forcing function','Deleting would silently retarget a draft.']],
+  segments:[['Dynamic and Static type badges','Recognition over recall','Whether a segment is computed when used or always holds the same people is visible without opening it.'],['Static badge carries its snapshot date','Mental-model match','“Same employees since this date” made literal.'],['Click any header to sort; filter menu per column',"Jakob's law",'Every table behaves like a spreadsheet the admin already knows.'],['Used in column','Consequence visibility','Before editing a segment, the admin sees which bulk changes depend on it.']],
+  segedit:[['Type and source chosen up front, then locked','Forcing function','A segment that silently changed from fixed to live would retarget bulk changes.'],['Header bands: Rippling fields vs "From your file"','Gestalt common region','Uploaded data is never confused with the system of record.'],['Sheets-style sort and filter in every header',"Jakob's law",'Admins already slice lists this way in Excel and Google Sheets.'],["Filters offer operators for the column's type",'Recognition over recall; error prevention','Numbers get ≥ and between, dates get "in the past N days", Yes/No gets Yes and No.'],['Untick rows to exclude people','Direct manipulation','Hand-picked exceptions are explicit and visible.'],['Detected column types you can override',"Postel's law; Tesler's law",'The system does the detective work; the admin only corrects it.'],['"What gets saved" in the rail','Feedback and feedforward','The admin knows exactly what a save will store before committing.'],['Sticky header with Save and Cancel','Visibility of system status','The commit action never scrolls out of reach on a long page.'],['Sheets filter conditions plus a custom formula','Jakob\'s law; flexibility for experts','Admins get the conditions they know from Google Sheets; power users get formulas, drafted by AI from plain English.'],['Paged tables with a rows-per-page setting','Cognitive load',"A page of 25 is scannable; 5,000 rows on one screen isn't."]],
+  segment:[['Bulk change as the primary action, then a choice of draft and Add vs Replace',"Fitts's law; error prevention",'The common next step is the biggest target, and the admin decides explicitly whether existing targeting is kept.'],['Refresh snapshot shows joined and left first','Feedback; error prevention','Nobody updates a fixed list without seeing who moves.'],['Delete blocked while a bulk change uses it','Forcing function','Deleting would silently retarget a draft.']],
   people:[['Directory opens the single-employee profile',"Jakob's law",'Same profile the case study starts from.']]};
 function notesKey(){if(S.se&&S.se.inSheet)return'segedit';if(S.route==='draft')return S.approver?'approver':S.step;return S.route}
 function renderNotes(){const el=$('#notes');el.classList.toggle('on',S.notes);if(!S.notes){el.innerHTML='';return}const rows=[...(NOTES[notesKey()]||[]),...NOTES.shell];
@@ -881,7 +970,6 @@ function back(){const i=STEPS.findIndex(s=>s.k===S.step);if(i>0){S.step=STEPS[i-
 function setCell(id,f,v){const d=S.d;d.manual[id]=d.manual[id]||{};d.manual[id][f]=v;d.csvHits.delete(id+'|'+f);if(f==='department'&&d.fields.includes('team')){const t=nv(d,EMPI[id],'team');if(!TEAMS[v]?.includes(t)&&v)d.manual[id].team=TEAMS[v][0]}}
 function refreshGrid(){dirty();G.items=gridItems(S.d);renderGridRows();const sm=$('#summary');if(sm)sm.outerHTML=summary(S.d)}
 function afterRender(){const w=$('#gwrap');if(w&&S.d){w.scrollTop=S.d.grid.scroll||0;renderGridRows();w.addEventListener('scroll',()=>{S.d.grid.scroll=w.scrollTop;if(!G.raf)G.raf=requestAnimationFrame(()=>{G.raf=0;renderGridRows()})},{passive:true})}
-  ['seed','segv'].forEach(id=>{const m=document.getElementById(id);if(!m||!MT[id])return;const ts=MT[id].ts;m.scrollTop=ts.scroll||0;renderMemberRows(id);let raf=0;m.addEventListener('scroll',()=>{ts.scroll=m.scrollTop;if(!raf)raf=requestAnimationFrame(()=>{raf=0;renderMemberRows(id)})},{passive:true})});
   if(S.focus){const el=document.getElementById(S.focus);if(el){el.focus();if(el.setSelectionRange&&el.type!=='date'&&el.type!=='number')try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}S.focus=null}}
 function applyFix(k,fx){const d=S.d;const A=analyze(d);const ids=A.issues[k]||[];
   ids.forEach(id=>{const e=EMPI[id];if(fx==='capmax'){const b=band(e,nv(d,e,'level'),nv(d,e,'per'),nv(d,e,'department'),nv(d,e,'location'));setCell(id,'compensation',b.max)}
@@ -892,30 +980,32 @@ function closeSheet(){S.se=null;render()}
 function openEditorFor(s,dup){const e=newEditor({segId:dup?null:s.id,name:dup?'Copy of '+s.name:s.name,desc:s.desc,type:s.type,source:s.source,groups:s.groups?clone(s.groups):undefined,excluded:dup?[]:(s.provenance?.excluded||[])});
   if(s.source==='csv')e.file={name:s.file.name,raw:null,header:['Employee ID',...s.columns.map(c=>c.label)],keyCol:0,types:{},cols:clone(s.columns),values:clone(s.values||{}),matched:s.members.slice(),unmatched:s.file.unmatched.slice(),rowsN:s.file.rows,showUnmatched:false};
   return e}
-const tsNew=()=>({tf:{},sort:null,q:'',hidden:new Set(),excluded:new Set(),scroll:0});
+const tsNew=size=>({tf:{},sort:null,q:'',hidden:new Set(),excluded:new Set(),page:1,size:size||25});
+const TS={};
 function saveSegment(){const se=S.se;if(!se.name.trim()){toast('Name the segment first.');S.focus='se-name';render();return}
   const allCols=edColsAll(se);const base=edBase(se);const rows=tableRows(se,base,allCols);
   const seg=se.segId?segById(se.segId):{id:'SEG-'+(SEGN++),owner:'You',created:'20 Nov 2026',usedSeed:[],version:1};
-  if(se.type==='dynamic'){if(!se.groups.some(g=>g.conds.some(complete))){toast('Add at least one complete condition.');return}Object.assign(seg,{type:'dynamic',source:'conditions',groups:clone(se.groups),members:null,columns:null})}
+  if(se.type==='dynamic'){if(!se.groups.some(g=>g.conds.some(complete))){toast('Add at least one complete condition.');return}const bad=se.groups.find(g=>['atleast','atmost','exactly'].includes(g.mode)&&(g.n||1)>g.conds.filter(complete).length);if(bad){toast('Give the "at least / at most / exactly" number a value no bigger than the number of conditions.');return}Object.assign(seg,{type:'dynamic',source:'conditions',groups:clone(se.groups),members:null,columns:null})}
   else{const keep=rows.filter(e=>!se.excluded.has(e.id));if(!keep.length){toast('No one would be in this segment. Loosen the filters or conditions.');return}
     Object.assign(seg,{type:'static',source:se.source,members:keep.map(e=>e.id),snapshotAt:NOWL,provenance:{filters:filtersTxt(se,allCols),excluded:[...se.excluded].filter(id=>base.some(e=>e.id===id)),search:se.q}});
     if(se.source==='conditions'){seg.groups=clone(se.groups);seg.columns=null}else{seg.groups=null;seg.columns=clone(se.file.cols);seg.values=Object.fromEntries(keep.map(e=>[e.id,se.file.values[e.id]]));seg.file={name:se.file.name,rows:se.file.rowsN,matched:se.file.matched.length,unmatched:se.file.unmatched.slice()}}}
   seg.name=se.name.trim();seg.desc=se.desc.trim();seg.updated='20 Nov 2026';if(!se.segId)SEGS.unshift(seg);dirty();
-  if(se.inSheet&&S.d){addTargetCond(S.d,{f:'empid',op:'inseg',v:[seg.id]});S.se=null;toast(`Saved "${seg.name}" and added it to this bulk change's targeting.`);render();return}
-  S.se=null;S.route='segment';S.segId=seg.id;S.segTab='members';S.sv=tsNew();toast(`Saved "${seg.name}".`);render();window.scrollTo(0,0)}
-function tsOf(t){return t==='seed'?S.se:S.sv}
+  if(se.inSheet&&S.d){const tc=se.target&&condAt('d',se.target.g,se.target.c);if(tc&&tc.f==='empid'&&(tc.op==='inseg'||tc.op==='notinseg')){tc.v=[seg.id];S.se=null;toast(`Saved "${seg.name}" and selected it in your condition.`)}
+    else{addTargetCond(S.d,{f:'empid',op:'inseg',v:[seg.id]});S.se=null;toast(`Saved "${seg.name}" and added it to this bulk change's targeting.`)}render();return}
+  S.se=null;S.route='segment';S.segId=seg.id;S.segTab='members';S.sv=tsNew(25);toast(`Saved "${seg.name}".`);render();window.scrollTo(0,0)}
+function tsOf(t){return t==='seed'?S.se:t==='segv'?S.sv:(TS[t]=TS[t]||tsNew(t==='people'?25:10))}
 function openHM(a){const t=a.dataset.t,k=a.dataset.k;const r=a.getBoundingClientRect();const ts=tsOf(t);const m=MT[t];const col=m.allCols.find(c=>c.key===k);
-  const f=ts.tf[k]||{};S.hm={t,k,x:r.left-8,y:r.bottom+6};S.hmd={op:f.cond?f.cond.op:'',v:f.cond?f.cond.v.slice():[],vals:f.vals?f.vals.slice():null,vq:''};
-  const cnt={};m.base.forEach(e=>{const v=dispVal(col,col.get(e));cnt[v]=(cnt[v]||0)+1});S.hmAll=Object.entries(cnt).sort((a,b)=>a[0].localeCompare(b[0]));renderHM()}
+  const f=ts.tf[k]||{};S.hm={t,k,x:r.left-8,y:r.bottom+6};S.hmd={op:f.cond?f.cond.op:'',v:f.cond?f.cond.v.slice():[],vals:f.vals?f.vals.slice():null,vq:'',ai:''};
+  const cnt={};m.base.forEach(e=>{const v=dispVal(col,col.get(e));cnt[v]=(cnt[v]||0)+1});S.hmAll=Object.entries(cnt).sort((a2,b)=>a2[0].localeCompare(b[0]));renderHM()}
 function act(k,a){const d=S.d;switch(k){
-  case'nav':S.route=['bulk','segments','people'].includes(a.dataset.k)?a.dataset.k:'module';S.modName=a.dataset.k;S.approver=false;S.hm=null;if(S.se&&!S.se.inSheet)S.se=null;try{history.replaceState(null,'','#'+a.dataset.k)}catch(_){}render();window.scrollTo(0,0);break;
+  case'nav':S.drawer=null;S.route=['bulk','segments','people'].includes(a.dataset.k)?a.dataset.k:'module';S.modName=a.dataset.k;S.approver=false;S.hm=null;if(S.se&&!S.se.inSheet)S.se=null;try{history.replaceState(null,'','#'+a.dataset.k)}catch(_){}render();window.scrollTo(0,0);break;
   case'size':setSize(+a.dataset.n);break;
   case'notes':S.notes=!S.notes;try{localStorage.setItem('bc-notes',S.notes?'1':'0')}catch(_){}render();break;
   case'demo':S.demo=!S.demo;renderDemo();break;
   case'soon':toast('Not part of this prototype.');break;
   case'q4':toast("This is Dana Okuneva's draft. Its people show a conflict warning in yours if both touch reporting lines.");break;
   case'gsp':S.gq='';$('#gq').value='';renderSearch();S.ov={type:'profile',id:a.dataset.id,tab:'emp'};renderOverlay();break;
-  case'gss':S.gq='';$('#gq').value='';renderSearch();S.route='segment';S.segId=a.dataset.id;S.segTab='members';S.sv=tsNew();render();break;
+  case'gss':S.gq='';$('#gq').value='';renderSearch();S.route='segment';S.segId=a.dataset.id;S.segTab='members';S.sv=tsNew(25);render();break;
   case'gsd':S.gq='';$('#gq').value='';renderSearch();act('resume',a);break;
   case'newdraft':if(d){S.parked=S.parked.filter(x=>x!==d);S.parked.unshift(d)}clearInterval(S.timer);S.d=blankDraft();S.step='setup';S.route='draft';S.approver=false;S.followups=0;render();break;
   case'resume':{const id=a.dataset.id;if(id&&(!S.d||id!==S.d.id)){const x=S.parked.find(p=>p.id===id);if(x){S.parked=S.parked.filter(p=>p!==x);if(S.d)S.parked.unshift(S.d);S.d=x;clearInterval(S.timer);if(x.run&&x.run.sync)S.timer=setInterval(()=>tick(x),700)}}
@@ -923,7 +1013,7 @@ function act(k,a){const d=S.d;switch(k){
   case'profile':S.ov={type:'profile',id:a.dataset.id,tab:'emp'};renderOverlay();break;
   case'ptab':S.ov.tab=a.dataset.k;renderOverlay();break;
   case'closeov':S.ov=null;renderOverlay();break;
-  case'step':if(a.dataset.k==='status'&&!d.run)break;S.step=a.dataset.k;S.pop=null;render();window.scrollTo(0,0);break;
+  case'step':if(a.dataset.k==='status'&&!d.run)break;S.approver=false;S.drawer=null;S.step=a.dataset.k;S.pop=null;render();window.scrollTo(0,0);break;
   case'next':next();break;case'back':back();break;
   case'saveexit':S.route='bulk';S.menu=false;toast('Draft saved. Resume it from Bulk change.');render();break;
   case'menu':S.menu=!PREV.menu;render();break;
@@ -942,7 +1032,21 @@ function act(k,a){const d=S.d;switch(k){
   case'bunpick':{const c=groupsOf(a.dataset.ctx)[+a.dataset.g].conds[+a.dataset.c];c.v=c.v.filter(x=>x!==a.dataset.id);S.pop=`${a.dataset.ctx}-${a.dataset.g}-${a.dataset.c}`;render();break}
   case'insmenu':S.insOpen=!PREV.insOpen;render();break;
   case'insseg':{S.insOpen=false;addTargetCond(d,{f:'empid',op:'inseg',v:[a.dataset.id]});toast(`Added "${segName(a.dataset.id)}"${d.who.groups.length>1?' as an OR group: its people join the targeting':''}.`);render();break}
-  case'createseg':S.se=newEditor({type:'dynamic',inSheet:true});render();break;
+  case'createseg':S.dd=null;S.se=newEditor({type:'dynamic',inSheet:true});S.focus='se-name';render();break;
+  case'ddcreateseg':{const p=S.dd.key.split(':');S.dd=null;S.se=newEditor({type:'dynamic',inSheet:true,target:{g:p[2],c:p[3]}});S.focus='se-name';render();break}
+  case'ddopen':{const key=a.dataset.dd;if(PREV.dd&&PREV.dd.key===key){S.dd=null;renderDD();break}const r=a.getBoundingClientRect();S.dd={key,x:r.left,y:r.bottom+4,top:r.top,w:r.width,q:'',focus:true};renderDD();break}
+  case'ddpick':{const v=a.dataset.v;const key=S.dd.key;const sp=ddSpec(key);S.dd=null;if(sp){sp.apply(v);if(sp.after==='hm'){renderHM();renderDD()}else render()}break}
+  case'ddtog':{const sp=ddSpec(S.dd.key);const cur=(sp.value||[]).slice();const v=a.dataset.v;ddApply(a.checked?[...cur,v]:cur.filter(x=>x!==v));break}
+  case'ddgrp':{const sp=ddSpec(S.dd.key);const g=sp.groups.find(x=>x.label===a.dataset.g);const vs=g.items.map(i=>i.v);const cur=new Set(sp.value||[]);a.checked?vs.forEach(v=>cur.add(v)):vs.forEach(v=>cur.delete(v));ddApply([...cur]);break}
+  case'ddall':{const sp=ddSpec(S.dd.key);const q=(S.dd.q||'').toLowerCase();const cur=new Set(sp.value||[]);sp.groups.forEach(g=>g.items.forEach(it=>{if(!q||(it.label+' '+(it.sub||'')+' '+it.v+' '+(it.q||'')).toLowerCase().includes(q))cur.add(it.v)}));ddApply([...cur]);break}
+  case'ddnone':{const sp=ddSpec(S.dd.key);const q=(S.dd.q||'').toLowerCase();if(!q){ddApply([]);break}const drop=new Set();sp.groups.forEach(g=>g.items.forEach(it=>{if((it.label+' '+(it.sub||'')+' '+it.v+' '+(it.q||'')).toLowerCase().includes(q))drop.add(it.v)}));ddApply((sp.value||[]).filter(v=>!drop.has(v)));break}
+  case'ddclose':S.dd=null;renderDD();break;
+  case'ddpaste':{const sp=ddSpec(S.dd.key);const txt=($('#dd-paste')||{}).value||'';const toks=txt.split(/[\n,;\t]+/).map(x=>x.trim()).filter(Boolean);const miss=[];const cur=new Set(sp.value||[]);toks.forEach(t=>{const id=parsePerson(t);if(id)cur.add(id);else miss.push(t)});ddApply([...cur]);toast(`${pl(toks.length-miss.length,'person','people')} added${miss.length?`. Not found: ${miss.slice(0,3).join(', ')}`:''}.`,miss.length?'warning':'success');break}
+  case'pg':{const ts=tsOf(a.dataset.t);ts.page=Math.max(1,+a.dataset.p);render();break}
+  case'mexclpage':{const m=MT[a.dataset.t];const ts=m.ts;const size=ts.size||25;const pr=m.rows.slice((ts.page-1)*size,ts.page*size);pr.forEach(e=>a.checked?ts.excluded.delete(e.id):ts.excluded.add(e.id));render();break}
+  case'drawer':S.drawer=a.dataset.k;renderDrawer();break;
+  case'drawerclose':S.drawer=null;renderDrawer();break;
+  case'haigen':{const m=MT[S.hm.t];const txt=S.hmd.ai||'';const f=aiFormula(txt,m.allCols);if(!f){toast('Couldn\'t draft a formula from that. Name a column and a value, for example: promo flag yes and increase above 5.','warning');break}S.hmd.v=[f];renderHM();toast('Formula drafted. Check it before applying.','info');break}
   case'saveastarget':S.se=newEditor({type:'dynamic',inSheet:true,groups:clone(d.who.groups),name:(d.name||'Bulk change')+' · targeting'});render();break;
   case'pasteids':d.who.pasteOpen=!d.who.pasteOpen;if(d.who.pasteOpen)S.focus='paste-ta';render();break;
   case'pastesample':{const r=rng(5);const pick=EMP.filter(()=>r()<Math.min(1,25/EMP.length)).slice(0,25);d.who.paste=pick.map((e,i)=>i%3===0?e.id:i%3===1?e.email:e.name).concat(['Hollis Nobody','E99999']).join('\n');render();break}
@@ -954,7 +1058,7 @@ function act(k,a){const d=S.d;switch(k){
   case'newseg':S.newMenu=false;S.se=newEditor({type:a.dataset.t,source:'conditions'});S.route='segedit';S.focus='se-name';render();window.scrollTo(0,0);break;
   case'sltype':S.slType=a.dataset.k;render();break;
   case'slsort':{const k2=a.dataset.k;S.slSort=S.slSort&&S.slSort.k===k2?{k:k2,dir:-S.slSort.dir}:{k:k2,dir:k2==='members'?-1:1};render();break}
-  case'openseg':S.route='segment';S.segId=a.dataset.id;S.segTab='members';S.sv=tsNew();render();window.scrollTo(0,0);break;
+  case'openseg':S.route='segment';S.segId=a.dataset.id;S.segTab='members';S.sv=tsNew(25);render();window.scrollTo(0,0);break;
   case'segtab':S.segTab=a.dataset.k;render();break;
   case'segmenu':S.segMenu=!PREV.segMenu;render();break;
   case'segedit':{const s=segById(S.segId);S.se=openEditorFor(s,false);S.route='segedit';render();window.scrollTo(0,0);break}
@@ -963,11 +1067,15 @@ function act(k,a){const d=S.d;switch(k){
   case'refreshyes':{const s=segById(S.segId);s.members=S.ov.next;s.version=(s.version||1)+1;s.snapshotAt=NOWL;s.updated='20 Nov 2026';S.ov=null;toast(`Snapshot refreshed. Version ${s.version} has ${pl(s.members.length,'person','people')}.`);render();break}
   case'segdel':S.segMenu=false;S.ov={type:'segdel'};renderOverlay();break;
   case'segdelyes':SEGS=SEGS.filter(s=>s.id!==S.segId);S.ov=null;S.route='segments';toast('Segment deleted.');render();break;
-  case'seguse':{const id=S.segId;if(!d||d.run){if(d)S.parked.unshift(d);S.d=blankDraft()}S.d.visited.add('who');addTargetCond(S.d,{f:'empid',op:'inseg',v:[id]});S.route='draft';S.step=S.d.name?'who':'setup';
-    toast(`"${segName(id)}" added to ${S.d.name?'"'+S.d.name+'"':'a new bulk change'}.`);render();window.scrollTo(0,0);break}
+  case'seguse':{const ds=[S.d,...S.parked].filter(x=>x&&!x.run);S.ov={type:'usebulk',draft:ds[0]?ds[0].id:'new',mode:'append'};renderOverlay();break}
+  case'ubd':S.ov.draft=a.value;renderOverlay();break;
+  case'ubm':S.ov.mode=a.value;renderOverlay();break;
+  case'ubgo':{const id=S.segId;const o=S.ov;let x;if(o.draft==='new'){if(S.d)S.parked.unshift(S.d);x=blankDraft();S.d=x}else{x=[S.d,...S.parked].find(y=>y&&y.id===o.draft);if(x!==S.d){S.parked=S.parked.filter(p=>p!==x);if(S.d)S.parked.unshift(S.d);S.d=x}}
+    const cond={f:'empid',op:'inseg',v:[id]};if(o.draft!=='new'&&o.mode==='replace')x.who.groups=[{mode:'all',conds:[cond]}];else addTargetCond(x,cond);x.visited.add('who');S.ov=null;clearInterval(S.timer);S.route='draft';S.step=x.name?'who':'setup';
+    toast(`"${segName(id)}" ${o.draft!=='new'&&o.mode==='replace'?'now targets':'added to'} ${x.name?'"'+x.name+'"':'a new bulk change. Name it to continue'}.`);render();window.scrollTo(0,0);break}
   case'setype':if(S.se.locked)break;S.se.type=a.dataset.v;if(S.se.type==='dynamic')S.se.source='conditions';S.se.tf={};S.se.excluded=new Set();render();break;
   case'sesrc':if(S.se.locked)break;S.se.source=a.dataset.v;S.se.tf={};S.se.excluded=new Set();render();break;
-  case'secancel':if(S.se.inSheet){closeSheet();break}S.route=S.se.segId?'segment':'segments';S.se=null;render();break;
+  case'secancel':if(S.se.inSheet){closeSheet();break}if(S.se.target){}S.route=S.se.segId?'segment':'segments';S.se=null;render();break;
   case'sheetclose':if(S.se&&S.se.inSheet)closeSheet();break;
   case'segsave':saveSegment();break;
   case'sesample':loadFile(S.se,'promotion-nominations-fy26.csv',sampleNominations());render();break;
@@ -975,20 +1083,21 @@ function act(k,a){const d=S.d;switch(k){
   case'sepasteload':if(loadFile(S.se,'pasted.csv',S.se.pasteText))render();break;
   case'sereplace':S.se.file=null;S.se.tf={};S.se.excluded=new Set();render();break;
   case'seunm':S.se.file.showUnmatched=!S.se.file.showUnmatched;render();break;
-  case'hsortq':{const ts=tsOf(a.dataset.t);const k2=a.dataset.k;ts.sort=ts.sort&&ts.sort.key===k2?(ts.sort.dir>0?{key:k2,dir:-1}:null):{key:k2,dir:1};render();break}
+  case'hsortq':{const ts=tsOf(a.dataset.t);const k2=a.dataset.k;ts.sort=ts.sort&&ts.sort.key===k2?(ts.sort.dir>0?{key:k2,dir:-1}:null):{key:k2,dir:1};ts.page=1;render();break}
   case'hmenu':if(PREV.hm&&PREV.hm.k===a.dataset.k&&PREV.hm.t===a.dataset.t){S.hm=null;renderHM();break}openHM(a);break;
-  case'hsort':{const ts=tsOf(S.hm.t);ts.sort={key:S.hm.k,dir:+a.dataset.dir};S.hm=null;render();break}
+  case'hsort':{const ts=tsOf(S.hm.t);ts.sort=+a.dataset.dir?{key:S.hm.k,dir:+a.dataset.dir}:null;ts.page=1;S.hm=null;render();break}
   case'hhide':{const ts=tsOf(S.hm.t);ts.hidden.add(S.hm.k);if(ts.sort&&ts.sort.key===S.hm.k)ts.sort=null;S.hm=null;render();break}
   case'hval':{const v=a.dataset.v;if(!S.hmd.vals)S.hmd.vals=S.hmAll.map(x=>x[0]);S.hmd.vals=a.checked?[...S.hmd.vals,v]:S.hmd.vals.filter(x=>x!==v);renderHM();break}
   case'hvall':S.hmd.vals=null;renderHM();break;
   case'hvnone':S.hmd.vals=[];renderHM();break;
-  case'hclear':{const ts=tsOf(S.hm.t);delete ts.tf[S.hm.k];S.hm=null;render();break}
-  case'happly':{const ts=tsOf(S.hm.t);const h=S.hmd;const cond=h.op?{op:h.op,v:h.v.slice()}:null;if(cond&&!complete(cond)){toast('Fill in the value for that condition.');break}
-    const vals=h.vals&&h.vals.length<S.hmAll.length?h.vals:null;if(!cond&&!vals)delete ts.tf[S.hm.k];else ts.tf[S.hm.k]={cond,vals};S.hm=null;ts.scroll=0;render();break}
+  case'hclear':{const ts=tsOf(S.hm.t);delete ts.tf[S.hm.k];ts.page=1;S.hm=null;render();toast('Filter reset for this column.','info');break}
+  case'happly':{const ts=tsOf(S.hm.t);const h=S.hmd;const cond=h.op?{op:h.op,v:h.v.slice()}:null;if(cond&&!completeSheet(cond)){toast('Fill in the value for that condition.');break}
+    if(cond&&cond.op==='formula'){const c=compileFormula(cond.v[0],MT[S.hm.t].allCols);if(!c.ok){toast('Fix the formula first: '+c.err);break}}
+    const vals=h.vals&&h.vals.length<S.hmAll.length?h.vals:null;if(!cond&&!vals)delete ts.tf[S.hm.k];else ts.tf[S.hm.k]={cond,vals};S.hm=null;ts.page=1;render();break}
   case'haddcond':{const h=S.hmd;const cfk=COL2CF[S.hm.k];let v=h.v.slice();if(LISTOP.has(h.op))v=(h.vals||S.hmAll.map(x=>x[0])).filter(x=>x!=='(Blanks)');const cond={f:cfk,op:h.op,v};
     if(!h.op||!complete(cond)){toast('Choose an operator and a value.');break}S.se.groups[0].conds.push(cond);S.hm=null;toast(`Added "${condTxt(cond)}" to the conditions.`);render();break}
   case'mexcl':{const ts=tsOf(a.dataset.t);if(a.checked)ts.excluded.delete(a.dataset.id);else ts.excluded.add(a.dataset.id);render();break}
-  case'mclear':{const ts=tsOf(a.dataset.t);ts.tf={};ts.q='';ts.sort=null;ts.scroll=0;render();break}
+  case'mclear':{const ts=tsOf(a.dataset.t);ts.tf={};ts.q='';ts.sort=null;ts.page=1;render();break}
   case'colsmenu':S.colsOpen=PREV.colsOpen===a.dataset.t?null:a.dataset.t;render();break;
   case'colshow':{const ts=tsOf(a.dataset.t);if(a.checked)ts.hidden.delete(a.dataset.k);else ts.hidden.add(a.dataset.k);S.colsOpen=a.dataset.t;render();break}
   case'field':{const f=a.dataset.f;if(a.checked){if(!d.fields.includes(f))d.fields.push(f);d.modes[f]=d.modes[f]||(f==='location'?'same':'diff');
@@ -1035,7 +1144,7 @@ function act(k,a){const d=S.d;switch(k){
   case'arrive':d.run.phase='committed';startSync(d);render();break;
   case'retry':{const s=d.run.sync.find(x=>x.k===a.dataset.k);if(s){s.state='prog';s.fail=0;s.detail='';toast('Retrying after Raj Patel reactivated the accounts.');clearInterval(S.timer);S.timer=setInterval(()=>tick(d),700)}render();break}
   case'reversal':toast('A reversal draft with the old values is ready under Bulk change (not built in this prototype).');break;
-  case'upsample':S.ov.text=sampleCSV(d);S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
+  case'upsample':S.ov.text=sampleCompChanges();S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
   case'uppreview':S.ov.text=($('#up-ta')||{}).value||'';S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
   case'upapply':{const p=S.ov.preview;d.csvHits=new Set();p.writes.forEach(([id,f,v])=>{d.csv[id]=d.csv[id]||{};d.csv[id][f]=v;d.csvHits.add(id+'|'+f);if(d.manual[id])delete d.manual[id][f]});S.ov=null;toast(`Wrote ${pl(p.cells,'value')} into the grid. They're marked ↑.`);render();break}
   case'copy':{const ta=$('#ov-ta');const txt=ta.value;const fb=()=>{ta.focus();ta.select();toast('Selected. Press Ctrl+C or ⌘C to copy.')};try{navigator.clipboard.writeText(txt).then(()=>toast('Copied.'),fb)}catch(_){fb()}break}
@@ -1049,8 +1158,60 @@ function parseAI(t){const s=t.toLowerCase();const m=s.match(/(\d+(?:\.\d+)?)\s*%
 
 /* ================= events ================= */
 let PREV={};
-function closePopups(){PREV={pop:S.pop,menu:S.menu,hm:S.hm,insOpen:S.insOpen,colsOpen:S.colsOpen,segMenu:S.segMenu,newMenu:S.newMenu};const any=!!(S.pop||S.menu||S.hm||S.insOpen||S.colsOpen||S.segMenu||S.newMenu);
-  S.pop=null;S.menu=false;S.hm=null;S.insOpen=false;S.colsOpen=null;S.segMenu=false;S.newMenu=false;return any}
+function closePopups(){PREV={pop:S.pop,menu:S.menu,hm:S.hm,segMenu:S.segMenu,newMenu:S.newMenu,dd:S.dd};const any=!!(S.pop||S.menu||S.hm||S.segMenu||S.newMenu||S.dd);
+  S.pop=null;S.menu=false;S.hm=null;S.segMenu=false;S.newMenu=false;S.dd=null;return any}
+const PLUS='<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8"/></svg>';
+const ddBtn=(key,label,ph,cls='')=>`<button type="button" class="ddt ${cls} ${label?'':'ph'}" data-act="ddopen" data-dd="${esc(key)}"><span>${esc(label||ph)}</span></button>`;
+const condAt=(ctx,g,c)=>{const G2=groupsOf(ctx);return G2&&G2[+g]?G2[+g].conds[+c]:null};
+function peopleGroups(filter){const by={};EMP.forEach(e=>{if(filter&&!filter(e))return;(by[e.department]=by[e.department]||[]).push({v:e.id,label:e.name,sub:`${e.id} · ${e.title}`,q:e.email})});return Object.keys(by).sort().map(k=>({label:k,items:by[k]}))}
+function ddSpec(key){const p=key.split(':');const t=p[0];
+  if(['bf','bo','bv','bseg','bppl','bpp1','brel','bvl'].includes(t)){const[,ctx,g,c,i]=p;const cond=condAt(ctx,g,c);if(!cond)return null;const F=fieldOf(cond);
+    switch(t){
+      case'bf':{const by={};Object.entries(CF).forEach(([k,x])=>(by[x.grp]=by[x.grp]||[]).push({v:k,label:x.label,sub:TYPE_LABEL[x.type]}));return{kind:'single',ph:'Search fields',groups:Object.entries(by).map(([l,items])=>({label:l,items})),value:cond.f,apply:v=>{cond.f=v;const ty=CF[v].type;cond.op=ty==='id'?'inseg':OPS[ty][0][0];cond.v=[]}}}
+      case'bo':return{kind:'single',search:false,groups:[{label:'',items:OPS[F.type].map(([o,l])=>({v:o,label:l}))}],value:cond.op,apply:v=>{cond.op=v;cond.v=[]}};
+      case'bv':{const counts={};EMP.forEach(e=>{const x=F.get(e);(Array.isArray(x)?x:[x]).forEach(y=>counts[y]=(counts[y]||0)+1)});let groups;
+        if(cond.f==='team')groups=Object.entries(TEAMS).map(([d2,ts])=>({label:d2,items:ts.map(x=>({v:x,label:x,count:counts[x]||0}))}));
+        else if(cond.f==='location')groups=[['United States','US'],['Canada','CA']].map(([l,cc])=>({label:l,items:LOCS.filter(x=>LOC[x].country===cc).map(x=>({v:x,label:x,count:counts[x]||0}))}));
+        else groups=[{label:'',items:F.opts().map(x=>({v:x,label:x,count:counts[x]||0}))}];
+        return{kind:'multi',ph:'Search values',groups,value:cond.v,apply:v=>{cond.v=v}}}
+      case'bvl':return{kind:'single',search:false,groups:[{label:'',items:LEVELS.map(l=>({v:l,label:l}))}],value:cond.v[+i],apply:v=>{cond.v=cond.v.slice();cond.v[+i]=v}};
+      case'brel':return{kind:'single',search:false,groups:[{label:'',items:REL.map(([v,l])=>({v,label:l}))}],value:cond.v[0],apply:v=>{cond.v=[v,cond.v[1]||'']}};
+      case'bseg':{const ex=ctx==='se'&&S.se&&S.se.segId;const mk=s=>({v:s.id,label:s.name,sub:`${fmtN(members(s.id).size)} people · ${s.type==='static'?'snapshot '+String(s.snapshotAt).split(',')[0]:'computed when used'}`});
+        return{kind:'single',ph:'Search segments',w:360,groups:[{label:'Dynamic',items:SEGS.filter(s=>s.type==='dynamic'&&s.id!==ex).map(mk)},{label:'Static',items:SEGS.filter(s=>s.type==='static'&&s.id!==ex).map(mk)}],value:cond.v[0],apply:v=>{cond.v=[v]},
+          footer:ctx==='d'?{act:'ddcreateseg',label:'Create new segment'}:null}}
+      case'bppl':return{kind:'multi',ph:'Search name, ID or email',w:360,groups:peopleGroups(),value:cond.v,apply:v=>{cond.v=v},paste:true};
+      case'bpp1':return{kind:'single',ph:'Search name or ID',w:360,groups:F.type==='person'?peopleGroups(e=>lvlN(e.level)>=5):peopleGroups(),value:cond.v[0],apply:v=>{cond.v=[v]}};
+    }}
+  if(t==='bm'){const g=groupsOf(p[1])[+p[2]];if(!g)return null;return{kind:'single',search:false,w:260,groups:[{label:'',items:[['all','all','Every condition is true'],['any','any','At least one condition is true'],['atleast','at least N','N or more of the conditions'],['atmost','at most N','No more than N of the conditions'],['exactly','exactly N','Exactly N of the conditions']].map(([v,l,sb])=>({v,label:l,sub:sb}))}],value:g.mode||'all',apply:v=>{g.mode=v;if(!g.n)g.n=1}}}
+  if(t==='ins'){const d=S.d;const mk=s=>({v:s.id,label:s.name,sub:`${fmtN(members(s.id).size)} people`});return{kind:'single',ph:'Search segments',w:360,groups:[{label:'Dynamic',items:SEGS.filter(s=>s.type==='dynamic').map(mk)},{label:'Static',items:SEGS.filter(s=>s.type==='static').map(mk)}],value:null,
+    apply:v=>{addTargetCond(d,{f:'empid',op:'inseg',v:[v]});toast(`Added "${segName(v)}"${d.who.groups.length>1?' as an OR group: its people join the targeting':''}.`)},footer:{act:'createseg',label:'Create new segment'}}}
+  if(t==='hop'){return{kind:'single',search:false,w:250,groups:[{label:'',items:[{v:'',label:'None'}]},...SOPS.map(([l,xs])=>({label:l,items:xs.map(([v,lb])=>({v,label:lb}))}))],value:S.hmd?S.hmd.op:'',apply:v=>{S.hmd.op=v;S.hmd.v=v.startsWith('d_')?['today']:v==='formula'?[S.hmd.v[0]&&String(S.hmd.v[0]).startsWith('=')?S.hmd.v[0]:'']:[]},after:'hm'}}
+  if(t==='hrel')return{kind:'single',search:false,groups:[{label:'',items:REL.map(([v,l])=>({v,label:l}))}],value:S.hmd?S.hmd.v[0]:'',apply:v=>{S.hmd.v=[v,S.hmd.v[1]||'']},after:'hm'};
+  if(t==='cols'){const ts=tsOf(p[1]);const m=MT[p[1]];if(!m)return null;const items=c=>({v:c.key,label:c.label});const rc=m.allCols.filter(c=>!c.file&&c.key!=='_emp'),fc=m.allCols.filter(c=>c.file);
+    return{kind:'multi',ph:'Search columns',groups:[{label:fc.length?'Rippling fields':'',items:rc.map(items)},...(fc.length?[{label:'From your file',items:fc.map(items)}]:[])],value:m.allCols.filter(c=>c.key!=='_emp'&&!ts.hidden.has(c.key)).map(c=>c.key),
+      apply:v=>{m.allCols.forEach(c=>{if(c.key==='_emp')return;if(v.includes(c.key))ts.hidden.delete(c.key);else ts.hidden.add(c.key)})}}}
+  if(t==='rows'){const ts=tsOf(p[1]);return{kind:'single',search:false,w:120,groups:[{label:'',items:[10,25,50,100].map(n=>({v:String(n),label:String(n)}))}],value:String(ts.size||25),apply:v=>{ts.size=+v;ts.page=1}}}
+  if(t==='keycol'){const f=S.se&&S.se.file;if(!f)return null;return{kind:'single',search:false,groups:[{label:'',items:f.header.map((h,i)=>({v:String(i),label:h||'Column '+(i+1)}))}],value:String(f.keyCol),apply:v=>{f.keyCol=+v;if(f.raw)reparse(S.se)}}}
+  if(t==='ctype'){const f=S.se&&S.se.file;if(!f)return null;const col=f.cols.find(x=>x.key===p[1]);return{kind:'single',search:false,w:160,groups:[{label:'',items:['text','num','date','bool','pick'].map(x=>({v:x,label:TYPE_LABEL[x]}))}],value:col.type,
+    apply:v=>{f.types[col.key]=v;if(f.raw)reparse(S.se);else col.type=v;delete S.se.tf[col.key]}}}
+  if(t==='sample')return{kind:'single',search:false,w:300,groups:[{label:'',items:[['promotion-nominations-fy26.csv','Promotion nominations','Employee ID key · Yes/No, number, date and picklist columns'],['austin-office-movers.csv','Austin office movers','Work Email key · move date, relocation and parking columns']].map(([v,l,sb])=>({v,label:l,sub:sb}))}],value:null,apply:v=>{loadFile(S.se,v,SAMPLES[v]())}};
+  return null}
+function renderDD(){const el=$('#pop2');if(!S.dd){el.innerHTML='';return}const sp=ddSpec(S.dd.key);if(!sp){S.dd=null;el.innerHTML='';return}
+  const q=(S.dd.q||'').toLowerCase();const multi=sp.kind==='multi';const val=multi?(sp.value||[]):sp.value;const LIM=200;let total=0,shown=0;
+  const groups=sp.groups.map(g=>{const items=g.items.filter(it=>!q||(it.label+' '+(it.sub||'')+' '+it.v+' '+(it.q||'')).toLowerCase().includes(q));total+=items.length;return{...g,items}}).filter(g=>g.items.length);
+  let body='';for(const g of groups){if(shown>=LIM)break;const its=g.items.slice(0,LIM-shown);shown+=its.length;const allOn=multi&&g.items.every(it=>val.includes(it.v));
+    if(g.label)body+=`<div class="ddg">${multi?`<label class="ddgl"><input type="checkbox" data-act="ddgrp" data-g="${esc(g.label)}" ${allOn?'checked':''}>${esc(g.label)}</label>`:`<span>${esc(g.label)}</span>`}<span>${fmtN(g.items.length)}</span></div>`;
+    body+=its.map(it=>{const on=multi?val.includes(it.v):val===it.v;const inner=`<span>${esc(it.label)}${it.sub?`<small>${esc(it.sub)}</small>`:''}</span>`;
+      return multi?`<label class="ddi ${on?'on':''}"><input type="checkbox" data-act="ddtog" data-v="${esc(it.v)}" ${on?'checked':''}>${inner}${it.count!==undefined?`<em>${fmtN(it.count)}</em>`:''}</label>`
+        :`<button type="button" class="ddi ${on?'on':''}" data-act="ddpick" data-v="${esc(it.v)}">${inner}${on?'<i>✓</i>':it.count!==undefined?`<em>${fmtN(it.count)}</em>`:''}</button>`}).join('')}
+  const W=Math.min(Math.max(S.dd.w,sp.w||240),window.innerWidth-16);const x=Math.max(8,Math.min(S.dd.x,window.innerWidth-W-8));const below=window.innerHeight-S.dd.y>300;const y=below?S.dd.y:Math.max(64,S.dd.top-390);
+  el.innerHTML=`<div class="dd pp" style="left:${x}px;top:${y}px;width:${W}px" role="listbox">${sp.search!==false?`<div class="dds"><input type="search" id="dd-q" data-in="ddq" placeholder="${esc(sp.ph||'Search')}" value="${esc(S.dd.q||'')}" autocomplete="off"></div>`:''}
+    ${multi?`<div class="ddbar"><button type="button" class="lnk" data-act="ddall">Select all${q?' matching':''}</button><button type="button" class="lnk" data-act="ddnone">Clear all</button><span class="muted">${fmtN(val.length)} selected</span></div>`:''}
+    ${sp.paste?`<div class="ddpaste"><textarea id="dd-paste" placeholder="Paste IDs, work emails or names, in any mix"></textarea><div><button type="button" class="btn2 sm" data-act="ddpaste">Add pasted people</button></div></div>`:''}
+    <div class="ddl">${body||'<div class="ddmore">No matches</div>'}${total>shown?`<div class="ddmore">Showing ${fmtN(shown)} of ${fmtN(total)}. Type to narrow the list.</div>`:''}</div>
+    ${sp.footer?`<button type="button" class="ddf" data-act="${sp.footer.act}">${PLUS}<span>${esc(sp.footer.label)}</span></button>`:''}${multi?`<div class="ddfoot"><button type="button" class="btn sm" data-act="ddclose">Done</button></div>`:''}</div>`;
+  if(S.dd.focus){const i=$('#dd-q');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}S.dd.focus=false}}
+function ddApply(v){const sp=ddSpec(S.dd.key);if(!sp)return;sp.apply(v);if(sp.after==='hm'){renderHM();renderDD()}else render()}
 document.addEventListener('click',ev=>{const t=ev.target;if(t.closest('.pp')){const a=t.closest('[data-act]');if(a&&!(a.tagName==='INPUT'&&(a.type==='checkbox'||a.type==='radio'))){PREV={};act(a.dataset.act,a)}return}
   if(t.id==='overlay'){S.ov=null;renderOverlay();return}
   if(S.gq&&!t.closest('.gsearch')){S.gq='';$('#gq').value='';renderSearch()}
@@ -1070,6 +1231,7 @@ document.addEventListener('change',ev=>{const t=ev.target;const d=S.d;
     case'name':d.name=t.value;render();break;case'reason':d.reason=t.value;break;
     case'date':d.date=fromIso(t.value);render();break;
     case'bgmode':G2[+t.dataset.g].mode=t.value;render();break;
+    case'bgn':G2[+t.dataset.g].n=Math.max(1,parseInt(t.value,10)||1);render();break;
     case'bf':{c.f=t.value;const ty=CF[c.f].type;c.op=ty==='id'?'inseg':OPS[ty][0][0];c.v=[];S.pop=LISTOP.has(c.op)?`${t.dataset.ctx}-${t.dataset.g}-${t.dataset.c}`:null;S.popQ='';render();break}
     case'bo':{c.op=t.value;c.v=[];S.pop=LISTOP.has(c.op)?`${t.dataset.ctx}-${t.dataset.g}-${t.dataset.c}`:null;S.popQ='';render();break}
     case'bv':{c.v=c.v||[];c.v[+t.dataset.i]=t.value;render();break}
@@ -1088,29 +1250,34 @@ document.addEventListener('change',ev=>{const t=ev.target;const d=S.d;
     case'hv':S.hmd.v[+t.dataset.i]=t.value;break;
   }});
 document.addEventListener('input',ev=>{const t=ev.target;const k=t.dataset.in;const d=S.d;
-  if(k==='popq'){S.popQ=t.value;S.focus='pop-q';const key=S.pop;render();S.pop=key}
+  if(k==='ddq'){S.dd.q=t.value;S.dd.focus=true;renderDD()}
+  else if(k==='hfx'){S.hmd.v=[t.value];const m=MT[S.hm.t];const c=compileFormula(t.value,m.allCols);const el=$('#fxmsg');if(el){const cnt=c.ok?m.base.filter(e=>{try{return!!c.fn(e)}catch(_){return false}}).length:0;el.className=!t.value?'muted':c.ok?'done-t':'loss';el.textContent=!t.value?'Write a formula or describe it below.':c.ok?`Valid · ${pl(cnt,'row')} match`:c.err}}
+  else if(k==='hai'){S.hmd.ai=t.value}
+  else if(k==='popq'){S.popQ=t.value;S.focus='pop-q';render()}
   else if(k==='whatq'){S.whatQ=t.value;S.focus='what-q';render()}
   else if(k==='empq'){S.empQ=t.value;S.focus='emp-q';render()}
   else if(k==='gq'){S.gq=t.value;renderSearch()}
   else if(k==='slq'){S.slQ=t.value;S.focus='slq';render()}
   else if(k==='pq'){S.pq=t.value;S.focus='pq';render()}
-  else if(k==='mq'){const ts=tsOf(t.dataset.t);ts.q=t.value;ts.scroll=0;S.focus=t.id;render()}
+  else if(k==='mq'){const ts=tsOf(t.dataset.t);ts.q=t.value;ts.page=1;S.focus=t.id;render()}
   else if(k==='hvq'){S.hmd.vq=t.value;renderHM();const el=document.querySelector('[data-in=hvq]');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
   else if(k==='hv'){S.hmd.v[+t.dataset.i]=t.value}
   else if(k==='sename'){S.se.name=t.value}else if(k==='sedesc'){S.se.desc=t.value}else if(k==='sepastetxt'){S.se.pasteText=t.value}
-  else if(k==='name'&&d){d.name=t.value;const ok=d.name.trim()&&d.date;const b=$('#nextbtn');if(b)b.disabled=!ok;const w=$('#nextwhy');if(w)w.textContent=ok?'':(!d.name.trim()?'Name the change to continue.':'Pick an effective date. It decides which payroll run picks this up.')}
+  else if((k==='name'||k==='reason')&&d){d[k]=t.value;const ok=d.name.trim()&&d.reason.trim()&&d.date;const b=$('#nextbtn');if(b)b.disabled=!ok;const w=$('#nextwhy');if(w)w.textContent=ok?'':(!d.name.trim()?'Name the change to continue.':!d.reason.trim()?'Add a reason. Approvers and the audit log need it.':'Pick an effective date. It decides which payroll run picks this up.')}
   else if(k==='paste'&&d)d.who.paste=t.value;
   else if(k==='acknote'&&d)d.ackNote[t.dataset.issue]=t.value;
   else if(k==='apreason'&&d)d.rejected.set(t.dataset.id,t.value)});
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(S.ov){S.ov=null;renderOverlay()}else if(S.hm){S.hm=null;renderHM()}else if(S.se&&S.se.inSheet){closeSheet()}else if(closePopups())render()}
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.dd){S.dd=null;renderDD();return}if(ev.key==='Escape'&&S.drawer){S.drawer=null;renderDrawer();return}
+  if(ev.key==='Enter'&&ev.target.id==='dd-q'){const b=document.querySelector('#pop2 .ddi');if(b&&b.tagName==='BUTTON'){ev.preventDefault();b.click()}return}
+  if(ev.key==='Escape'){if(S.ov){S.ov=null;renderOverlay()}else if(S.hm){S.hm=null;renderHM()}else if(S.se&&S.se.inSheet){closeSheet()}else if(closePopups())render()}
   if(ev.key==='Enter'&&ev.target.dataset&&(ev.target.dataset.cell||ev.target.dataset.in==='bv'||ev.target.dataset.in==='bvp'))ev.target.blur();
   if(ev.key==='Enter'&&ev.target.dataset&&ev.target.dataset.in==='hv'){const b=document.querySelector('[data-act=happly],[data-act=haddcond]');if(b){S.hmd.v[+ev.target.dataset.i]=ev.target.value;b.click()}}});
-window.addEventListener('resize',()=>{if(S.hm){S.hm=null;renderHM()}});
+window.addEventListener('resize',()=>{if(S.hm){S.hm=null;renderHM()}if(S.dd){S.dd=null;renderDD()}});
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(['bulk','segments','people'].includes(h)&&S.route!==h){S.route=h;render()}});
 
 /* ================= boot ================= */
 build(S.size);makeSeeds();S.d=demoDraft();
 const h0=location.hash.slice(1);if(['bulk','segments','people'].includes(h0))S.route=h0;
 render();
-window.__app={S,act,render,SEGS:()=>SEGS,members,MT,cohort,testVal,evalGroups,EMP:()=>EMP,segById};
+window.__app={S,act,render,SEGS:()=>SEGS,members,MT,cohort,testVal,evalGroups,EMP:()=>EMP,segById,SAMPLES,compileFormula,aiFormula,testSheet};
 })();
