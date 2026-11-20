@@ -52,6 +52,13 @@ const ROLE={'Engineering':'Software Engineer','Sales':'Account Executive','Marke
 const FIRST=['Lavonne','Emmitt','Kenji','Tobias','Marisol','Hollis','Anneliese','Cyrus','Delphine','Ezekiel','Florence','Gideon','Harriet','Ismael','Juniper','Kasimir','Leontine','Maverick','Nadia','Osvaldo','Petra','Quincy','Rosalind','Silas','Theodora','Ulrich','Verna','Wendell','Ximena','Yusuf','Zelda','Arjun','Mei','Tomas','Ines','Kofi','Sanna','Rhett','Ayla','Bram','Celeste','Dario','Elva','Lorine','Garnet','Mafalda','Otis','Reva'];
 const LAST=['Kshlerin','Wuckert','Hackett','Runolfsdottir','Bergstrom','Schaden','Gutkowski','Haley','Lind','Kub','Turcotte','Rau','Bode','Hilpert','Mayer','Rempel','Zieme','Ondricka','Cormier','Dicki','Abernathy','Bechtelar','Collier','Daugherty','Ebert','Funk','Gerlach','Heller','Jacobi','Koepp','Larkin','Mraz','Nader','Oberbrunner','Prosacco','Quigley','Reichert','Stiedemann','Tromp','Upton','Volkman','Wehner','Yost','Considine'];
 const lvlN=l=>parseInt(String(l).slice(1),10)||0;
+let TTL=null;
+function titleCat(){if(TTL&&TTL.emp===EMP)return TTL;const by={};const add=(dp,t)=>{by[dp]=by[dp]||new Set();by[dp].add(t)};
+  DEPTS.forEach(dp=>LEVELS.forEach(l=>add(dp,ladder(dp,l))));EMP.forEach(e=>add(e.department,e.title));
+  const dept={};Object.entries(by).forEach(([dp,ts])=>ts.forEach(t=>{if(!dept[t])dept[t]=dp}));const all=Object.keys(dept).sort();
+  TTL={emp:EMP,all,dept,groups:Object.keys(by).sort().map(dp=>({label:dp,items:[...by[dp]].filter(t=>dept[t]===dp).sort()})).filter(g=>g.items.length)};return TTL}
+const titleOpts=()=>titleCat().all;
+function closestTitle(raw){const bg=x=>{x=String(x).toLowerCase().replace(/[^a-z]/g,'');const o=[];for(let i=0;i<x.length-1;i++)o.push(x.slice(i,i+2));return o};const a=bg(raw);let best='',sc=0;titleOpts().forEach(t=>{const b=bg(t);const m=b.slice();let k=0;a.forEach(x=>{const i=m.indexOf(x);if(i>=0){k++;m.splice(i,1)}});const d=2*k/(a.length+b.length||1);if(d>sc){sc=d;best=t}});return sc>=.6?best:''}
 function ladder(dept,level){const n=lvlN(level);if(dept==='Executive')return'Chief Executive Officer';
   if(dept==='Customer Support')return['Support Associate','Support Specialist','Senior Support Specialist','Manager Customer Support','Senior Manager Customer Support','Director Customer Support','Head of Customer Support','VP Customer Support'][n-1];
   const R=ROLE[dept];return[`Associate ${R}`,R,`Senior ${R}`,`Staff ${R}`,`Principal ${R}`,`Director, ${dept}`,`Head of ${dept}`,`VP ${dept}`][n-1]}
@@ -111,7 +118,7 @@ function under(e,mid){if(!e)return false;let x=e.manager,g=0;while(x&&g<20){if(x
 
 /* ================= value fields (bulk change) ================= */
 const FIELDS={
-  title:{label:'Title',grp:'emp',type:'text'},
+  title:{label:'Title',grp:'emp',type:'select',opts:()=>titleOpts()},
   department:{label:'Department',grp:'emp',type:'select',opts:()=>DEPTS,approval:true},
   team:{label:'Team',grp:'emp',type:'team'},
   manager:{label:'Manager',grp:'emp',type:'person',approval:true},
@@ -239,7 +246,7 @@ function parseMoney(s){if(s===undefined||s===null)return NaN;let t=String(s).tri
 /* ================= condition engine (one catalog for every builder and column filter) ================= */
 const CF={
   empid:{label:'Employee ID',type:'id',grp:'Employee',get:e=>e.id},
-  title:{label:'Title',type:'text',grp:'Employment information',get:e=>e.title},
+  title:{label:'Title',type:'pick',grp:'Employment information',get:e=>e.title,opts:()=>titleOpts()},
   department:{label:'Department',type:'pick',grp:'Employment information',get:e=>e.department,opts:()=>DEPTS},
   team:{label:'Team',type:'pick',grp:'Employment information',get:e=>e.team,opts:()=>ALLTEAMS},
   manager:{label:'Manager',type:'person',grp:'Employment information',get:e=>e.manager},
@@ -453,7 +460,7 @@ const TYL={money:'Amount',int:'Number',select:'List',team:'List',text:'Text',dat
 function ropsFor(f){const F=FIELDS[f];if(!F)return[];const t=F.type;let o;
   if(t==='money')o=[['pct','Change by a percentage'],['add','Change by an amount'],['set','Set to an amount'],...(f!=='compensation'?[['pctbase','Set to a % of base pay']]:[])];
   else if(t==='int')o=[['add','Change by'],['pct','Change by a percentage'],['set','Set to']];
-  else if(t==='select')o=[['set','Set to'],['map','Replace one value with another'],...(f==='level'?[['step','Move up or down levels']]:[])];
+  else if(t==='select')o=[['set','Set to'],['map','Replace one value with another'],...(f==='level'?[['step','Move up or down levels']]:[]),...(f==='title'?[['ladder','Use the standard title for the level']]:[])];
   else if(t==='team')o=[['set','Set to'],['map','Replace one team with another'],['first','First team in the new department']];
   else if(t==='date')o=[['set','Set to a date'],['shift','Move by a number of days'],['eff','Set to the effective date']];
   else if(t==='person')o=[['set','Set to'],['map','Replace one manager with another'],['skip',"Move to their manager's manager"]];
@@ -472,7 +479,7 @@ function ruleVal(d,e,f,r){if(!r)return undefined;const F=FIELDS[f];const o=r.op,
   switch(F.type){
     case'money':{const c0=+cur||0;const v=o==='pct'?c0*(1+(+a)/100):o==='add'?c0+conv(+a,r.cur,cc):o==='set'?conv(+a,r.cur,cc):o==='pctbase'?annual(nv(d,e,'compensation'),nv(d,e,'per'))*(+a)/100:NaN;return isFinite(v)?Math.max(0,Math.round(v/10)*10):undefined}
     case'int':{const c0=+cur||0;const v=o==='add'?c0+(+a):o==='pct'?c0*(1+(+a)/100):o==='set'?+a:NaN;return isFinite(v)?Math.max(0,Math.round(v)):undefined}
-    case'select':if(o==='set')return a;if(o==='map')return String(cur)===String(a)?b:undefined;if(o==='step'){const i=LEVELS.indexOf(cur);if(i<0)return undefined;return LEVELS[Math.max(0,Math.min(LEVELS.length-1,i+(+a||0)))]}return undefined;
+    case'select':if(o==='ladder')return ladder(nv(d,e,'department'),nv(d,e,'level'));if(o==='set')return a;if(o==='map')return String(cur)===String(a)?b:undefined;if(o==='step'){const i=LEVELS.indexOf(cur);if(i<0)return undefined;return LEVELS[Math.max(0,Math.min(LEVELS.length-1,i+(+a||0)))]}return undefined;
     case'team':if(o==='set')return a;if(o==='map')return cur===a?b:undefined;if(o==='first')return TEAMS[nv(d,e,'department')]?.[0];return undefined;
     case'date':if(o==='set')return a;if(o==='eff')return d.date?iso(d.date):undefined;if(o==='shift'){const x=fromIso(cur);return x?iso(addDays(x,+a||0)):undefined}return undefined;
     case'person':if(o==='set')return a;if(o==='map')return cur===a?b:undefined;if(o==='skip')return EMPI[cur]?.manager||undefined;return undefined;
@@ -682,7 +689,7 @@ function draftView(){const d=S.d;const st=STEPS.find(s=>s.k===S.step);const A=an
   let body='';switch(S.step){case'setup':body=setupView(d);break;case'who':body=segStepView(d);break;case'what':body=whatView(d);break;case'values':body=valuesView(d);break;case'review':body=reviewView(d);break;case'impact':body=impactView(d);break;case'status':body=statusView(d);break}
   return`<div class="card nos"><section class="main">${head}${summary(d,A)}<div class="content">${body}</div>${footer(d,A)}</section></div>`}
 function summary(d,A){A=A||analyze(d);const kb=(l,v,c,act,k)=>`<button class="kv kvb" data-act="${act}" data-k="${k}" title="Open the list"><span>${esc(l)}</span><b class="${c}">${v}</b></button>`;
-  return`<div class="strip" id="summary">${kv('Change',esc(d.name||'Untitled'))}${kv('Effective',d.date?fmtD(d.date,true):'Not set')}${kb('People',fmtN(A.rows.length),'','plist','targeted')}${kv('Fields',d.fields.length)}${kb('Changes',fmtN(A.changes),'','plist','changed')}${kb('Errors',fmtN(A.err),A.err?'err':'','issuesdrawer','e')}${kb('Warnings',fmtN(A.warn),A.warn?'warn':'','issuesdrawer','w')}</div>`}
+  return`<div class="strip" id="summary">${kv('Change',esc(d.name||'Untitled'))}${kv('Effective',d.date?fmtD(d.date,true):'Not set')}${kb('Targeted',fmtN(A.rows.length),'','plist','targeted')}${kb('Changing',fmtN(A.rowChanged.size),'','plist','changed')}${kv('Fields',d.fields.length)}${kv('Values changing',fmtN(A.changes))}${kb('Errors',fmtN(A.err),A.err?'err':'','issuesdrawer','e')}${kb('Warnings',fmtN(A.warn),A.warn?'warn':'','issuesdrawer','w')}</div>`}
 function footer(d,A){const i=STEPS.findIndex(s=>s.k===S.step);if(['status','impact','review'].includes(S.step))return'';
   let ok=true,why='';
   if(S.step==='setup'){if(!d.name.trim()){ok=false;why='Name the change to continue.'}else if(!d.reason.trim()){ok=false;why='Add a reason. Approvers and the audit log need it.'}else if(!d.date){ok=false;why='Pick an effective date. It decides which payroll run picks this up.'}}
@@ -1107,7 +1114,8 @@ function editor(d,e,f){const F=FIELDS[f];const key=e.id+'|'+f;
   if(d.modes[f]==='same'){const v=d.same[f];if(v===undefined||v==='')return`<span class="muted">Set above</span>`;const nv2=val(d,e,f);return String(nv2)===String(e[f])?`<span class="muted">No change</span>`:`<span>${esc(fmtVal(e,f,nv2))}</span>`}
   const v=val(d,e,f);const shown=(v===undefined||v===null||v===''||String(v)===String(e[f]))?'':v;
   if(F.type==='date')return`<input class="cell" type="date" data-cell="${key}" value="${esc(shown)}" aria-label="New ${esc(F.label)}" title="Today: ${esc(fmtIso(e[f]))}">`;
-  if(F.type==='select'||F.type==='team'){const opts=F.type==='team'?TEAMS[nv(d,e,'department')]:F.opts();
+  if(F.type==='select'||F.type==='team')return ddBtn('cell:'+key,shown?String(shown):'',fmtVal(e,f,e[f])||'—','cellb');
+  if(false){const opts=[];
     return`<select class="cell s ${shown?'':'ghost'}" data-cell="${key}" aria-label="New ${esc(F.label)}"><option value="">${esc(fmtVal(e,f,e[f]))}</option>${opts.filter(o=>o!==e[f]).map(o=>`<option ${o===shown?'selected':''}>${esc(o)}</option>`).join('')}</select>`}
   if(F.type==='person')return`<input class="cell" list="dl-mgr" data-cell="${key}" value="${shown&&EMPI[shown]?esc(EMPI[shown].name):''}" placeholder="${esc(fmtVal(e,f,e[f]))}" aria-label="New manager">`;
   const disp=shown===''?'':(F.type==='money'||F.type==='int')?(f==='compensation'&&+shown<1000?String(shown):fmtN(+shown)):shown;
@@ -1181,8 +1189,8 @@ function reviewView(d){const A=analyze(d);const keys=ISS_ORDER.filter(k=>A.issue
   const unacked=keys.filter(k=>ISS[k].sev==='w'&&!d.ack[k]);const errRows=new Set();keys.filter(k=>ISS[k].sev==='e').forEach(k=>A.issues[k].forEach(id=>errRows.add(id)));
   const gate=A.err?`<div class="gate"><span>${pl(errRows.size,'row')} with errors can't be submitted.</span><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn2" data-act="back">Back to Values</button><button class="btn" data-act="moveerr">Move ${fmtN(errRows.size)} to a new draft and continue with ${fmtN(A.rows.length-errRows.size)}</button></div></div>`
     :unacked.length?`<div class="gate"><span>Acknowledge ${pl(unacked.length,'warning group')} to continue.</span><button class="btn" disabled>Continue to Impact &amp; approvals</button></div>`
-    :`<div class="gate"><label class="confirm req-box"><input type="checkbox" data-act="confirmchg" ${d.confirmed===confirmSig(d,A)?'checked':''} ${A.changes?'':'disabled'}><span class="req">I've reviewed the change list: ${pl(A.changes,'change')} for ${pl(A.rowChanged.size,'person','people')}</span></label><div style="display:flex;gap:10px"><button class="btn2" data-act="back">Back</button><button class="btn" data-act="next" ${A.changes&&d.confirmed===confirmSig(d,A)?'':'disabled'}>Continue to Impact &amp; approvals</button></div></div>`;
-  return`<div class="sumchips"><button class="sumchip" data-act="issuesdrawer" data-k="e"><span class="sev e">!</span>${pl(A.err,'error')}</button><button class="sumchip" data-act="issuesdrawer" data-k="w"><span class="sev w">!</span>${pl(A.warn,'warning')}</button><button class="sumchip" data-act="plist" data-k="sev:i"><span class="sev i">i</span>${fmtN(A.info)} info</button><span class="muted" style="align-self:center">across ${nl(A.rowChanged.size,'changed')} ${A.rowChanged.size===1?'person':'people'} with changes</span></div>${summaryBlock(d,A)}<div class="sec-h" style="margin-top:6px"><h3 class="h3">Errors and warnings</h3></div>${groups||'<p class="sub">No issues found.</p>'}${gate}`}
+    :`<div class="gate"><label class="confirm req-box"><input type="checkbox" data-act="confirmchg" ${d.confirmed===confirmSig(d,A)?'checked':''} ${A.changes?'':'disabled'}><span class="req">I've reviewed the change list: ${pl(A.changes,'value')} changing for ${pl(A.rowChanged.size,'person','people')}</span></label><div style="display:flex;gap:10px"><button class="btn2" data-act="back">Back</button><button class="btn" data-act="next" ${A.changes&&d.confirmed===confirmSig(d,A)?'':'disabled'}>Continue to Impact &amp; approvals</button></div></div>`;
+  return`<div class="sumchips"><button class="sumchip" data-act="issuesdrawer" data-k="e"><span class="sev e">!</span>${pl(A.err,'error')}</button><button class="sumchip" data-act="issuesdrawer" data-k="w"><span class="sev w">!</span>${pl(A.warn,'warning')}</button><button class="sumchip" data-act="plist" data-k="sev:i"><span class="sev i">i</span>${fmtN(A.info)} info</button><span class="muted" style="align-self:center">in ${nl(A.rowChanged.size,'changed')} of ${nl(A.rows.length,'targeted')} targeted people · ${pl(A.changes,'value')} changing</span></div>${summaryBlock(d,A)}<div class="sec-h" style="margin-top:6px"><h3 class="h3">Errors and warnings</h3></div>${groups||'<p class="sub">No issues found.</p>'}${gate}`}
 function issueCard(d,A,k){const I=ISS[k],ids=A.issues[k];
   const fixes=(I.fix||[]).map(([l,fx])=>`<button class="btn2 sm" data-act="fix" data-issue="${k}" data-fix="${fx}">${esc(l)} (${fmtN(ids.length)})</button>`).join('');
   const ack=I.sev==='w'?(d.ack[k]?`<span class="acked">✓ Acknowledged${d.ackNote[k]?': '+esc(d.ackNote[k]):''}</span>`:`<input class="notein" data-in="acknote" data-issue="${k}" placeholder="Note for the audit log (optional)" value="${esc(d.ackNote[k]||'')}"><button class="btn2 sm" data-act="ack" data-issue="${k}">Acknowledge ${fmtN(ids.length)}</button>`):'';
@@ -1332,6 +1340,9 @@ function modal(){const o=S.ov;const d=S.d;const wrap=(t,b,f)=>`<div class="modal
     `<button class="btn2" data-act="closeov">Keep version ${s.version}</button><button class="btn" data-act="refreshyes">Save new snapshot</button>`)}
   if(o.type==='segdel'){const s=segById(S.segId);const u=usedIn(s);return wrap('Delete segment?',u.length?`<p><b>${esc(s.name)}</b> is used in ${esc(u.join(', '))}. Remove it from ${u.length===1?'that bulk change':'those bulk changes'} first, so nobody's targeting silently changes.</p>`:`<p><b>${esc(s.name)}</b> will be deleted. It isn't used in any bulk change.</p>`,
     u.length?`<button class="btn" data-act="closeov">OK</button>`:`<button class="btn2" data-act="closeov">Cancel</button><button class="btn danger" data-act="segdelyes">Delete segment</button>`)}
+  if(o.type==='reqtitle')return wrap('Request a new title',`<p class="sub">Titles come from Acme Corp's job architecture, owned by Dana Okuneva (People). New titles are added there, then appear in every list.</p>
+    <div class="rows">${row('Title',`<input class="in" id="rt-name" placeholder="e.g. Staff Data Engineer" autocomplete="off">`,true)}${row('Department',`<select class="sel" id="rt-dept">${DEPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select>`,true)}${row('Level',`<select class="sel" id="rt-lvl">${LEVELS.map(x=>`<option>${x}</option>`).join('')}</select>`,true)}${row('Why it is needed',`<input class="in" id="rt-why" placeholder="Shown to the reviewer" autocomplete="off">`)}</div>`,
+    `<button class="btn2" data-act="closeov">Cancel</button><button class="btn" data-act="reqtitlego">Send request</button>`);
   if(o.type==='usebulk'){const s=segById(S.segId);const ds=[S.d,...S.parked].filter(x=>x&&!x.run);const cond={f:'empid',op:'inseg',v:[s.id]};
     const target=ds.find(x=>x.id===o.draft);let preview='';if(target){const g=o.mode==='replace'?[{mode:'all',conds:[cond]}]:[...target.who.groups.filter(x=>x.conds.length),{mode:'all',conds:[cond]}];const before=cohort(target).list.length;const after=cohort({...target,who:{...target.who,groups:g}}).list.length;preview=`Targeting goes from ${pl(before,'person','people')} to ${pl(after,'person','people')}.`}
     return wrap(`Bulk change with "${s.name}"`,`<div class="sec"><b class="req">Which bulk change</b>${ds.map(x=>`<label class="opt"><input type="radio" name="ubd" data-act="ubd" value="${x.id}" ${o.draft===x.id?'checked':''}><span><b>${esc(x.name||'Untitled change')}</b><small class="muted">${x.id} · draft · ${pl(cohort(x).list.length,'person','people')} targeted now</small></span></label>`).join('')}
@@ -1342,7 +1353,7 @@ function modal(){const o=S.ov;const d=S.d;const wrap=(t,b,f)=>`<div class="modal
   if(o.type==='upload'){const p=o.preview;return wrap('Upload CSV',`<p class="sub">Upload the template your managers filled in, or paste it. Columns can be in any order. Amounts like $92,500, 92500, 92.5k or 1,20,000 are all read correctly.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input type="file" id="up-file" accept=".csv,text/csv"><button class="txt" data-act="upsample">Use a sample file from managers</button></div>
     <textarea class="ta" id="up-ta" data-in="uptext" placeholder="Employee ID,Compensation (new),Level (new)">${esc(o.text||'')}</textarea>
-    ${p?`<div class="cutoff" style="background:var(--nav);border-color:var(--rule)"><b>${fmtN(p.matched)} rows matched · ${fmtN(p.cells)} values to write</b><span>${p.unknown.length?`${pl(p.unknown.length,'ID')} not in this change: ${esc(p.unknown.slice(0,4).join(', '))}${p.unknown.length>4?'…':''}. `:''}${p.norm?`${pl(p.norm,'amount')} normalised (e.g. "1,20,000" → 120000). `:''}${p.conv?`${pl(p.conv,'amount')} converted to the person's currency. `:''}${p.ignored.length?`Ignored columns: ${esc(p.ignored.join(', '))}.`:''}${p.bad?` ${pl(p.bad,'value')} couldn't be read and were skipped.`:''}</span></div>`:''}`,
+    ${p?`<div class="cutoff" style="background:var(--nav);border-color:var(--rule)"><b>${fmtN(p.matched)} rows matched · ${fmtN(p.cells)} values to write</b><span>${p.unknown.length?`${pl(p.unknown.length,'ID')} not in this change: ${esc(p.unknown.slice(0,4).join(', '))}${p.unknown.length>4?'…':''}. `:''}${p.norm?`${pl(p.norm,'amount')} normalised (e.g. "1,20,000" → 120000). `:''}${p.conv?`${pl(p.conv,'amount')} converted to the person's currency. `:''}${p.ignored.length?`Ignored columns: ${esc(p.ignored.join(', '))}.`:''}${p.bad?` ${pl(p.bad,'value')} couldn't be read and were skipped.`:''}${p.sugg&&p.sugg.length?`<br><b class="loss">${pl(p.sugg.length,'title')} not in the job architecture, skipped:</b> ${p.sugg.slice(0,4).map(([r,c])=>`“${esc(r)}”${c?` (closest: ${esc(c)})`:''}`).join('; ')}${p.sugg.length>4?'…':''}. <button class="lnk" data-act="reqtitle">Request a new title</button>`:''}</span></div>`:''}`,
     `<button class="btn2" data-act="uppreview">Preview</button><button class="btn" data-act="upapply" ${p&&p.cells?'':'disabled'}>Write ${p?fmtN(p.cells):''} values into the grid</button>`)}
   return''}
 
@@ -1357,18 +1368,18 @@ function previewCSV(d,text){const rows=parseCSV(text||'');if(rows.length<2)retur
   const H=rows[0];let keyCol=-1,keyKind='',curCol=-1;const cols=[];const ignored=[];
   H.forEach((h,i)=>{const n=normH(h);if(/current/i.test(h))return;if(['employeeid','id','empid'].includes(n)){keyCol=i;keyKind='id';return}if(['workemail','email'].includes(n)&&keyCol<0){keyCol=i;keyKind='email';return}if(n==='name')return;if(n==='currency'){curCol=i;return}
     const f=Object.keys(FIELDS).find(k=>normH(FIELDS[k].label)===n)||ALIAS[n];if(f&&d.fields.includes(f))cols.push([i,f]);else ignored.push(h.trim()+(f?' (not in this change)':''))});
-  const inChange=new Set(analyze(d).rows.map(e=>e.id));const unknown=[];let matched=0,nrm=0,bad=0,nconv=0;const writes=[];
+  const inChange=new Set(analyze(d).rows.map(e=>e.id));const unknown=[];const sugg=[];let matched=0,nrm=0,bad=0,nconv=0;const writes=[];
   rows.slice(1).forEach(r=>{const k=(r[keyCol]||'').trim();const id=keyKind==='email'?parsePerson(k):(EMPI[k.toUpperCase()]?k.toUpperCase():null);if(!id||!inChange.has(id)){if(k)unknown.push(k);return}matched++;const e=EMPI[id];const rc=curCol>=0?(r[curCol]||'').trim().toUpperCase():'';
     cols.forEach(([i,f])=>{const raw=(r[i]||'').trim();if(!raw)return;let v=raw;const F=FIELDS[f];
       if(F.type==='money'||F.type==='int'){v=parseMoney(raw);if(!isFinite(v)){bad++;return}if(String(v)!==raw)nrm++;
         if(MONEY.has(f)&&rc){if(!FX[rc]){bad++;return}if(rc!==curCode(e)){v=conv(v,rc,curCode(e));nconv++}}
         v=f==='compensation'?roundComp(v,nv(d,e,'per')):MONEY.has(f)?Math.round(v/10)*10:Math.round(v)}
-      else if(F.type==='select'){const o=F.opts().find(x=>x.toLowerCase()===raw.toLowerCase());if(!o){bad++;return}v=o}
+      else if(F.type==='select'){const o=F.opts().find(x=>x.toLowerCase()===raw.toLowerCase());if(!o){if(f==='title')sugg.push([raw,closestTitle(raw)]);else bad++;return}v=o}
       else if(F.type==='team'){const o=ALLTEAMS.find(x=>x.toLowerCase()===raw.toLowerCase());if(!o){bad++;return}v=o}
       else if(F.type==='date'){v=parseDateStr(raw);if(!v){bad++;return}if(v!==raw)nrm++}
       else if(F.type==='person'){v=parsePerson(raw);if(!v){bad++;return}}
       if(String(v)!==String(e[f]))writes.push([id,f,v])})});
-  return{matched,cells:writes.length,unknown,norm:nrm,ignored,bad,conv:nconv,writes}}
+  return{matched,cells:writes.length,unknown,norm:nrm,ignored,bad,conv:nconv,writes,sugg}}
 function sampleCSV(d){const r=rng(99);const A=analyze(d);const rows=A.rows.filter(e=>e.rating!=='Below').filter(()=>r()<.16).slice(0,400);const fs=d.fields.filter(f=>['compensation','level','title','bonus'].includes(f));
   const lines=[csvLine(['Employee ID','Name',...fs.map(f=>FIELDS[f].label+' (new)'),'Manager notes'])];let k=0;
   rows.forEach(e=>{const vals=fs.map(f=>{if(f==='compensation'){const v=roundComp(e.compensation*(1.03+r()*.07),e.per);k++;if(e.per==='Hourly')return'$'+v.toFixed(2);const m=k%4;return m===0?'$'+fmtN(v):m===1?String(v):m===2?(v/1000).toFixed(1)+'k':v.toString().replace(/(\d)(?=(\d\d)+\d{3}$)/g,'$1,').replace(/(\d)(\d{3})$/,'$1,$2')}
@@ -1584,6 +1595,8 @@ function act(k,a){const d=S.d;switch(k){
   case'issuesdrawer':S.drawer={type:'issues',k:a.dataset.k};renderDrawer();break;
   case'issuegrid':{const k=a.dataset.k;S.drawer=null;d.grid.appr=ISS[k].sev==='e'?'err':ISS[k].sev==='w'?'warn':'';d.grid.issue=k;d.grid.cur=null;S.step='values';d.grid.scroll=0;render();window.scrollTo(0,0);break}
   case'plist':{S.ov={type:'plist',k:a.dataset.k};TS.plist=tsNew(25);renderOverlay();break}
+  case'reqtitle':{S.dd=null;renderDD();S.ov={type:'reqtitle',t:'',dept:(S.d&&S.d.fields&&'')||'',lvl:''};renderOverlay();break}
+  case'reqtitlego':{const t=($('#rt-name')||{}).value||'';if(!t.trim()){toast('Enter the title you need.');break}const near=closestTitle(t);S.ov=null;renderOverlay();toast(`Request sent to Dana Okuneva (People) to add “${t.trim()}” to the job architecture.${near?` Closest existing title: ${near}.`:''}`,'info');break}
   case'logall':S.drawer={type:'log'};renderDrawer();break;
   case'addrule':{const R=S.rt;const F=FIELDS[R.field];const o=R.op;const noArg=['first','eff','skip','ladder'].includes(o);let a=R.a,b=R.b;
     if(!noArg){if(['pct','add','pctbase','step','shift'].includes(o)||(o==='set'&&(F.type==='money'||F.type==='int'))){a=parseMoney(a);if(!isFinite(a)){toast('Enter a number for the rule.');break}}
@@ -1701,7 +1714,8 @@ function ddSpec(key){const p=key.split(':');const t=p[0];
       case'bf':{const by={};Object.entries(CF).forEach(([k,x])=>(by[x.grp]=by[x.grp]||[]).push({v:k,label:x.label,meta:TYPE_LABEL[x.type],sub:(x.src?'From '+x.src:'')+(x.agg?'Computed from current data':'')+(x.money?'Compared in the currency you pick':'')}));return{kind:'single',ph:'Search fields',groups:Object.entries(by).map(([l,items])=>({label:l,items})),value:cond.f,apply:v=>{cond.f=v;const ty=CF[v].type;cond.op=ty==='id'?'inseg':OPS[ty][0][0];cond.v=[]}}}
       case'bo':return{kind:'single',search:false,groups:[{label:'',items:OPS[F.type].map(([o,l])=>({v:o,label:l}))}],value:cond.op,apply:v=>{cond.op=v;cond.v=[]}};
       case'bv':{const counts={};EMP.forEach(e=>{const x=F.get(e);(Array.isArray(x)?x:[x]).forEach(y=>counts[y]=(counts[y]||0)+1)});let groups;
-        if(cond.f==='team')groups=Object.entries(TEAMS).map(([d2,ts])=>({label:d2,items:ts.map(x=>({v:x,label:x,count:counts[x]||0}))}));
+        if(cond.f==='title')groups=titleCat().groups.map(g=>({label:g.label,items:g.items.map(x=>({v:x,label:x,count:counts[x]||0}))}));
+        else if(cond.f==='team')groups=Object.entries(TEAMS).map(([d2,ts])=>({label:d2,items:ts.map(x=>({v:x,label:x,count:counts[x]||0}))}));
         else if(cond.f==='location')groups=[['United States','US'],['Canada','CA']].map(([l,cc])=>({label:l,items:LOCS.filter(x=>LOC[x].country===cc).map(x=>({v:x,label:x,count:counts[x]||0}))}));
         else groups=[{label:'',items:F.opts().map(x=>({v:x,label:x,count:counts[x]||0}))}];
         return{kind:'multi',ph:'Search values',groups,value:cond.v,apply:v=>{cond.v=v}}}
@@ -1727,8 +1741,8 @@ function ddSpec(key){const p=key.split(':');const t=p[0];
     apply:v=>{f.types[col.key]=v;if(f.raw)reparse(S.se);else col.type=v;delete S.se.tf[col.key]}}}
   if(t==='rtf'){const d=S.d;return{kind:'single',ph:'Search fields',w:300,groups:[{label:'Fields in this change',items:d.fields.map(x=>({v:x,label:FIELDS[x].label,meta:TYL[FIELDS[x].type]||'Text',sub:d.modes[x]==='same'?'Now one value for everyone; a rule switches it to each person':''}))}],value:S.rt.field,apply:v=>{S.rt.field=v;S.rt.op=ropsFor(v)[0][0];S.rt.a='';S.rt.b='';S.rt.cap=v==='compensation'?'max':''}}}
   if(t==='rtk')return{kind:'single',search:false,w:280,groups:[{label:'For '+(TYL[FIELDS[S.rt.field].type]||'Text').toLowerCase()+' fields',items:ropsFor(S.rt.field).map(([v,l])=>({v,label:l}))}],value:S.rt.op,apply:v=>{S.rt.op=v;S.rt.a='';S.rt.b=''}};
-  if(t==='rtv'){const F=FIELDS[S.rt.field];const w=p[1];const d=S.d;let groups;if(F.type==='team')groups=Object.entries(TEAMS).map(([dp,ts])=>({label:dp,items:ts.map(x=>({v:x,label:x}))}));else{const cnt={};analyze(d).rows.forEach(e=>{cnt[e[S.rt.field]]=(cnt[e[S.rt.field]]||0)+1});groups=[{label:'',items:F.opts().map(x=>({v:x,label:x,count:w==='a'&&S.rt.op==='map'?cnt[x]||0:undefined}))}]}
-    return{kind:'single',ph:'Search values',groups,value:S.rt[w],apply:v=>{S.rt[w]=v}}}
+  if(t==='rtv'){const F=FIELDS[S.rt.field];const w=p[1];const d=S.d;let groups;if(S.rt.field==='title')groups=titleCat().groups.map(g=>({label:g.label,items:g.items.map(x=>({v:x,label:x}))}));else if(F.type==='team')groups=Object.entries(TEAMS).map(([dp,ts])=>({label:dp,items:ts.map(x=>({v:x,label:x}))}));else{const cnt={};analyze(d).rows.forEach(e=>{cnt[e[S.rt.field]]=(cnt[e[S.rt.field]]||0)+1});groups=[{label:'',items:F.opts().map(x=>({v:x,label:x,count:w==='a'&&S.rt.op==='map'?cnt[x]||0:undefined}))}]}
+    return{kind:'single',ph:'Search values',groups,value:S.rt[w],apply:v=>{S.rt[w]=v},footer:S.rt.field==='title'?{act:'reqtitle',label:'Request a new title'}:null}}
   if(t==='gby'){const d=S.d;const other=['department','team','location','level','rating','manager','etype','status','per','timeOff','benefits','costCenter'].filter(k=>!d.fields.includes(k)&&CF[k]);
     return{kind:'single',ph:'Search fields',w:300,groups:[{label:'Fields you are editing',items:d.fields.map(k=>({v:k,label:FIELDS[k].label,sub:'Grouped by today\'s value'}))},{label:'Other attributes',items:other.map(k=>({v:k,label:CF[k].label}))}],value:d.grid.groupBy,apply:v=>{d.grid.groupBy=v;d.grid.group=true;d.grid.collapsed=new Set();d.grid.scroll=0}}}
   if(t==='gctx'){const d=S.d;const ks=Object.keys(CF).filter(k=>!CF[k].agg&&k!=='empid'&&!d.fields.includes(k));return{kind:'multi',ph:'Search attributes',w:300,groups:[...new Set(ks.map(k=>CF[k].grp))].map(gp=>({label:gp,items:ks.filter(k=>CF[k].grp===gp).map(k=>({v:k,label:CF[k].label}))})),value:d.grid.ctx||[],apply:v=>{d.grid.ctx=v}}}
@@ -1742,6 +1756,12 @@ function ddSpec(key){const p=key.split(':');const t=p[0];
   if(t==='ffilt'){const items=(p,ls)=>ls.map(l=>({v:p+l,label:l}));return{kind:'multi',search:false,w:240,groups:[{label:'Source',items:items('s:',['Standard','Custom field','App field','Connector'])},{label:'Type',items:items('t:',['Text','List','Number','Amount','Date','Person'])},{label:'Last used in a bulk change',items:[['new','Last 30 days'],['mid','Last 6 months'],['old','Over 6 months ago'],['never','Never']].map(([v,l])=>({v:'u:'+v,label:l}))}],value:S.fFilt,apply:v=>{S.fFilt=v}}}
   if(t==='fmode'){const f=p[1];const rule=true;return{kind:'single',search:false,w:280,groups:[{label:'',items:[{v:'diff',label:'Each person',sub:'Edit cells, paste or upload a CSV'},{v:'same',label:'One value for everyone',sub:'Set it once above the grid'},...(rule?[{v:'rule',label:'By rule',sub:'An operation for the rows that match conditions'}]:[])]}],value:S.d.modes[f]==='same'?'same':'diff',
     apply:v=>{const d=S.d;if(v==='rule'){d.grid.tool='rule';rtInit(d);S.rt.field=f;S.rt.op=ropsFor(f)[0][0];S.rt.cap=f==='compensation'?'max':''}else{if(d.modes[f]!==v)rec(`${FIELDS[f].label}: ${v==='same'?'one value for everyone':'each person'}`);d.modes[f]=v;if(f==='department'&&d.fields.includes('team'))d.modes.team=v}}}}
+  if(t==='cell'){const[id,f]=p[1].split('|');const d=S.d;const e=EMPI[id];const F=FIELDS[f];if(!e||!F)return null;let groups;
+    if(f==='title'){const dp=nv(d,e,'department');const cat=titleCat();groups=[...cat.groups.filter(g=>g.label===dp),...cat.groups.filter(g=>g.label!==dp)].map(g=>({label:g.label,items:g.items.map(x=>({v:x,label:x}))}))}
+    else if(F.type==='team')groups=[{label:nv(d,e,'department'),items:(TEAMS[nv(d,e,'department')]||[]).map(x=>({v:x,label:x}))}];else groups=[{label:'',items:F.opts().map(x=>({v:x,label:x}))}];
+    groups=[{label:'',items:[{v:'__keep',label:`Keep “${fmtVal(e,f,e[f])||'blank'}”`,sub:'No change'}]},...groups.map(g=>({label:g.label,items:g.items.filter(it=>it.v!==e[f])}))];
+    const v0=val(d,e,f);return{kind:'single',ph:f==='title'?'Search titles':'Search values',w:300,groups,value:v0&&String(v0)!==String(e[f])?v0:'__keep',
+      apply:v=>{rec(`Edited ${e.name} · ${F.label}`);setCell(id,f,v==='__keep'?'':v)},footer:f==='title'?{act:'reqtitle',label:'Request a new title'}:null}}
   if(t==='sample')return{kind:'single',search:false,w:300,groups:[{label:'',items:[['promotion-nominations-fy26.csv','Promotion nominations','Employee ID key · Yes/No, number, date and picklist columns'],['austin-office-movers.csv','Austin office movers','Work Email key · move date, relocation and parking columns']].map(([v,l,sb])=>({v,label:l,sub:sb}))}],value:null,apply:v=>{loadFile(S.se,v,SAMPLES[v]())}};
   return null}
 function renderDD(){const el=$('#pop2');if(!S.dd){el.innerHTML='';return}const sp=ddSpec(S.dd.key);if(!sp){S.dd=null;el.innerHTML='';return}
