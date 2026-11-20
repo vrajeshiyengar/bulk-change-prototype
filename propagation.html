@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Bulk Change Propagation</title><meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>:root{--ink:#1A1A1A;--label:#6B6B6B;--rule:#E6E6E6;--plum:#7A1846;--plum-a:#2A0E1F;--plum-b:#4A1530;--plum-meta:#D9A8C2;--cream:#FDF6E7;--tan:#E8D9A8;--cream-ink:#5A4718;--page:#F4F4F6;color-scheme:light}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.6 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;padding:24px max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
+.doc{background:#fff;border:1px solid var(--rule);border-radius:10px;padding:28px clamp(16px,4vw,56px) 40px;display:flex;flex-direction:column;gap:18px;max-width:1080px;margin:0 auto}
+.dochead{border-radius:10px;background:linear-gradient(100deg,var(--plum-a),var(--plum-b) 45%,var(--plum-a));color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 26px;flex-wrap:wrap}
+.dochead img{height:22px}.dh-m{color:var(--plum-meta);font-size:14px}
+h2{color:var(--plum);font-size:21px;margin:6px 0 0;display:flex;align-items:center;gap:12px;text-wrap:balance}h3{color:var(--plum);font-size:16px;margin:6px 0 0}
+p,li{max-width:74ch}p{margin:0}.circ{width:30px;height:30px;border-radius:50%;background:var(--plum);color:#fff;display:inline-grid;place-items:center;font-size:14px;font-weight:600;flex:none}
+.callout{background:var(--cream);border:1px solid var(--tan);border-radius:8px;padding:14px 18px;color:var(--cream-ink);display:flex;flex-direction:column;gap:6px}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}th{text-align:left;color:var(--plum);font-weight:600;padding:8px 10px;border-bottom:2px solid #EAD6E0}td{padding:9px 10px;border-bottom:1px solid var(--rule);vertical-align:top}tr.pick td{background:#FBF3F7}
+.callout th{color:var(--cream-ink);border-color:var(--tan)}.callout td{border-color:#EFE3C2}
+.quote{font-size:16px;border-left:4px solid var(--plum);padding:4px 0 4px 16px;margin:0}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.pgrid div{border:1px solid var(--rule);border-radius:8px;padding:10px 12px;font-size:13.5px;display:flex;flex-direction:column;gap:2px}.pgrid b{font-size:14px}.pgrid span{color:var(--plum);font-size:12.5px;font-weight:500}.pgrid small{color:var(--label)}
+a.btn{align-self:flex-start;border:1px solid var(--plum);color:var(--plum);background:#FBF3F7;border-radius:999px;padding:7px 14px;font-weight:600;text-decoration:none}
+.foot{font-size:12px;color:var(--label);text-align:center;margin-top:16px}</style></head><body><article class="doc">
+<div class="dochead"><img src="assets/logo.png" alt="Rippling"><span class="dh-m">Bulk change · product case study · Vrajesh Iyengar</span></div>
+<h2><span class="circ">3</span>Propagating the change</h2>
+<p class="quote">Rippling is the system of record. A change commits once it's approved and its effective date arrives. Each downstream system syncs as its own job. A third-party failure never blocks or rolls back the Rippling change, and never blocks payroll.</p>
+<h3>How we know which systems to update</h3>
+<p>Each integration subscribes to profile fields. The changed fields, crossed with those subscriptions and the people who have an account in each app, give exactly the Integrated Apps list on the Impact &amp; approvals step. The IT owner sets the mapping up once; the HR admin never does.</p>
+<div class="tw"><table><thead><tr><th>Field</th><th>Slack</th><th>Google Workspace</th><th>GitHub</th></tr></thead><tbody>
+<tr><td>Title</td><td>Profile title</td><td>Directory title</td><td>—</td></tr><tr><td>Department, Team</td><td>User groups</td><td>Org unit, Groups</td><td>Team membership</td></tr>
+<tr><td>Manager</td><td>Profile manager</td><td>Directory manager</td><td>—</td></tr><tr><td>Work Email</td><td>Account email</td><td>Primary email (renames sign-in)</td><td>SSO identity</td></tr></tbody></table></div>
+<div class="callout"><b>Block or notify</b><div class="tw"><table><thead><tr><th>Event</th><th>Blocks?</th><th>Who hears</th></tr></thead><tbody>
+<tr><td>Validation error, missing permission</td><td>Blocks submit</td><td>Submitter, inline</td></tr>
+<tr><td>Approval pending or rejected</td><td>Holds those rows only</td><td>Approver, then submitter</td></tr>
+<tr><td>Approval lands after the payroll cutoff</td><td>Choice made before submit</td><td>Payroll admin, if off-cycle</td></tr>
+<tr><td>First-party effect (benefits, leave, devices)</td><td>Never: they read the record</td><td>That product's admin, as a digest</td></tr>
+<tr><td>Third-party failure</td><td><b>Never blocks or rolls back</b></td><td>The app owner by name, plus one digest to the submitter</td></tr>
+<tr><td>Employees</td><td>Never for sync</td><td>Only business events, opt-in, on the effective date</td></tr></tbody></table></div></div>
+<h3>The hard parts</h3><div class="pgrid"><div><b>Payroll cutoff</b><span>First-party</span><small>Late approvals choose next run with retro pay, or off-cycle, before submit.</small></div><div><b>Location changes</b><span>First-party</span><small>Tax state, leave policy and benefits region move with the work location.</small></div><div><b>Dynamic segments</b><span>First-party</span><small>Membership is frozen at submit, so approvers sign off on named people.</small></div><div><b>Rate limits</b><span>Third-party</span><small>Batch and throttle; show an ETA instead of an error.</small></div><div><b>App rejects a value</b><span>Third-party</span><small>Route the app's own message to its owner. Rippling's value stands.</small></div><div><b>Irreversible effects</b><span>Third-party</span><small>Access removals and email renames are framed as losses and wait for the effective date.</small></div></div>
+<p class="quote">Your payroll run never depends on GitHub being up.</p>
+<a class="btn" href="index.html">Back to the prototype →</a></article><p class="foot">Concept prototype for a Rippling product case study. Fictional company and data. Not a Rippling product.</p></body></html>

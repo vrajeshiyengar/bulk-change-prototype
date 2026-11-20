@@ -1,0 +1,1116 @@
+(()=>{
+'use strict';
+/* ================= utilities ================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nf=new Intl.NumberFormat('en-US');
+const fmtN=n=>nf.format(Math.round(n));
+const clone=o=>JSON.parse(JSON.stringify(o));
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const D=(y,m,d)=>new Date(y,m,d);
+const fmtD=(d,y)=>d?`${d.getDate()} ${MONTHS[d.getMonth()]}${y?' '+d.getFullYear():''}`:'';
+const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const fromIso=s=>{const p=String(s||'').split('-').map(Number);return p.length===3&&p[0]?D(p[0],p[1]-1,p[2]):null};
+const fmtIso=s=>{const d=fromIso(s);return d?fmtD(d,true):''};
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const TODAY=D(2026,10,20), NEXTP=D(2026,11,1);
+const NOWL='20 Nov 2026, 11:20 IST';
+function runFor(dt){const y=dt.getFullYear(),m=dt.getMonth();return dt.getDate()<=15?D(y,m,15):D(y,m+1,0)}
+function nextRun(run){const y=run.getFullYear(),m=run.getMonth();return run.getDate()===15?D(y,m+1,0):D(y,m+1,15)}
+function cutoffOf(run){const c=new Date(run);c.setDate(c.getDate()-3);return c}
+function payInfo(dt){let run=runFor(dt),retro=false;if(run<TODAY){retro=true;run=runFor(TODAY)}return{run,cutoff:cutoffOf(run),retro,prorated:!retro&&dt.getDate()!==1&&dt.getDate()!==16,next:nextRun(run)}}
+const initials=n=>String(n).split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+const pl=(n,a,b)=>`${fmtN(n)} ${n===1?a:(b||a+'s')}`;
+const norm2=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
+const slug=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+const FUNNEL='<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 2h10L7.2 6.6V10L4.8 11V6.6z" fill="currentColor"/></svg>';
+
+/* ================= domain constants ================= */
+const DEPTS=['Customer Support','Engineering','Sales','Marketing','Product','Design','Finance','People','IT'];
+const DEPT_W=[['Customer Support',22],['Engineering',25],['Sales',15],['Marketing',9],['Product',7],['Design',6],['Finance',5],['People',6],['IT',5]];
+const TEAMS={'Customer Support':['Tier 1','Tier 2','Escalations'],'Engineering':['Platform','Payments','Growth','Infrastructure'],'Sales':['SMB','Mid-market','Enterprise'],'Marketing':['Brand','Demand Gen','Product Marketing'],'Product':['Core HR','Payroll','Apps'],'Design':['Product Design','Research'],'Finance':['FP&A','Accounting'],'People':['HR Ops','Talent'],'IT':['Workplace IT','Security'],'Executive':['Office of the CEO']};
+const ALLTEAMS=[...new Set(Object.values(TEAMS).flat())];
+const LOC={'San Francisco':{state:'CA',country:'US'},'New York':{state:'NY',country:'US'},'Austin':{state:'TX',country:'US'},'Denver':{state:'CO',country:'US'},'Toronto':{state:'ON',country:'CA'}};
+const LOCS=Object.keys(LOC);
+const LOC_W=[['San Francisco',36],['New York',22],['Austin',17],['Denver',13],['Toronto',12]];
+const LEVELS=['L1','L2','L3','L4','L5','L6','L7','L8'];
+const LV_W=[['L1',10],['L2',25],['L3',25],['L4',18],['L5',12],['L6',6],['L7',3],['L8',1]];
+const RATINGS=['Exceeds','Meets','Partially meets','Below'];
+const RT_W=[['Exceeds',22],['Meets',58],['Partially meets',15],['Below',5]];
+const BANDS={L1:[55,70,85],L2:[70,88,105],L3:[90,112,135],L4:[115,140,165],L5:[140,170,200],L6:[170,205,240],L7:[205,245,285],L8:[245,295,345]};
+const DMULT={'Customer Support':.75,'Engineering':1.15,'Product':1.15,'Design':1.05,'Sales':1,'Marketing':1,'Finance':1,'People':.95,'IT':.95,'Executive':1.4};
+const EQ={L1:0,L2:0,L3:1500,L4:4000,L5:8000,L6:15000,L7:30000,L8:60000};
+const ROLE={'Engineering':'Software Engineer','Sales':'Account Executive','Marketing':'Marketing Manager','Product':'Product Manager','Design':'Product Designer','Finance':'Financial Analyst','People':'People Partner','IT':'IT Engineer'};
+const FIRST=['Lavonne','Emmitt','Kenji','Tobias','Marisol','Hollis','Anneliese','Cyrus','Delphine','Ezekiel','Florence','Gideon','Harriet','Ismael','Juniper','Kasimir','Leontine','Maverick','Nadia','Osvaldo','Petra','Quincy','Rosalind','Silas','Theodora','Ulrich','Verna','Wendell','Ximena','Yusuf','Zelda','Arjun','Mei','Tomas','Ines','Kofi','Sanna','Rhett','Ayla','Bram','Celeste','Dario','Elva','Lorine','Garnet','Mafalda','Otis','Reva'];
+const LAST=['Kshlerin','Wuckert','Hackett','Runolfsdottir','Bergstrom','Schaden','Gutkowski','Haley','Lind','Kub','Turcotte','Rau','Bode','Hilpert','Mayer','Rempel','Zieme','Ondricka','Cormier','Dicki','Abernathy','Bechtelar','Collier','Daugherty','Ebert','Funk','Gerlach','Heller','Jacobi','Koepp','Larkin','Mraz','Nader','Oberbrunner','Prosacco','Quigley','Reichert','Stiedemann','Tromp','Upton','Volkman','Wehner','Yost','Considine'];
+const lvlN=l=>parseInt(String(l).slice(1),10)||0;
+function ladder(dept,level){const n=lvlN(level);if(dept==='Executive')return'Chief Executive Officer';
+  if(dept==='Customer Support')return['Support Associate','Support Specialist','Senior Support Specialist','Manager Customer Support','Senior Manager Customer Support','Director Customer Support','Head of Customer Support','VP Customer Support'][n-1];
+  const R=ROLE[dept];return[`Associate ${R}`,R,`Senior ${R}`,`Staff ${R}`,`Principal ${R}`,`Director, ${dept}`,`Head of ${dept}`,`VP ${dept}`][n-1]}
+const hourlyRole=(dept,level)=>dept==='Customer Support'&&lvlN(level)<=4;
+const curOf=e=>LOC[e.location].country==='CA'?'CA$':'$';
+const r5=x=>Math.round(x*2)/2, r100=x=>Math.round(x/100)*100;
+function band(e,level,per,dept,loc){const b=BANDS[level]||BANDS.L3;const m=DMULT[dept||e.department]||1;const cad=LOC[loc||e.location].country==='CA'?1.25:1;
+  const a=b.map(x=>x*1000*m*cad);if(per==='Hour')return{min:r5(a[0]/2080),mid:r5(a[1]/2080),max:r5(a[2]/2080)};return{min:r100(a[0]),mid:r100(a[1]),max:r100(a[2])}}
+const roundComp=(v,per)=>per==='Hour'?r5(v):r100(v);
+const annual=(v,per)=>per==='Hour'?v*2080:v;
+
+/* ================= fake company ================= */
+let EMP=[],EMPI={},CONFLICT=new Set(),NAMEIDX={};
+function gen(N){
+  const r=rng(N*7+3);const pick=a=>a[Math.floor(r()*a.length)];
+  const wp=items=>{let x=r()*items.reduce((s,i)=>s+i[1],0);for(const[v,w]of items){x-=w;if(x<=0)return v}return items[0][0]};
+  const E=[],used={};
+  function mk(o){const id='E'+(1001+E.length);const key=(o.first+o.last).toLowerCase();const n=used[key]=(used[key]||0)+1;
+    const e={id,first:o.first,last:o.last,name:o.first+' '+o.last,department:o.dept,team:o.team||pick(TEAMS[o.dept]),level:o.level,location:o.loc||'San Francisco',
+      rating:o.rating||'Meets',etype:o.etype||'Full-time',status:o.status||'Active',languages:o.languages||['English'],manager:null};
+    e.email=(o.email||`${o.first}.${o.last}${n>1?n-1:''}@metzhand.com`).toLowerCase();
+    e.title=o.title||ladder(o.dept,o.level);e.per=o.per||(hourlyRole(o.dept,o.level)?'Hour':'Year');
+    const b=band(e,e.level,e.per);e.compensation=o.comp??roundComp(b.min+(b.max-b.min)*(.22+r()*.5),e.per);
+    e.bonus=o.bonus??(lvlN(e.level)>=5?r100(annual(e.compensation,e.per)*(.1+r()*.1)):0);
+    e.equity=o.equity??Math.round(EQ[e.level]*(.8+r()*.4)/100)*100;
+    e.startDate=o.start||iso(addDays(TODAY,-Math.round(20+Math.pow(r(),1.4)*3600)));
+    e.costCenter='CC-'+(100+Math.max(0,DEPTS.indexOf(e.department)));E.push(e);return e}
+  mk({first:'Odessa',last:'Marvin',dept:'Executive',level:'L8',title:'Chief Executive Officer',rating:'Exceeds',team:'Office of the CEO',start:'2016-03-01'});
+  mk({first:'Fleda',last:'Pfannerstill',dept:'Customer Support',level:'L7',team:'Escalations',languages:['English','Spanish'],start:'2018-06-11'});
+  mk({first:'Virge',last:'Considine',dept:'Customer Support',level:'L4',team:'Tier 1',title:'Manager Customer Support',per:'Hour',comp:50,email:'virge.considine0@metzhand.com',rating:'Exceeds',equity:0,bonus:0,start:'2021-09-20'});
+  mk({first:'Priya',last:'Shah',dept:'Finance',level:'L7',team:'FP&A',start:'2019-01-07'});
+  mk({first:'Raj',last:'Patel',dept:'IT',level:'L6',team:'Security',start:'2020-04-13'});
+  mk({first:'Jason',last:'Lee',dept:'Product',level:'L4',team:'Core HR',loc:'New York',start:'2023-02-27'});
+  mk({first:'Dana',last:'Okuneva',dept:'People',level:'L6',team:'HR Ops',start:'2019-08-19'});
+  while(E.length<N){const dept=wp(DEPT_W);const level=wp(LV_W);const pr=r();
+    mk({first:pick(FIRST),last:pick(LAST),dept,level,loc:wp(LOC_W),rating:wp(RT_W),etype:r()<.04?'Contractor':'Full-time',
+      status:r()<.02?'On leave':(r()<.012?'Scheduled termination':'Active'),languages:pr<.5?['English']:pr<.72?['English','Spanish']:pr<.9?['English','French']:['English','Spanish','French']})}
+  const ceo=E[0];const byDept={};E.forEach(e=>{if(e!==ceo)(byDept[e.department]=byDept[e.department]||[]).push(e)});
+  Object.values(byDept).forEach(list=>{const head=list.reduce((a,b)=>lvlN(b.level)>lvlN(a.level)?b:a,list[0]);head.manager=ceo.id;
+    list.forEach(e=>{if(e===head)return;const cands=list.filter(x=>x!==e&&lvlN(x.level)>lvlN(e.level)&&lvlN(x.level)>=5);
+      if(!cands.length){e.manager=head.id;return}const minL=Math.min(...cands.map(x=>lvlN(x.level)));const c2=cands.filter(x=>lvlN(x.level)===minL);e.manager=c2[Math.floor(r()*c2.length)].id})});
+  return E}
+function build(N){EMP=gen(N);EMPI={};NAMEIDX={};EMP.forEach(e=>{EMPI[e.id]=e;e.reports=[];NAMEIDX[e.name.toLowerCase()]=NAMEIDX[e.name.toLowerCase()]||e.id});
+  EMP.forEach(e=>{if(e.manager)EMPI[e.manager].reports.push(e.id)});
+  CONFLICT=new Set(EMP.filter(e=>e.department==='Engineering'&&e.team==='Platform').slice(0,40).map(e=>e.id));
+  $('#dl-people').innerHTML=EMP.map(e=>`<option value="${esc(e.name)} · ${e.id}"></option>`).join('');
+  $('#dl-mgr').innerHTML=EMP.filter(e=>lvlN(e.level)>=5).map(e=>`<option value="${esc(e.name)} · ${e.id}">${esc(e.title)}</option>`).join('');
+  const ts=new Set();DEPTS.forEach(dp=>LEVELS.forEach(l=>ts.add(ladder(dp,l))));$('#dl-titles').innerHTML=[...ts].map(t=>`<option value="${esc(t)}"></option>`).join('')}
+function parsePerson(s){if(!s)return null;const m=String(s).match(/\bE\d{4,}\b/i);if(m&&EMPI[m[0].toUpperCase()])return m[0].toUpperCase();const k=String(s).trim().toLowerCase();if(NAMEIDX[k])return NAMEIDX[k];
+  const byMail=EMP.find(e=>e.email===k);return byMail?byMail.id:null}
+function under(e,mid){if(!e)return false;let x=e.manager,g=0;while(x&&g<20){if(x===mid)return true;x=EMPI[x]?.manager;g++}return false}
+
+/* ================= value fields (bulk change) ================= */
+const FIELDS={
+  title:{label:'Title',tab:'emp',type:'text'},
+  department:{label:'Department',tab:'emp',type:'select',opts:()=>DEPTS,approval:true},
+  team:{label:'Team',tab:'emp',type:'team'},
+  compensation:{label:'Compensation',tab:'emp',type:'money',approval:true},
+  per:{label:'Per',tab:'emp',type:'select',opts:()=>['Hour','Year'],approval:true},
+  bonus:{label:'Target annual bonus',tab:'emp',type:'money',approval:true},
+  equity:{label:'Equity - Number of shares',tab:'emp',type:'int',approval:true},
+  email:{label:'Work Email',tab:'emp',type:'text',identity:true},
+  manager:{label:'Manager',tab:'emp',type:'person',approval:true},
+  location:{label:'Work location',tab:'emp',type:'select',opts:()=>LOCS,approval:true},
+  level:{label:'Level',tab:'add',type:'select',opts:()=>LEVELS},
+  rating:{label:'Performance rating',tab:'add',type:'select',opts:()=>RATINGS},
+  costCenter:{label:'Cost center',tab:'add',type:'select',opts:()=>DEPTS.map((d,i)=>'CC-'+(100+i))}
+};
+const FORDER=['compensation','per','bonus','equity','level','title','department','team','manager','location','email','rating','costCenter'];
+function fmtVal(e,f,v){if(v===undefined||v===null||v==='')return'';
+  if(f==='compensation'||f==='bonus'){const c=curOf(e);const n=+v;return c+(f==='compensation'&&n<1000?n.toFixed(n%1?2:0):fmtN(n))}
+  if(f==='equity')return fmtN(+v);if(f==='manager')return EMPI[v]?EMPI[v].name:'';return String(v)}
+function parseMoney(s){if(s===undefined||s===null)return NaN;let t=String(s).trim().toLowerCase().replace(/ca\$|usd|\$|\s|%/g,'');if(!t)return NaN;
+  let mult=1;if(/k$/.test(t)){mult=1000;t=t.slice(0,-1)}t=t.replace(/,/g,'');const n=parseFloat(t);return isFinite(n)&&/^-?[\d.]+$/.test(t)?n*mult:NaN}
+
+/* ================= condition engine (one catalog for every builder and column filter) ================= */
+const CF={
+  empid:{label:'Employee ID',type:'id',grp:'Employee',get:e=>e.id},
+  title:{label:'Title',type:'text',grp:'Employment',get:e=>e.title},
+  department:{label:'Department',type:'pick',grp:'Employment',get:e=>e.department,opts:()=>DEPTS},
+  team:{label:'Team',type:'pick',grp:'Employment',get:e=>e.team,opts:()=>ALLTEAMS},
+  manager:{label:'Manager',type:'person',grp:'Employment',get:e=>e.manager},
+  location:{label:'Work location',type:'pick',grp:'Employment',get:e=>e.location,opts:()=>LOCS},
+  email:{label:'Work Email',type:'text',grp:'Employment',get:e=>e.email},
+  etype:{label:'Employment type',type:'pick',grp:'Employment',get:e=>e.etype,opts:()=>['Full-time','Contractor']},
+  status:{label:'Employment status',type:'pick',grp:'Employment',get:e=>e.status,opts:()=>['Active','On leave','Scheduled termination']},
+  startDate:{label:'Start date',type:'date',grp:'Employment',get:e=>e.startDate},
+  compensation:{label:'Compensation (annualised)',type:'num',grp:'Compensation',get:e=>annual(e.compensation,e.per)},
+  per:{label:'Per (pay type)',type:'pick',grp:'Compensation',get:e=>e.per,opts:()=>['Hour','Year']},
+  bonus:{label:'Target annual bonus',type:'num',grp:'Compensation',get:e=>e.bonus},
+  equity:{label:'Equity - Number of shares',type:'num',grp:'Compensation',get:e=>e.equity},
+  level:{label:'Level',type:'ord',grp:'Additional Information',get:e=>e.level,opts:()=>LEVELS},
+  rating:{label:'Performance rating',type:'pick',grp:'Additional Information',get:e=>e.rating,opts:()=>RATINGS},
+  costCenter:{label:'Cost center',type:'pick',grp:'Additional Information',get:e=>e.costCenter,opts:()=>DEPTS.map((d,i)=>'CC-'+(100+i))},
+  languages:{label:'Languages spoken',type:'multi',grp:'Additional Information',get:e=>e.languages,opts:()=>['English','Spanish','French']}
+};
+const OPS={
+  id:[['inseg','belongs to segment'],['notinseg',"doesn't belong to segment"],['eq','is exactly'],['ne','is not'],['anyof','is any of'],['noneof','is none of'],['starts','starts with'],['contains','contains']],
+  text:[['contains','contains'],['ncontains','does not contain'],['starts','starts with'],['ends','ends with'],['eq','is exactly'],['ne','is not'],['empty','is empty'],['nempty','is not empty']],
+  pick:[['anyof','is any of'],['noneof','is none of'],['empty','is empty'],['nempty','is not empty']],
+  ord:[['anyof','is any of'],['noneof','is none of'],['gte','is at least'],['lte','is at most'],['between','is between']],
+  num:[['eq','='],['ne','≠'],['gt','>'],['gte','≥'],['lt','<'],['lte','≤'],['between','is between'],['nbetween','is not between'],['empty','is empty'],['nempty','is not empty']],
+  date:[['on','is'],['before','is before'],['after','is after'],['onbefore','is on or before'],['onafter','is on or after'],['between','is between'],['pastN','is in the past N days'],['nextN','is in the next N days'],['empty','is empty']],
+  person:[['is','is'],['isnot','is not'],['reports','reports directly to'],['reportsAll','reports to (any level)'],['empty','is empty']],
+  multi:[['hasany','has any of'],['hasall','has all of'],['hasnone','has none of'],['empty','is empty']],
+  bool:[['yes','is Yes'],['no','is No']]
+};
+const TYPE_LABEL={text:'Text',num:'Number',date:'Date',bool:'Yes / No',pick:'Picklist',ord:'Ordered list',id:'Employee ID',person:'Person',multi:'Multi-select'};
+const NOVAL=new Set(['empty','nempty','yes','no']),TWO=new Set(['between','nbetween']),LISTOP=new Set(['anyof','noneof','hasany','hasall','hasnone']);
+const opLabel=(t,o)=>((OPS[t]||[]).find(x=>x[0]===o)||[0,o])[1];
+const isEmpty=v=>v===undefined||v===null||v===''||(Array.isArray(v)&&!v.length);
+function complete(c){if(NOVAL.has(c.op))return true;const v=c.v||[];const ok=x=>x!==undefined&&x!==null&&x!=='';if(TWO.has(c.op))return ok(v[0])&&ok(v[1]);if(LISTOP.has(c.op))return v.length>0;return ok(v[0])}
+function testVal(t,val,c,e){const v=c.v||[];const op=c.op;
+  if(op==='empty')return isEmpty(val);if(op==='nempty')return!isEmpty(val);
+  switch(t){
+    case'id':{const id=e.id;if(op==='inseg')return segHas(v[0],id);if(op==='notinseg')return!segHas(v[0],id);if(op==='eq')return id===v[0];if(op==='ne')return id!==v[0];
+      if(op==='anyof')return v.includes(id);if(op==='noneof')return!v.includes(id);const q=String(v[0]||'').toUpperCase();if(op==='starts')return id.startsWith(q);if(op==='contains')return id.includes(q);return false}
+    case'text':{const s=String(val??'').toLowerCase(),q=String(v[0]??'').toLowerCase();switch(op){case'contains':return s.includes(q);case'ncontains':return!s.includes(q);case'starts':return s.startsWith(q);case'ends':return s.endsWith(q);case'eq':return s===q;case'ne':return s!==q}return false}
+    case'pick':return op==='anyof'?v.includes(val):op==='noneof'?!v.includes(val):false;
+    case'ord':{const n=lvlN(val);if(op==='anyof')return v.includes(val);if(op==='noneof')return!v.includes(val);if(op==='gte')return n>=lvlN(v[0]);if(op==='lte')return n<=lvlN(v[0]);if(op==='between'){const a=lvlN(v[0]),b=lvlN(v[1]);return n>=Math.min(a,b)&&n<=Math.max(a,b)}return false}
+    case'num':{if(isEmpty(val))return op==='ne'||op==='nbetween';const n=+val,a=+v[0],b=+v[1];switch(op){case'eq':return n===a;case'ne':return n!==a;case'gt':return n>a;case'gte':return n>=a;case'lt':return n<a;case'lte':return n<=a;case'between':return n>=Math.min(a,b)&&n<=Math.max(a,b);case'nbetween':return n<Math.min(a,b)||n>Math.max(a,b)}return false}
+    case'date':{if(isEmpty(val))return false;const s=String(val),a=String(v[0]||''),b=String(v[1]||'');switch(op){case'on':return s===a;case'before':return s<a;case'after':return s>a;case'onbefore':return s<=a;case'onafter':return s>=a;case'between':return s>=(a<b?a:b)&&s<=(a<b?b:a);
+      case'pastN':return s<=iso(TODAY)&&s>=iso(addDays(TODAY,-(+v[0]||0)));case'nextN':return s>=iso(TODAY)&&s<=iso(addDays(TODAY,+v[0]||0))}return false}
+    case'person':{if(op==='is')return val===v[0];if(op==='isnot')return val!==v[0];if(op==='reports')return e.manager===v[0];if(op==='reportsAll')return under(e,v[0]);return false}
+    case'multi':{const arr=Array.isArray(val)?val:[];if(op==='hasany')return v.some(x=>arr.includes(x));if(op==='hasall')return v.every(x=>arr.includes(x));if(op==='hasnone')return!v.some(x=>arr.includes(x));return false}
+    case'bool':{const y=val===true||/^(yes|y|true|1)$/i.test(String(val??'').trim());return op==='yes'?y:!y}}
+  return false}
+const fieldOf=c=>CF[c.f]||{label:c.f,type:'text',get:()=>''};
+const testCond=(c,e)=>{const F=fieldOf(c);return testVal(F.type,F.get(e),c,e)};
+function evalGroups(groups,e){for(let i=0;i<groups.length;i++){const g=groups[i];const cs=g.conds.filter(complete);if(!cs.length)continue;
+  if(g.mode==='all'?cs.every(c=>testCond(c,e)):cs.some(c=>testCond(c,e)))return i}return-1}
+function names(ids){const n=ids.map(id=>EMPI[id]?.name||id);return n.length>3?n.slice(0,3).join(', ')+` and ${n.length-3} more`:n.join(', ')}
+function fmtCV(t,x){if(t==='num')return isFinite(+x)?fmtN(+x):String(x);if(t==='date')return fmtIso(x)||String(x);return String(x)}
+function condTxt(c){const F=fieldOf(c);const v=c.v||[];let vt='';
+  if(!NOVAL.has(c.op)){if(F.type==='id'){vt=(c.op==='inseg'||c.op==='notinseg')?`"${segName(v[0])}"`:['eq','ne','anyof','noneof'].includes(c.op)?names(v):`"${v[0]||''}"`}
+    else if(F.type==='person')vt=EMPI[v[0]]?.name||'…';else if(TWO.has(c.op))vt=`${fmtCV(F.type,v[0])} and ${fmtCV(F.type,v[1])}`;else if(c.op==='pastN'||c.op==='nextN')vt=`${v[0]} days`;
+    else if(LISTOP.has(c.op))vt=v.join(', ');else if(F.type==='text')vt=`"${v[0]||''}"`;else vt=fmtCV(F.type,v[0])}
+  return`${F.label} ${opLabel(F.type,c.op)}${vt?' '+vt:''}`}
+function groupsTxt(groups){const live=groups.filter(g=>g.conds.some(complete));if(!live.length)return'';
+  return live.map(g=>{const cs=g.conds.filter(complete);const s=cs.map(condTxt).join(g.mode==='all'?' and ':' or ');return live.length>1&&cs.length>1?`(${s})`:s}).join(', or ')}
+
+/* ================= segments store ================= */
+let SEGS=[],SEGN=110;const SEGC=new Map();const SEGSTACK=[];
+const segById=id=>SEGS.find(s=>s.id===id);
+const segName=id=>segById(id)?.name||'(deleted segment)';
+function members(id){if(SEGC.has(id))return SEGC.get(id);const s=segById(id);if(!s)return new Set();
+  if(s.type==='static'){const m=new Set(s.members.filter(x=>EMPI[x]));SEGC.set(id,m);return m}
+  if(SEGSTACK.includes(id))return new Set();SEGSTACK.push(id);const m=new Set();for(const e of EMP)if(evalGroups(s.groups,e)>=0)m.add(e.id);SEGSTACK.pop();SEGC.set(id,m);return m}
+const segHas=(id,eid)=>members(id).has(eid);
+const typeBadge=s=>s.type==='dynamic'?'<span class="badge b-dyn">Dynamic</span>':`<span class="badge b-stat">Static · ${esc(String(s.snapshotAt||'').split(',')[0])}</span>`;
+function segDef(s){if(s.type==='dynamic')return groupsTxt(s.groups);if(s.source==='csv')return`${s.file.name} · ${pl(s.columns.length,'column')}`;return'Snapshot of: '+groupsTxt(s.groups)}
+function usedIn(s){if(!s)return[];const out=[...(s.usedSeed||[])];[S.d,...S.parked].filter(Boolean).forEach(d=>{if(d.who.groups.some(g=>g.conds.some(c=>c.f==='empid'&&(c.op==='inseg'||c.op==='notinseg')&&c.v[0]===s.id)))out.push(d.name||'Untitled change')});return out}
+function detectType(vals){const vs=vals.filter(v=>v!=='');if(!vs.length)return'text';
+  if(vs.every(v=>/^(yes|no|y|n|true|false)$/i.test(v)))return'bool';
+  if(vs.every(v=>isFinite(parseMoney(v))))return'num';
+  if(vs.every(v=>parseDateStr(v)))return'date';
+  const d=new Set(vs);if(d.size<=8&&vs.length>=d.size*2)return'pick';return'text'}
+function parseDateStr(s){s=String(s).trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(m)return`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2}) ([A-Za-z]{3})[a-z]* (\d{4})$/);if(m){const mi=MONTHS.findIndex(x=>x.toLowerCase()===m[2].toLowerCase());if(mi>=0)return iso(D(+m[3],mi,+m[1]))}return null}
+function coerce(t,raw){if(raw==='')return'';if(t==='num'){const n=parseMoney(raw);return isFinite(n)?n:''}if(t==='bool')return/^(yes|y|true|1)$/i.test(raw);if(t==='date')return parseDateStr(raw)||'';return raw}
+function loadFile(se,name,text){const rows=parseCSV(text||'');if(rows.length<2){toast('That file has no data rows.');return false}
+  const H=rows[0].map(h=>h.trim());let key=H.findIndex(h=>['employeeid','id','empid'].includes(norm2(h)));if(key<0)key=H.findIndex(h=>['workemail','email'].includes(norm2(h)));
+  if(key<0)key=H.findIndex((h,i)=>rows.slice(1,6).every(r=>/^E\d+$/i.test((r[i]||'').trim())));if(key<0)key=0;
+  se.file={name,raw:rows,header:H,keyCol:key,types:{},showUnmatched:false};se.tf={};se.sort=null;se.excluded=new Set();reparse(se);return true}
+function reparse(se){const f=se.file;const H=f.header;const body=f.raw.slice(1);f.rowsN=body.length;
+  const skip=new Set([f.keyCol]);H.forEach((h,i)=>{if(['name','employeename','fullname'].includes(norm2(h)))skip.add(i)});
+  f.cols=H.map((h,i)=>({i,key:'f_'+(slug(h)||'col'+i),label:h||'Column '+(i+1)})).filter(c=>!skip.has(c.i));
+  f.cols.forEach(c=>{c.type=f.types[c.key]||detectType(body.map(r=>(r[c.i]||'').trim()))});
+  f.values={};f.matched=[];f.unmatched=[];const seen=new Set();
+  body.forEach(r=>{const k=(r[f.keyCol]||'').trim();if(!k)return;const id=EMPI[k.toUpperCase()]?k.toUpperCase():parsePerson(k);if(!id){f.unmatched.push(k);return}if(seen.has(id))return;seen.add(id);f.matched.push(id);
+    const o={};f.cols.forEach(c=>{o[c.key]=coerce(c.type,(r[c.i]||'').trim())});f.values[id]=o})}
+function sampleNominations(){const r=rng(EMP.length+77);const pool=EMP.filter(e=>e.department!=='Executive'&&e.etype==='Full-time'&&(e.rating==='Exceeds'||(e.rating==='Meets'&&r()<.3)));
+  const pick=pool.filter(()=>r()<.55).slice(0,Math.max(6,Math.round(EMP.length*.1)));
+  const lines=[csvLine(['Employee ID','Employee name','Nominated by','Calibrated rating','Promo flag','Proposed level','Proposed increase %','Nomination date'])];
+  pick.forEach((e,i)=>{const yes=i===0||(e.rating==='Exceeds'?r()<.72:r()<.3);const flag=yes?(i%5===0?'Y':i%7===0?'yes':'Yes'):(i%6===0?'N':'No');const inc=yes?6+Math.floor(r()*7):2+Math.floor(r()*3);
+    const dd=1+Math.floor(r()*28);const date=i%4===0?`${String(dd).padStart(2,'0')}/10/2026`:`2026-10-${String(dd).padStart(2,'0')}`;
+    lines.push(csvLine([i%9===4?e.email:e.id,e.name,EMPI[e.manager]?.name||'',yes?'Strong':(r()<.5?'Solid':'Developing'),flag,'L'+Math.min(8,lvlN(e.level)+(yes?1:0)),i%3===0?inc+'%':String(inc),date]))});
+  lines.push(csvLine(['E9991','Left in October','','','No','','','']),csvLine(['E9874','Typo row','','','Yes','','','']),csvLine(['jordan.smith@metzhand.com','Not in Rippling','','','Yes','','','']));
+  return lines.join('\n')}
+function makeSeeds(){SEGS=[];SEGN=110;SEGC.clear();
+  const dyn=(id,name,desc,groups,owner,updated,usedSeed)=>({id,name,desc,type:'dynamic',source:'conditions',groups,owner,updated,created:updated,usedSeed:usedSeed||[],version:1});
+  SEGS.push(dyn('SEG-101','All full-time employees','Everyone on a full-time contract.',[{mode:'all',conds:[{f:'etype',op:'anyof',v:['Full-time']}]}],'Dana Okuneva','12 Nov 2026'));
+  const se=newEditor({type:'static',source:'csv'});loadFile(se,'promotion-nominations-fy26.csv',sampleNominations());const pf=se.file.cols.find(c=>c.label==='Promo flag');
+  se.tf={[pf.key]:{cond:{op:'yes',v:[]},vals:null}};const keep=tableRows(se,edBase(se),edColsAll(se));
+  SEGS.push({id:'SEG-104',name:'FY26 promotion nominees',desc:'Calibration nominations with Promo flag = Yes.',type:'static',source:'csv',members:keep.map(e=>e.id),columns:clone(se.file.cols),
+    values:Object.fromEntries(keep.map(e=>[e.id,se.file.values[e.id]])),file:{name:se.file.name,rows:se.file.rowsN,matched:se.file.matched.length,unmatched:se.file.unmatched.slice()},
+    provenance:{filters:['Promo flag is Yes'],excluded:[],search:''},snapshotAt:'14 Nov 2026, 18:40 IST',owner:'Priya Shah',updated:'14 Nov 2026',created:'14 Nov 2026',usedSeed:[],version:1});
+  SEGS.push(dyn('SEG-102','Engineering · US · L5 and above','Senior engineers outside Canada.',[{mode:'all',conds:[{f:'department',op:'anyof',v:['Engineering']},{f:'location',op:'noneof',v:['Toronto']},{f:'level',op:'gte',v:['L5']}]}],'Dana Okuneva','3 Nov 2026',['Q4 reorg · Platform']));
+  SEGS.push(dyn('SEG-103','L7s in San Francisco, or Marketing in Austin who speak Spanish and French','Bilingual go-to-market leads for the LATAM and Quebec launch.',[{mode:'all',conds:[{f:'level',op:'anyof',v:['L7']},{f:'location',op:'anyof',v:['San Francisco']}]},{mode:'all',conds:[{f:'department',op:'anyof',v:['Marketing']},{f:'location',op:'anyof',v:['Austin']},{f:'languages',op:'hasall',v:['Spanish','French']}]}],'You','19 Nov 2026'));
+  SEGS.push(dyn('SEG-106','On leave or leaving','People on leave or with a scheduled termination.',[{mode:'any',conds:[{f:'status',op:'anyof',v:['On leave','Scheduled termination']}]}],'Dana Okuneva','1 Nov 2026'));
+  const ag=[{mode:'all',conds:[{f:'location',op:'anyof',v:['Austin']},{f:'startDate',op:'before',v:['2026-07-01']}]}];
+  SEGS.push({id:'SEG-105',name:'Austin office movers · Q3',desc:'Austin-based people at the time of the Q3 move.',type:'static',source:'conditions',groups:ag,members:EMP.filter(e=>evalGroups(ag,e)>=0).slice(0,Math.max(3,Math.round(EMP.length*.03))).map(e=>e.id),
+    snapshotAt:'22 Sep 2026, 16:05 IST',owner:'You',updated:'22 Sep 2026',created:'22 Sep 2026',usedSeed:['Austin office move'],version:1})}
+
+/* ================= state ================= */
+const S={route:'bulk',parked:[],size:412,notes:false,step:'setup',d:null,pop:null,ov:null,menu:false,approver:false,whatQ:'',setF:null,followups:0,timer:null,
+  se:null,sv:null,segId:null,segTab:'members',slQ:'',slType:'all',slSort:null,hm:null,hmd:null,hmAll:[],gq:'',demo:false,modName:'',insOpen:false,colsOpen:null,segMenu:false,newMenu:false};
+try{S.notes=localStorage.getItem('bc-notes')==='1'}catch(_){}
+let DRAFTN=2041;
+const STEPS=[{k:'setup',t:'Details',h:'Change details'},{k:'who',t:'Segments',h:'Target segments'},{k:'what',t:'Fields',h:'Fields to update'},{k:'values',t:'Values',h:'Enter values'},{k:'review',t:'Validation',h:'Validation'},{k:'impact',t:'Impact & approvals',h:'Impact & approvals'},{k:'status',t:'Submit & track',h:'Submission status'}];
+function blankDraft(){return{id:'BC-'+(DRAFTN++),name:'',reason:'',date:null,dateKind:null,template:null,
+  who:{groups:[{mode:'all',conds:[]}],incLeave:true,incTerm:false,incContract:false,cnt:null,prev:null,paste:'',pasteOpen:false},
+  fields:[],modes:{},same:{},manual:{},csv:{},csvHits:new Set(),rules:[],moved:new Set(),ack:{},ackNote:{},
+  grid:{changed:false,group:null,dept:'',issue:null,collapsed:new Set(),tool:null,scroll:0},show:{},
+  cutoff:{choice:'next',confirmed:false},appSync:'effective',digest:true,notifyEmp:false,notifyMgr:true,accessAck:false,run:null,visited:new Set(['setup']),rejected:new Map()}}
+function demoDraft(){const d=blankDraft();d.name='FY26 annual review';d.reason='Outcomes of the FY26 performance review cycle';d.date=NEXTP;d.dateKind='next';d.template='comp';
+  d.who.groups=[{mode:'all',conds:[{f:'empid',op:'inseg',v:['SEG-101']}]}];d.fields=['compensation','title','level'];d.fields.forEach(f=>d.modes[f]='diff');
+  d.rules=[{field:'compensation',pct:8,where:{f:'rating',v:['Exceeds']},cap:'max',ai:false,accepted:true},{field:'compensation',pct:4,where:{f:'rating',v:['Meets']},cap:'max',ai:false,accepted:true}];
+  seedPromos(d);['setup','who','what','values'].forEach(k=>d.visited.add(k));return d}
+function seedPromos(d){d.csv={};const r=rng(EMP.length+11);let k=0;
+  cohort(d).list.forEach(e=>{const n=lvlN(e.level);if(e.rating==='Exceeds'&&n<7&&e.department!=='Executive'&&r()<.4){k++;const nl='L'+(n+1);const b=band(e,nl,e.per);
+    let c=Math.max(b.min+(b.mid-b.min)*.6,e.compensation*1.06);if(k%11===0)c=b.max*1.06;else if(k%7===0)c=Math.min(e.compensation*1.19,b.max*.98);
+    d.csv[e.id]={level:nl,title:k%13===0?e.title:ladder(e.department,nl),compensation:roundComp(c,e.per)}}})}
+
+/* ================= targeting + values ================= */
+function cohort(d){const g=d.who.groups;const list=[],why=new Map(),auto={leave:0,term:0,contract:0};
+  for(const e of EMP){const gi=evalGroups(g,e);if(gi<0)continue;
+    const named=g[gi].conds.some(c=>c.f==='empid'&&complete(c)&&((c.op==='eq'&&c.v[0]===e.id)||(c.op==='anyof'&&c.v.includes(e.id))));
+    if(!named){if(e.status==='On leave'){auto.leave++;if(!d.who.incLeave)continue}if(e.status==='Scheduled termination'){auto.term++;if(!d.who.incTerm)continue}if(e.etype==='Contractor'){auto.contract++;if(!d.who.incContract)continue}}
+    const sc=g[gi].conds.find(c=>c.f==='empid'&&c.op==='inseg'&&complete(c));
+    list.push(e);why.set(e.id,named?'Named by Employee ID':sc?'In '+segName(sc.v[0]):g.length>1?`Matches group ${gi+1}`:'Matches the conditions')}
+  return{list,why,auto}}
+function rowsOf(d){let base;if(d.run&&d.run.frozen)base=d.run.frozen.map(id=>EMPI[id]).filter(Boolean);else base=cohort(d).list;return base.filter(e=>!d.moved.has(e.id))}
+function ruleHit(d,e,f){for(let i=d.rules.length-1;i>=0;i--){const r=d.rules[i];if(r.field!==f)continue;if(r.where&&r.where.v.length&&!r.where.v.includes(e[r.where.f]))continue;return r}return null}
+function ruleVal(d,e,f,r){if(!r)return undefined;
+  if(f==='compensation'){const per=nv(d,e,'per');if(per!==e.per)return undefined;let x=e.compensation*(1+r.pct/100);if(r.cap){const b=band(e,nv(d,e,'level'),per,nv(d,e,'department'),nv(d,e,'location'));const cap=r.cap==='max'?b.max:b.mid;if(x>cap)x=Math.max(e.compensation,cap)}return roundComp(x,per)}
+  if(f==='bonus'){const sal=annual(nv(d,e,'compensation'),nv(d,e,'per'));return r100(sal*r.pct/100)}return undefined}
+function val(d,e,f){const m=d.manual[e.id];if(m&&f in m)return m[f];const c=d.csv[e.id];if(c&&f in c)return c[f];
+  if(d.modes[f]==='same'&&d.same[f]!==undefined&&d.same[f]!=='')return d.same[f];return ruleVal(d,e,f,ruleHit(d,e,f))}
+function src(d,e,f){const m=d.manual[e.id];if(m&&f in m)return m[f]===''?null:'m';const c=d.csv[e.id];if(c&&f in c)return'c';
+  if(d.modes[f]==='same'&&d.same[f]!==undefined&&d.same[f]!=='')return's';const r=ruleHit(d,e,f);if(r&&ruleVal(d,e,f,r)!==undefined)return r.ai&&!r.accepted?'ai':'r';return null}
+function nv(d,e,f){if(!d.fields.includes(f))return e[f];const v=val(d,e,f);return(v===undefined||v===''||v===null)?e[f]:v}
+function changed(d,e,f){if(!d.fields.includes(f))return false;const v=val(d,e,f);if(v===undefined||v===''||v===null)return false;return String(v)!==String(e[f])}
+
+/* ================= validation ================= */
+const ISS={
+  band_max:{sev:'e',f:'compensation',label:'Above the band maximum',desc:'Compensation is above the hard maximum in comp policy for the new level.',fix:[['Cap at band maximum','capmax'],['Move to a new draft','move']]},
+  bad_number:{sev:'e',f:'compensation',label:'Not a valid amount',desc:'The value could not be read as an amount.',fix:[['Clear these values','clearcomp']]},
+  team_dept:{sev:'e',f:'team',label:"Team doesn't belong to the new department",desc:'Team ▾ is filtered by Department, so the old team is no longer valid.',fix:[["Use each department's first team",'fixteam']]},
+  cross_country:{sev:'e',f:'location',label:'Moves to another country',desc:'Toronto is a different legal entity. Cross-entity moves go through an international transfer, not a bulk edit.',fix:[['Move to a new draft','move']]},
+  mgr_cycle:{sev:'e',f:'manager',label:'Manager creates a reporting loop',desc:'The new manager reports up to this employee.',fix:[['Undo the manager change','clearmgr']]},
+  mgr_term:{sev:'e',f:'manager',label:'New manager has a scheduled termination',desc:'Approval chains would break on the termination date.',fix:[['Undo the manager change','clearmgr']]},
+  conflict:{sev:'w',f:null,label:"Also in Dana Okuneva's draft 'Q4 reorg'",desc:'Both drafts touch reporting lines. Whichever is submitted second shows a conflict diff.'},
+  raise15:{sev:'w',f:'compensation',label:'Raise above 15%',desc:'Valid, but unusual for an annual cycle. Finance sees these first.'},
+  above_mid:{sev:'w',f:'compensation',label:'Crosses the band midpoint',desc:'Moves from below the midpoint to above it. Valid; Finance approval covers these.'},
+  unit_switch:{sev:'w',f:'per',label:'Pay type changes (Hour ↔ Year)',desc:'Changes overtime eligibility and how payroll calculates pay. Shown annualised in the grid.'},
+  equity_down:{sev:'w',f:'equity',label:'Equity decreases',desc:'Share counts usually only go up. Check this is intended.'},
+  retro:{sev:'w',f:null,label:'Effective date is in a paid period',desc:'Payroll computes retro pay in the next run.'},
+  title_ladder:{sev:'i',f:'title',label:"Title doesn't follow the level ladder",desc:'Allowed. Some titles are intentionally off-ladder.',fix:[['Use the ladder title','laddertitle']]},
+  email_identity:{sev:'i',f:'email',label:'Work Email renames sign-in for every app',desc:'Google, Slack and GitHub accounts are renamed on the effective date.'}
+};
+const ISS_ORDER=Object.keys(ISS);
+function rowIssues(d,e){const out=[];const has=f=>d.fields.includes(f);const ch=f=>changed(d,e,f);if(!d.fields.some(ch))return out;
+  if(ch('compensation')){const v=+val(d,e,'compensation');if(!(v>0))out.push('bad_number');else{const per=nv(d,e,'per');const b=band(e,nv(d,e,'level'),per,nv(d,e,'department'),nv(d,e,'location'));
+    if(v>b.max)out.push('band_max');else if(v>b.mid&&e.compensation<=band(e,e.level,e.per).mid)out.push('above_mid');if(per===e.per&&(v-e.compensation)/e.compensation>.15)out.push('raise15')}}
+  if(ch('per'))out.push('unit_switch');
+  if((ch('department')||ch('team'))&&has('department')){const dp=nv(d,e,'department'),t=nv(d,e,'team');if(!TEAMS[dp].includes(t))out.push('team_dept')}
+  if(ch('location')&&LOC[nv(d,e,'location')].country!==LOC[e.location].country)out.push('cross_country');
+  if(ch('manager')){const m=nv(d,e,'manager');if(m===e.id||under(EMPI[m],e.id))out.push('mgr_cycle');else if(EMPI[m]?.status==='Scheduled termination')out.push('mgr_term')}
+  if(ch('equity')&&+nv(d,e,'equity')<e.equity)out.push('equity_down');
+  if((ch('title')||ch('level'))&&nv(d,e,'title')!==ladder(nv(d,e,'department'),nv(d,e,'level')))out.push('title_ladder');
+  if(ch('email'))out.push('email_identity');
+  if(d.date&&d.date<TODAY)out.push('retro');
+  if(CONFLICT.has(e.id)&&(has('manager')||has('department')||has('team')))out.push('conflict');
+  return out}
+let A_CACHE=null;
+function analyze(d){if(A_CACHE&&A_CACHE.d===d)return A_CACHE;const rows=rowsOf(d);const rowIss=new Map(),issues={},rowChanged=new Set();let changes=0;
+  for(const e of rows){let c=0;for(const f of d.fields)if(changed(d,e,f))c++;if(c){rowChanged.add(e.id);changes+=c}
+    const iss=rowIssues(d,e);if(iss.length){rowIss.set(e.id,iss);iss.forEach(k=>(issues[k]=issues[k]||[]).push(e.id))}}
+  let err=0,warn=0,info=0;for(const k in issues){const s=ISS[k].sev;if(s==='e')err+=issues[k].length;else if(s==='w')warn+=issues[k].length;else info+=issues[k].length}
+  A_CACHE={d,rows,rowIss,issues,rowChanged,changes,err,warn,info};return A_CACHE}
+const dirty=()=>{A_CACHE=null;SEGC.clear()};
+
+/* ================= impact ================= */
+function impact(d){const A=analyze(d);const R=A.rows.filter(e=>A.rowChanged.has(e.id));const ch=(e,f)=>changed(d,e,f);const N=(e,f)=>nv(d,e,f);
+  const I={people:R.length};
+  I.pay=R.filter(e=>ch(e,'compensation')||ch(e,'per')||ch(e,'bonus')).length;
+  I.tax=R.filter(e=>ch(e,'location')&&LOC[N(e,'location')].state!==LOC[e.location].state).length;
+  let delta=0,base=0;A.rows.forEach(e=>{base+=annual(e.compensation,e.per)});R.forEach(e=>{if(ch(e,'compensation')||ch(e,'per'))delta+=annual(+N(e,'compensation'),N(e,'per'))-annual(e.compensation,e.per)});
+  I.delta=delta;I.base=base;
+  I.benSal=R.filter(e=>(ch(e,'compensation')||ch(e,'per'))&&N(e,'per')==='Year').length;
+  I.benLoc=R.filter(e=>ch(e,'location')&&LOC[N(e,'location')].state!==LOC[e.location].state).length;
+  I.benClass=R.filter(e=>ch(e,'per')).length;I.pto=I.benLoc;I.ot=R.filter(e=>ch(e,'per')).length;I.dev=R.filter(e=>ch(e,'department')).length;
+  I.wf=R.filter(e=>ch(e,'manager')).length;I.wfAppr=R.filter(e=>ch(e,'manager')).reduce((s,e)=>s+(parseInt(e.id.slice(1))%3),0);
+  const cnt=pred=>R.filter(pred).length;const deptCh=e=>ch(e,'department')||ch(e,'team');
+  I.apps={
+    slack:{name:'Slack',items:[[cnt(e=>ch(e,'title')),'profile title updates','Title → Slack profile title'],[cnt(e=>ch(e,'manager')),'manager field updates','Manager → Slack profile manager'],[cnt(e=>ch(e,'location')),'location and time zone updates','Work location → Slack time zone'],[cnt(e=>ch(e,'department')),'user-group moves','Department → Slack user groups'],[cnt(e=>ch(e,'email')),'sign-in email changes','Work Email → Slack account email']],
+      loss:cnt(e=>ch(e,'department')),lossTxt:n=>`${pl(n,'person','people')} will lose their old department channels`},
+    google:{name:'Google Workspace',items:[[cnt(e=>ch(e,'title')),'directory title updates','Title → Directory title'],[cnt(deptCh),'OU and group moves','Department, Team → Org unit and Groups'],[cnt(e=>ch(e,'manager')),'directory manager updates','Manager → Directory manager'],[cnt(e=>ch(e,'location')),'building and address updates','Work location → Directory building'],[cnt(e=>ch(e,'email')),'primary email renames','Work Email → Primary email (renames sign-in)']],
+      loss:cnt(deptCh),lossTxt:n=>`${pl(n,'person','people')} will lose their old department Groups`},
+    github:{name:'GitHub',items:[[cnt(e=>(ch(e,'team')||ch(e,'department'))&&['Engineering','Product'].includes(N(e,'department'))),'team membership changes','Team → GitHub team'],[cnt(e=>ch(e,'email')&&['Engineering','Product'].includes(e.department)),'SSO email updates','Work Email → SSO identity']],
+      loss:cnt(e=>ch(e,'department')&&['Engineering','Product'].includes(e.department)&&!['Engineering','Product'].includes(N(e,'department'))),lossTxt:n=>`${pl(n,'person','people')} will lose access to the GitHub organisation`}};
+  Object.values(I.apps).forEach(a=>{a.total=a.items.reduce((s,x)=>s+x[0],0)});I.losses=Object.values(I.apps).reduce((s,a)=>s+a.loss,0);
+  const ap=[];const anyF=fs=>R.some(e=>fs.some(f=>ch(e,f)));
+  if(anyF(['compensation','per','bonus','equity']))ap.push({who:'Priya Shah',role:'Head of Finance',what:'Compensation, Per, bonus and equity changes'});
+  if(anyF(['manager','location','department']))ap.push({who:'Dana Okuneva',role:'Director, People',what:'Manager, department and location changes'});
+  if(anyF(['email']))ap.push({who:'Raj Patel',role:'Director, IT',what:'Work Email renames'});
+  I.approvers=ap;return I}
+
+/* ================= shell ================= */
+const ICON={bulk:'<path d="M2 5l6-3 6 3-6 3z M2 8l6 3 6-3 M2 11l6 3 6-3" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  segments:'<circle cx="6" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  people:'<circle cx="6" cy="5.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 14c0-2.8 2-4.5 4.5-4.5s4.5 1.7 4.5 4.5M11 3.5a2.3 2.3 0 0 1 0 4.4M12.5 9.8c1.3.6 2 1.9 2 4.2" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  payroll:'<rect x="1.5" y="3.5" width="13" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="1.8" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  benefits:'<path d="M8 13.5S2 10 2 6a3 3 0 0 1 6-1 3 3 0 0 1 6 1c0 4-6 7.5-6 7.5z" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  time:'<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  devices:'<rect x="2.5" y="3" width="11" height="7.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1 13h14" stroke="currentColor" stroke-width="1.4"/>',
+  apps:'<rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+  reports:'<path d="M3 13V8M8 13V3M13 13V6" stroke="currentColor" stroke-width="1.8"/>',
+  settings:'<circle cx="8" cy="8" r="2.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke="currentColor" stroke-width="1.4"/>'};
+const ic=k=>`<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">${ICON[k]}</svg>`;
+const NAV=[['bulk','Bulk change'],['segments','Segments'],['people','People'],'sep',['payroll','Payroll'],['benefits','Benefits'],['time','Time'],['devices','Devices'],['apps','Apps'],['reports','Reports'],['settings','Settings']];
+function navKey(){return S.route==='draft'?'bulk':(S.route==='segment'||S.route==='segedit')?'segments':S.route==='module'?S.modName:S.route}
+function renderNav(){const k=navKey();$('#gnav').innerHTML=`<div class="nh">Workforce</div>`+NAV.map(x=>x==='sep'?'<div class="sep"></div><div class="nh">Products</div>':`<button class="${x[0]===k?'on':''}" data-act="nav" data-k="${x[0]}">${ic(x[0])}${x[1]}</button>`).join('')}
+function render(){dirty();let h='';
+  switch(S.route){case'bulk':h=bulkList();break;case'draft':h=draftPage();break;case'segments':h=segList();break;case'segment':h=segDetail();break;
+    case'segedit':h=`<div class="crumbs"><button data-act="nav" data-k="segments">Segments</button><span>/</span><span>${S.se.segId?'Edit segment':'New '+(S.se.type==='static'?'static':'dynamic')+' segment'}</span></div>`+segEditor(S.se);break;
+    case'people':h=peoplePage();break;default:h=placeholder()}
+  $('#app').innerHTML=h+`<p class="disclaimer">Concept prototype by Vrajesh Iyengar for a Rippling product case study. Metzhand, its people and all data are fictional. Not a Rippling product.</p>`;
+  renderNav();renderSheet();renderOverlay();renderNotes();renderDemo();renderHM();afterRender()}
+function renderSheet(){const on=!!(S.se&&S.se.inSheet);$('#sheet').classList.toggle('on',on);$('#sheetbg').classList.toggle('on',on);
+  $('#sheet').innerHTML=on?`<div class="sheet-h"><b>Create segment</b><span class="muted" style="font-size:13px">Your bulk change stays open behind this. Saving adds the segment to its targeting.</span><span class="sp"></span><button class="btn2 sm" data-act="sheetclose">Close X</button></div><div class="sheet-b">${segEditor(S.se)}</div>`:''}
+function renderDemo(){$('#demo').innerHTML=(S.demo?`<div class="dpanel pp"><span class="demo-l">Demo controls · not part of the product</span>
+  <div><div class="muted" style="margin-bottom:4px">Company size</div><div class="seg2">${[12,412,5000].map(n=>`<button class="${S.size===n?'on':''}" data-act="size" data-n="${n}">${fmtN(n)}</button>`).join('')}</div></div>
+  <label class="tg"><input type="checkbox" data-act="notes" ${S.notes?'checked':''}> Show "Why this?" notes</label>
+  <div style="display:flex;flex-direction:column;gap:4px"><a href="approach.html" target="_blank" rel="noopener">Approach (presentation page) ↗</a><a href="propagation.html" target="_blank" rel="noopener">Propagation (presentation page) ↗</a></div></div>`:'')+`<button class="fab" data-act="demo">${S.demo?'Close':'Demo controls'}</button>`}
+let TT=0;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(TT);TT=setTimeout(()=>t.classList.remove('on'),3400)}
+const navBtn=(label,on,attrs='',dis=false,n='',cls='')=>`<button class="nav-i ${on?'on':''} ${cls}" ${attrs} ${dis?'disabled':''}>${n?`<span class="n">${n}</span>`:''}${esc(label)}</button>`;
+const kv=(l,v,c='')=>`<div class="kv"><span>${esc(l)}</span><b class="${c}" title="${esc(String(v).replace(/<[^>]+>/g,''))}">${v}</b></div>`;
+const row=(l,v)=>`<div class="r"><div class="l">${esc(l)}</div><div class="v">${v}</div></div>`;
+const person=(e,sub)=>`<span class="person"><span class="av">${initials(e.name)}</span><span><b>${esc(e.name)}</b>${sub?`<br><small class="muted">${esc(sub)}</small>`:''}</span></span>`;
+function renderSearch(){const q=S.gq.trim().toLowerCase();const el=$('#gres');if(q.length<2){el.innerHTML='';return}
+  const ppl=EMP.filter(e=>e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q)).slice(0,5);const segs=SEGS.filter(s=>s.name.toLowerCase().includes(q)).slice(0,4);
+  const drs=[S.d,...S.parked].filter(Boolean).filter(d=>(d.name||'').toLowerCase().includes(q)).slice(0,3);
+  el.innerHTML=((ppl.length?'<h6>People</h6>'+ppl.map(e=>`<button data-act="gsp" data-id="${e.id}"><span>${esc(e.name)}</span><span class="muted">${e.id} · ${esc(e.title)}</span></button>`).join(''):'')+
+    (segs.length?'<h6>Segments</h6>'+segs.map(s=>`<button data-act="gss" data-id="${s.id}"><span>${esc(s.name)}</span>${typeBadge(s)}</button>`).join(''):'')+
+    (drs.length?'<h6>Bulk changes</h6>'+drs.map(d=>`<button data-act="gsd" data-id="${d.id}"><span>${esc(d.name)}</span><span class="muted">${d.id}</span></button>`).join(''):''))||'<h6>No results</h6>'}
+
+/* ================= pages: bulk list, people, placeholder ================= */
+function bulkList(){const rows=[];
+  for(const d of [S.d,...S.parked].filter(Boolean)){const A=analyze(d);const st=d.run?(d.run.phase==='approval'?'<span class="badge b-warn">Awaiting approval</span>':d.run.phase==='scheduled'?'<span class="badge b-appr">Scheduled</span>':'<span class="badge b-ok">Committed</span>'):`<span class="badge b-lock">Draft · ${esc(STEPS.find(s=>s.k===lastStep(d)).t)}</span>`;
+    const segs=[...new Set(d.who.groups.flatMap(g=>g.conds.filter(c=>c.f==='empid'&&c.op==='inseg'&&c.v[0]).map(c=>segName(c.v[0]))))];
+    rows.push(`<tr class="click" data-act="resume" data-id="${d.id}"><td><b>${esc(d.name||'Untitled change')}</b><br><small class="muted">${d.id} · You · edited today</small></td><td>${st}</td><td>${segs.length?esc(segs.join(', ')):'<span class="muted">Custom conditions</span>'}</td><td class="num">${fmtN(A.rows.length)}</td><td>${d.fields.map(f=>FIELDS[f].label).join(', ')||'—'}</td><td>${d.date?fmtD(d.date,true):'—'}</td></tr>`)}
+  if(S.followups)rows.push(`<tr><td><b>${esc((S.d&&S.d.name)||'FY26 annual review')} · follow-ups</b><br><small class="muted">Rows moved out of the main change</small></td><td><span class="badge b-lock">Draft</span></td><td class="muted">Named employees</td><td class="num">${fmtN(S.followups)}</td><td>Compensation, Title, Level</td><td>${fmtD(NEXTP,true)}</td></tr>`);
+  rows.push(`<tr class="click" data-act="q4"><td><b>Q4 reorg · Platform</b><br><small class="muted">BC-2037 · Dana Okuneva · edited 2 days ago</small></td><td><span class="badge b-lock">Draft · Values</span></td><td>Engineering · US · L5 and above</td><td class="num">${EMP.filter(e=>CONFLICT.has(e.id)).length}</td><td>Department, Team, Manager</td><td>${fmtD(D(2027,0,1),true)}</td></tr>`);
+  rows.push(`<tr><td><b>Austin office move</b><br><small class="muted">BC-2019 · You · completed</small></td><td><span class="badge b-ok">Committed</span></td><td>Austin office movers · Q3</td><td class="num">${members('SEG-105').size}</td><td>Work location, Manager</td><td>${fmtD(D(2026,8,22),true)}</td></tr>`);
+  return`<div class="ph"><div><h1>Bulk change</h1><p>Change attributes for many employees at once. Drafts save as you go.</p></div><div class="pa"><button class="btn2" data-act="nav" data-k="segments">Manage segments</button><button class="btn" data-act="newdraft">New bulk change</button></div></div>
+  <div class="pcard" style="padding:6px 8px"><div class="tw"><table class="t"><thead><tr><th>Change</th><th>Status</th><th>Segments</th><th>People</th><th>Fields</th><th>Effective</th></tr></thead><tbody>${rows.join('')}</tbody></table></div></div>`}
+function lastStep(d){let k='setup';STEPS.forEach(s=>{if(d.visited.has(s.k)&&(s.k!=='status'||d.run))k=s.k});return k}
+function peoplePage(){const q=(S.pq||'').toLowerCase();const list=EMP.filter(e=>!q||e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q)||e.title.toLowerCase().includes(q)).slice(0,100);
+  return`<div class="ph"><div><h1>People</h1><p>${fmtN(EMP.length)} employees at Metzhand. Open anyone to see the single-employee profile.</p></div></div>
+  <div class="pcard"><div class="mtool"><input class="search" id="pq" data-in="pq" value="${esc(S.pq||'')}" placeholder="Search by name, ID or title"><span class="muted">Showing ${fmtN(list.length)}${list.length===100?'+':''}</span></div>
+  <div class="tw"><table class="t"><thead><tr><th>Name</th><th>Employee ID</th><th>Title</th><th>Department</th><th>Work location</th><th>Start date</th></tr></thead><tbody>${list.map(e=>`<tr class="click" data-act="profile" data-id="${e.id}"><td>${person(e)}</td><td class="num">${e.id}</td><td>${esc(e.title)}</td><td>${esc(e.department)}</td><td>${esc(e.location)}</td><td class="num">${fmtIso(e.startDate)}</td></tr>`).join('')}</tbody></table></div></div>`}
+function placeholder(){const n=(NAV.find(x=>x[0]===S.modName)||[0,'Module'])[1];return`<div class="ph"><div><h1>${esc(n)}</h1></div></div><div class="pcard"><div class="empty"><b>Not part of this prototype</b><span>Bulk change, Segments and People are built. ${esc(n)} reads the same employee record they change.</span><button class="btn2" data-act="nav" data-k="bulk">Go to Bulk change</button></div></div>`}
+
+/* ================= draft (bulk change editor) ================= */
+function draftPage(){if(S.approver)return`<div class="crumbs"><button data-act="nav" data-k="bulk">Bulk change</button><span>/</span><span>${esc(S.d.name)}</span><span>/</span><span>Approval</span></div>`+approverView();
+  return`<div class="crumbs"><button data-act="nav" data-k="bulk">Bulk change</button><span>/</span><span>${esc(S.d.name||'New bulk change')}</span></div>`+draftView()}
+function draftView(){const d=S.d;const st=STEPS.find(s=>s.k===S.step);const A=analyze(d);const locked=!!d.run;
+  const nav=STEPS.map((s,i)=>{const can=locked?s.k==='status':d.visited.has(s.k)&&(s.k!=='status');const done=d.visited.has(s.k)&&s.k!==S.step&&!locked;return navBtn(s.t,s.k===S.step,`data-act="step" data-k="${s.k}"`,!can,done?'✓':String(i+1),done?'done':'')}).join('');
+  const head=`<header class="bar"><h2>${esc(st.h)}</h2><div class="bar-act">${locked?`<button data-act="nav" data-k="bulk">Back to Bulk change</button>`:`<button data-act="saveexit">Save &amp; exit</button><button data-act="menu" aria-label="More">⋯</button>`}</div>${S.menu?`<div class="menu pp"><button data-act="discard">Discard draft</button></div>`:''}</header>`;
+  let body='';switch(S.step){case'setup':body=setupView(d);break;case'who':body=segStepView(d);break;case'what':body=whatView(d);break;case'values':body=valuesView(d);break;case'review':body=reviewView(d);break;case'impact':body=impactView(d);break;case'status':body=statusView(d);break}
+  return`<div class="card"><nav class="side" aria-label="Steps"><div class="side-h">${esc(d.id)} · bulk change</div>${nav}<div class="side-foot">${locked?'Submitted changes are read-only. Use Create reversal to change them.':'Autosaved · 11:20 IST'}</div></nav>
+  <section class="main">${head}${summary(d,A)}<div class="content">${body}</div>${footer(d,A)}</section></div>`}
+function summary(d,A){A=A||analyze(d);return`<div class="strip" id="summary">${kv('Change',esc(d.name||'Untitled'))}${kv('Effective',d.date?fmtD(d.date,true):'Not set')}${kv('People',fmtN(A.rows.length))}${kv('Fields',d.fields.length)}${kv('Changes',fmtN(A.changes))}${kv('Errors',fmtN(A.err),A.err?'err':'')}${kv('Warnings',fmtN(A.warn),A.warn?'warn':'')}</div>`}
+function footer(d,A){const i=STEPS.findIndex(s=>s.k===S.step);if(['status','impact','review'].includes(S.step))return'';
+  let ok=true,why='';
+  if(S.step==='setup'){if(!d.name.trim()){ok=false;why='Name the change to continue.'}else if(!d.date){ok=false;why='Pick an effective date. It decides which payroll run picks this up.'}}
+  if(S.step==='who'&&!A.rows.length){ok=false;why='Target at least one employee to continue.'}
+  if(S.step==='what'&&!d.fields.length){ok=false;why='Choose at least one field.'}
+  if(S.step==='values'&&!A.changes){ok=false;why='Enter at least one new value.'}
+  return`<div class="foot"><div>${i>0?`<button class="btn2" data-act="back">Back</button>`:''}</div><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="why" id="nextwhy">${esc(why)}</span><button class="btn" id="nextbtn" data-act="next" ${ok?'':'disabled'}>Continue to ${esc(STEPS[i+1].t)}</button></div></div>`}
+function setupView(d){const pi=d.date?payInfo(d.date):null;
+  const chip=(k,l)=>`<button class="chip ${d.dateKind===k?'on':''}" data-act="datechip" data-k="${k}">${esc(l)}</button>`;
+  const tchip=(k,l)=>`<button class="chip ${d.template===k?'on':''}" data-act="tpl" data-k="${k}">${esc(l)}</button>`;
+  let pt='Required. Nothing is pre-filled, because this date decides which payroll run picks the change up.';
+  if(pi){pt=pi.retro?`<span style="color:var(--warn)">${fmtD(d.date)} is in a period that's already been paid. Payroll will compute retro pay in the <b>${fmtD(pi.run)}</b> run (cutoff ${fmtD(pi.cutoff)}).</span>`:`Lands in the <b>${fmtD(pi.run)}</b> payroll run if approved by the <b>${fmtD(pi.cutoff)}</b> cutoff.${pi.prorated?' Mid-period, so pay for this period is prorated.':''}`}
+  return`<div class="rows">
+  ${row('Name',`<input id="f-name" class="in" data-in="name" value="${esc(d.name)}" placeholder="e.g. FY26 annual review" autocomplete="off">`)}
+  ${row('Reason',`<input id="f-reason" class="in" data-in="reason" value="${esc(d.reason)}" placeholder="Shown to approvers and kept in the audit log" autocomplete="off">`)}
+  ${row('Effective date',`<div class="chips">${chip('next','Start of next pay period · '+fmtD(NEXTP))}${chip('today','Today · '+fmtD(TODAY))}${chip('custom','Custom date')}</div>${d.dateKind==='custom'?`<input type="date" id="f-date" class="in date" data-in="date" value="${d.date?iso(d.date):''}">`:''}<div class="hint">${pt}</div>`)}
+  </div>`}
+const TPL={blank:{f:[],m:{}},comp:{f:['compensation','title','level'],m:{}},reorg:{f:['department','team','manager'],m:{department:'same',team:'same',manager:'same'}},office:{f:['location','manager'],m:{location:'same'}}};
+
+/* ================= condition builder (shared) ================= */
+const groupsOf=ctx=>ctx==='d'?S.d.who.groups:S.se.groups;
+function builder(ctx,groups){const exclude=ctx==='se'&&S.se.segId;
+  return groups.map((g,gi)=>`<div class="grp"><div class="grp-h">${gi===0?'Employees':'or employees'} where <select class="sel" data-in="bgmode" data-ctx="${ctx}" data-g="${gi}" aria-label="Match mode"><option value="all" ${g.mode==='all'?'selected':''}>all</option><option value="any" ${g.mode==='any'?'selected':''}>any</option></select> of these are true:${gi>0?` <button class="x" data-act="bdelgroup" data-ctx="${ctx}" data-g="${gi}" aria-label="Remove group" style="margin-left:auto">×</button>`:''}</div>
+    ${g.conds.map((c,ci)=>condRow(ctx,c,gi,ci,exclude)).join('')||`<p class="sub" style="padding:6px 0">No conditions yet.</p>`}<div style="padding-top:8px"><button class="lnk" data-act="baddcond" data-ctx="${ctx}" data-g="${gi}">+ Add condition</button></div></div>`).join('<div class="or">OR</div>')
+    +(groups[0].conds.length?`<div><button class="lnk" data-act="baddgroup" data-ctx="${ctx}">+ Add condition group (OR)</button></div>`:'')}
+function condRow(ctx,c,gi,ci,exclude){const F=fieldOf(c);const da=`data-ctx="${ctx}" data-g="${gi}" data-c="${ci}"`;const key=`${ctx}-${gi}-${ci}`;
+  const byG={};Object.entries(CF).forEach(([k,x])=>(byG[x.grp]=byG[x.grp]||[]).push([k,x]));
+  const fsel=`<select class="sel" data-in="bf" ${da} aria-label="Field">${Object.entries(byG).map(([g,xs])=>`<optgroup label="${esc(g)}">${xs.map(([k,x])=>`<option value="${k}" ${k===c.f?'selected':''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>`;
+  const osel=`<select class="sel" data-in="bo" ${da} aria-label="Operator">${OPS[F.type].map(([o,l])=>`<option value="${o}" ${o===c.op?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  return`<div class="cond">${fsel}${osel}${valueCtl(ctx,c,gi,ci,F,exclude)}<button class="x" data-act="bdelcond" ${da} aria-label="Remove condition">×</button>${S.pop===key?condPop(ctx,c,gi,ci,F):''}</div>`}
+function valueCtl(ctx,c,gi,ci,F,exclude){const v=c.v||[];const da=`data-ctx="${ctx}" data-g="${gi}" data-c="${ci}"`;const op=c.op,t=F.type;const key=`${ctx}-${gi}-${ci}`;
+  if(NOVAL.has(op))return'<span></span>';
+  if(t==='id'&&(op==='inseg'||op==='notinseg'))return`<select class="sel" data-in="bv" ${da} data-i="0" aria-label="Segment"><option value="">Choose a segment</option>${SEGS.filter(s=>s.id!==exclude).map(s=>`<option value="${s.id}" ${v[0]===s.id?'selected':''}>${esc(s.name)} · ${s.type==='static'?'Static':'Dynamic'} · ${fmtN(members(s.id).size)}</option>`).join('')}</select>`;
+  if((t==='id'&&(op==='eq'||op==='ne'))||t==='person')return`<input class="in" list="${t==='person'?'dl-mgr':'dl-people'}" data-in="bvp" ${da} value="${v[0]&&EMPI[v[0]]?esc(EMPI[v[0]].name+' · '+v[0]):''}" placeholder="Type a name or ID" autocomplete="off">`;
+  if(t==='id'&&(op==='anyof'||op==='noneof'))return`<button class="valbtn ${v.length?'':'ph'}" data-act="openpop" data-key="${key}">${v.length?esc(pl(v.length,'person','people')+': '+names(v)):'Paste or pick people'}</button>`;
+  if(LISTOP.has(op))return`<button class="valbtn ${v.length?'':'ph'}" data-act="openpop" data-key="${key}">${v.length?esc(v.join(', ')):'Choose values'}</button>`;
+  if(t==='ord'){const sel=i=>`<select class="sel" data-in="bv" ${da} data-i="${i}"><option value="">Level</option>${LEVELS.map(l=>`<option ${v[i]===l?'selected':''}>${l}</option>`).join('')}</select>`;return TWO.has(op)?`<span class="twov">${sel(0)} and ${sel(1)}</span>`:sel(0)}
+  const typ=(t==='date'&&op!=='pastN'&&op!=='nextN')?'date':(t==='num'||op==='pastN'||op==='nextN')?'number':'text';
+  const inp=i=>`<input class="in" type="${typ}" data-in="bv" ${da} data-i="${i}" value="${esc(v[i]??'')}" placeholder="${op==='pastN'||op==='nextN'?'Days':'Value'}" ${typ==='date'?'style="max-width:150px"':''}>`;
+  return TWO.has(op)?`<span class="twov">${inp(0)} and ${inp(1)}</span>`:inp(0)}
+function condPop(ctx,c,gi,ci,F){const v=c.v||[];const da=`data-ctx="${ctx}" data-g="${gi}" data-c="${ci}"`;
+  if(F.type==='id'){if(!['anyof','noneof'].includes(c.op))return'';}if(F.type==='id')return`<div class="pop pp"><b style="font-size:13px">Paste employee IDs, work emails or names</b><textarea class="ta" id="pop-ta" style="min-height:90px" placeholder="E1003, jason.lee@metzhand.com&#10;Fleda Pfannerstill"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn sm" data-act="bpaste" ${da}>Add to list</button><input class="in" list="dl-people" data-in="bpick" ${da} placeholder="or pick one person" style="max-width:170px;font-size:13px"></div>
+    ${v.length?`<div class="pills">${v.slice(0,30).map(id=>`<span class="pill">${esc(EMPI[id]?.name||id)} <button class="x" data-act="bunpick" ${da} data-id="${id}" aria-label="Remove">×</button></span>`).join('')}${v.length>30?`<span class="muted">+${v.length-30} more</span>`:''}</div>`:''}</div>`;
+  if(!F.opts||!LISTOP.has(c.op))return'';const q=(S.popQ||'').toLowerCase();const counts={};EMP.forEach(e=>{const x=F.get(e);(Array.isArray(x)?x:[x]).forEach(y=>counts[y]=(counts[y]||0)+1)});
+  return`<div class="pop pp"><input type="search" id="pop-q" data-in="popq" placeholder="Search" value="${esc(S.popQ||'')}"><div class="pop-l">${F.opts().filter(o=>o.toLowerCase().includes(q)).map(o=>`<label><input type="checkbox" data-act="bpopv" ${da} data-v="${esc(o)}" ${v.includes(o)?'checked':''}>${esc(o)}<span>${fmtN(counts[o]||0)}</span></label>`).join('')}</div></div>`}
+
+/* ================= bulk change: Segments step ================= */
+function segStepView(d){const w=d.who;const C=cohort(d);const n=C.list.length;if(n!==w.cnt){w.prev=w.cnt;w.cnt=n}
+  const delta=w.prev!==null&&w.prev!==undefined&&w.prev!==n?`<span class="delta">(${n-w.prev>0?'+':''}${fmtN(n-w.prev)})</span>`:'';
+  const qa=`<div class="qa"><div class="ddw"><button class="btn2" data-act="insmenu">Insert saved segment ▾</button>${S.insOpen?`<div class="ddm left pp">${SEGS.map(s=>`<button data-act="insseg" data-id="${s.id}"><b>${esc(s.name)}</b><span>${s.type==='static'?'Static':'Dynamic'} · ${pl(members(s.id).size,'person','people')} · ${esc(segDef(s).slice(0,90))}</span></button>`).join('')}</div>`:''}</div>
+    <button class="btn2" data-act="createseg">Create segment</button><button class="btn2" data-act="pasteids">Paste employee IDs</button></div>`;
+  const paste=w.pasteOpen?`<div class="pastecard"><b style="font-size:13.5px">Paste employee IDs, work emails or names</b><span class="sub">Any mix, one per line or comma-separated. They're added as an "Employee ID is any of" group, so they join the people you already target.</span>
+    <textarea class="ta" id="paste-ta" data-in="paste">${esc(w.paste)}</textarea><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sm" data-act="pasteadd">Add people</button><button class="txt" data-act="pastesample">Paste a sample list</button><button class="txt" data-act="pasteids">Cancel</button></div></div>`:'';
+  const autoRow=(k,label,n2,on)=>`<div><span>${esc(label)}: <b class="num">${fmtN(n2)}</b> · ${on?'included':'excluded'}</span><button class="lnk" data-act="autotg" data-k="${k}">${on?'Exclude':'Include'}</button></div>`;
+  const samp=spread(C.list,5).map(e=>`<tr><td>${person(e,e.title)}</td><td><span class="badge b-lock">${esc(C.why.get(e.id))}</span></td></tr>`).join('');
+  const rb=groupsTxt(w.groups);const ex=[];if(!w.incTerm)ex.push('scheduled terminations');if(!w.incContract)ex.push('contractors');if(!w.incLeave)ex.push('people on leave');
+  return`<div class="two"><div class="sec">${qa}${paste}${builder('d',w.groups)}</div>
+  <aside class="panel" aria-live="polite"><div><span class="big">${fmtN(n)}</span><span class="muted"> ${n===1?'person':'people'} targeted</span>${delta}</div>
+    <div class="readback"><b>${fmtN(n)}</b> = ${esc(rb||'Add a condition, or insert a segment')}${ex.length?`. Leaves out ${ex.join(' and ')}.`:'.'}</div>
+    ${n?`<div class="sec"><span class="h3" style="font-size:13px">By department</span><div class="bars">${topN(C.list,'department').map(([k,c])=>bar(k,c,n)).join('')}</div></div>
+    <div class="sec"><span class="h3" style="font-size:13px">By work location</span><div class="bars">${topN(C.list,'location').map(([k,c])=>bar(k,c,n)).join('')}</div></div>
+    <div class="sec"><span class="h3" style="font-size:13px">Sample, and why each person is included</span><div class="tw"><table class="t">${samp}</table></div><div style="display:flex;gap:14px;flex-wrap:wrap"><button class="lnk" data-act="exportlist">Export the full list</button><button class="lnk" data-act="saveastarget">Save this targeting as a segment</button></div></div>`:''}
+    <div class="auto">${autoRow('leave','On leave',C.auto.leave,w.incLeave)}${autoRow('term','Scheduled termination',C.auto.term,w.incTerm)}${autoRow('contract','Contractors',C.auto.contract,w.incContract)}</div>
+    <p class="note">Dynamic segments stay live while you draft and are frozen when you submit, so approvers sign off on named people. Static segments are already fixed.</p>
+  </aside></div>`}
+function topN(list,f){const m={};list.forEach(e=>m[e[f]]=(m[e[f]]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5)}
+const bar=(k,c,n)=>`<div class="barrow"><span title="${esc(k)}">${esc(k)}</span><i style="width:${Math.max(2,c/n*100)}%"></i><span>${fmtN(c)}</span></div>`;
+function spread(list,k){if(list.length<=k)return list;const out=[];const step=list.length/k;for(let i=0;i<k;i++)out.push(list[Math.floor(i*step+step/2)]);return out}
+function addTargetCond(d,cond){const g=d.who.groups;if(!g[0].conds.length)g[0].conds.push(cond);else g.push({mode:'all',conds:[cond]})}
+
+/* ================= segments: list ================= */
+function segList(){const q=S.slQ.toLowerCase();let list=SEGS.filter(s=>(!q||s.name.toLowerCase().includes(q)||(s.desc||'').toLowerCase().includes(q))&&(S.slType==='all'||s.type===S.slType));
+  if(S.slSort){const{k,dir}=S.slSort;list=list.slice().sort((a,b)=>(k==='members'?members(a.id).size-members(b.id).size:String(a[k]).localeCompare(String(b[k])))*dir)}
+  const th=(k,l)=>`<th><button data-act="slsort" data-k="${k}">${l}${S.slSort&&S.slSort.k===k?(S.slSort.dir>0?' ↑':' ↓'):''}</button></th>`;
+  return`<div class="ph"><div><h1>Segments</h1><p>Reusable groups of employees. Dynamic segments follow rules; static segments are fixed lists of employee IDs.</p></div>
+    <div class="pa"><div class="ddw"><button class="btn" data-act="newmenu">New segment ▾</button>${S.newMenu?`<div class="ddm pp"><button data-act="newseg" data-t="dynamic"><b>Dynamic segment</b><span>Rules. Membership updates as people change.</span></button><button data-act="newseg" data-t="static"><b>Static segment</b><span>A fixed list of employee IDs, from conditions or a CSV file.</span></button></div>`:''}</div></div></div>
+  <div class="pcard"><div class="mtool"><input class="search" id="slq" data-in="slq" value="${esc(S.slQ)}" placeholder="Search segments"><div class="seg2">${[['all','All'],['dynamic','Dynamic'],['static','Static']].map(([k,l])=>`<button class="${S.slType===k?'on':''}" data-act="sltype" data-k="${k}">${l}</button>`).join('')}</div><span class="muted">${pl(list.length,'segment')}</span></div>
+  <div class="tw"><table class="t"><thead><tr>${th('name','Name')}<th>Type</th>${th('members','Members')}<th>Definition</th><th>Used in</th>${th('owner','Owner')}${th('updated','Last updated')}</tr></thead><tbody>
+  ${list.map(s=>{const u=usedIn(s);return`<tr class="click" data-act="openseg" data-id="${s.id}"><td><b>${esc(s.name)}</b><br><small class="muted">${esc(s.desc||'')}</small></td><td>${typeBadge(s)}</td><td class="num">${fmtN(members(s.id).size)}</td><td style="max-width:340px;white-space:normal"><small>${esc(segDef(s))}</small></td><td>${u.length?esc(u.join(', ')):'<span class="muted">—</span>'}</td><td>${esc(s.owner)}</td><td class="num">${esc(s.updated)}</td></tr>`}).join('')||'<tr><td colspan="7"><div class="empty">No segments match.</div></td></tr>'}
+  </tbody></table></div></div>`}
+
+/* ================= segments: editor ================= */
+function newEditor(o={}){return{segId:o.segId||null,name:o.name||'',desc:o.desc||'',type:o.type||'dynamic',source:o.source||'conditions',groups:o.groups||[{mode:'all',conds:[]}],file:o.file||null,
+  tf:{},sort:null,excluded:new Set(o.excluded||[]),hidden:new Set(),q:'',inSheet:!!o.inSheet,locked:!!o.segId,scroll:0,pasteOpen:false,pasteText:''}}
+const RCOLS=[{key:'_emp',label:'Employee',type:'text',get:e=>e.name},{key:'_id',label:'Employee ID',type:'text',get:e=>e.id},{key:'department',label:'Department',type:'pick',get:e=>e.department},
+  {key:'title',label:'Title',type:'text',get:e=>e.title},{key:'location',label:'Work location',type:'pick',get:e=>e.location},{key:'level',label:'Level',type:'ord',get:e=>e.level},{key:'startDate',label:'Start date',type:'date',get:e=>e.startDate}];
+function edBase(se){if(se.type==='static'&&se.source==='csv')return se.file?se.file.matched.map(id=>EMPI[id]).filter(Boolean):[];
+  if(!se.groups.some(g=>g.conds.some(complete)))return[];return EMP.filter(e=>evalGroups(se.groups,e)>=0)}
+function edColsAll(se){const fc=(se.type==='static'&&se.source==='csv'&&se.file)?se.file.cols.map(c=>({key:c.key,label:c.label,type:c.type,file:true,get:e=>se.file.values[e.id]?.[c.key]})):[];return[...RCOLS,...fc]}
+function dispVal(col,v){if(isEmpty(v)&&v!==false)return'(Blanks)';if(col.type==='bool')return v?'Yes':'No';if(col.type==='num'){const s=Number.isInteger(+v)?fmtN(+v):(+v).toFixed(1);return /%/.test(col.label)?s+'%':s}if(col.type==='date')return fmtIso(v);return String(v)}
+function cmpv(col,a,b){if(isEmpty(a))return 1;if(isEmpty(b))return-1;if(col.type==='num')return a-b;if(col.type==='ord')return lvlN(a)-lvlN(b);if(col.type==='bool')return(a?1:0)-(b?1:0);return String(a).localeCompare(String(b))}
+function tableRows(ts,base,cols){let rows=base;const q=(ts.q||'').trim().toLowerCase();if(q)rows=rows.filter(e=>e.name.toLowerCase().includes(q)||e.id.toLowerCase().includes(q));
+  for(const[k,f]of Object.entries(ts.tf||{})){const col=cols.find(c=>c.key===k);if(!col)continue;if(f.cond&&complete(f.cond))rows=rows.filter(e=>testVal(col.type,col.get(e),f.cond,e));if(f.vals)rows=rows.filter(e=>f.vals.includes(dispVal(col,col.get(e))))}
+  if(ts.sort){const col=cols.find(c=>c.key===ts.sort.key);if(col)rows=rows.slice().sort((a,b)=>cmpv(col,col.get(a),col.get(b))*ts.sort.dir)}return rows}
+function filtersTxt(ts,cols){return Object.entries(ts.tf||{}).map(([k,f])=>{const col=cols.find(c=>c.key===k);if(!col)return'';const p=[];if(f.cond&&complete(f.cond)){const v=f.cond.v||[];p.push(`${col.label} ${opLabel(col.type,f.cond.op)}${NOVAL.has(f.cond.op)?'':' '+(TWO.has(f.cond.op)?v.join(' and '):v[0])}`)}if(f.vals)p.push(`${col.label} is one of ${f.vals.slice(0,4).join(', ')}${f.vals.length>4?'…':''}`);return p.join('; ')}).filter(Boolean)}
+const MT={};
+function memberTable(id,ts,base,allCols,opts){const cols=allCols.filter(c=>!ts.hidden.has(c.key));const rows=tableRows(ts,base,allCols);MT[id]={ts,base,cols,allCols,rows,opts};
+  const chk=opts.static&&opts.editable;const fcols=cols.filter(c=>c.file),rcols=cols.filter(c=>!c.file);const firstF=fcols[0]&&fcols[0].key;
+  const band=fcols.length?`<tr><th class="band-r" colspan="${rcols.length+(chk?1:0)}">Rippling fields</th><th class="band-f" colspan="${fcols.length}">From ${esc(opts.fileName||'file')}</th></tr>`:'';
+  const head=`<tr>${chk?'<th class="mchk"><span class="muted" title="Included">✓</span></th>':''}${cols.map(c=>{const f=ts.tf[c.key];const on=f&&((f.cond&&complete(f.cond))||f.vals);const so=ts.sort&&ts.sort.key===c.key?(ts.sort.dir>0?' ↑':' ↓'):'';
+    return`<th class="${c.file?'fcol':''} ${c.key===firstF?'first':''}"><span class="hcell"><button class="hlab" data-act="hsortq" data-t="${id}" data-k="${c.key}" title="Sort">${esc(c.label)}${so}</button><button class="hfil ${on?'on':''}" data-act="hmenu" data-t="${id}" data-k="${c.key}" aria-label="Sort and filter ${esc(c.label)}">${FUNNEL}</button></span></th>`}).join('')}</tr>`;
+  return`<div class="mwrap" id="${id}"><table class="g ${band?'hasband':''}"><thead>${band}${head}</thead><tbody id="${id}-body"></tbody></table></div>`}
+function renderMemberRows(id){const wrap=document.getElementById(id);const m=MT[id];if(!wrap||!m)return;const RHM=44;const{rows,cols,ts,opts}=m;const chk=opts.static&&opts.editable;const n=cols.length+(chk?1:0);
+  const st=Math.max(0,Math.floor(wrap.scrollTop/RHM)-6),en=Math.min(rows.length,st+Math.ceil((wrap.clientHeight||520)/RHM)+14);const firstF=(cols.find(c=>c.file)||{}).key;
+  let h=st?`<tr class="spacer"><td colspan="${n}" style="height:${st*RHM}px"></td></tr>`:'';
+  for(let i=st;i<en;i++){const e=rows[i];const ex=ts.excluded&&ts.excluded.has(e.id);
+    h+=`<tr class="${ex?'exrow':''}">${chk?`<td class="mchk"><input type="checkbox" data-act="mexcl" data-t="${id}" data-id="${e.id}" ${ex?'':'checked'} aria-label="Include ${esc(e.name)}"></td>`:''}${cols.map(c=>{const v=c.get(e);const cls=(c.file?'fcol':'')+(c.key===firstF?' first':'');
+      if(c.key==='_emp')return`<td><button class="lnk" style="color:var(--ink);font-weight:400" data-act="profile" data-id="${e.id}">${person(e)}</button></td>`;return`<td class="${cls} ${c.type==='num'?'num':''}">${esc(isEmpty(v)&&v!==false?'':dispVal(c,v))}</td>`}).join('')}</tr>`}
+  if(rows.length>en)h+=`<tr class="spacer"><td colspan="${n}" style="height:${(rows.length-en)*RHM}px"></td></tr>`;
+  if(!rows.length)h=`<tr><td colspan="${n}" style="padding:24px;text-align:center;height:auto" class="muted">${esc(opts.emptyText||'No rows match these filters.')}</td></tr>`;
+  document.getElementById(id+'-body').innerHTML=h}
+function membersCard(id,ts,base,allCols,opts){const rows=tableRows(ts,base,allCols);const nf=Object.values(ts.tf).filter(f=>(f.cond&&complete(f.cond))||f.vals).length;const exN=ts.excluded?rows.filter(e=>ts.excluded.has(e.id)).length:0;
+  return`<div class="pcard"><div class="sec-h"><h3 class="h3">${esc(opts.title||'Members')}</h3><span class="muted num">${fmtN(rows.length)} of ${fmtN(base.length)} rows${exN?` · ${fmtN(exN)} excluded`:''}</span></div>
+  <div class="mtool"><input class="search" id="${id}-q" data-in="mq" data-t="${id}" value="${esc(ts.q)}" placeholder="Search name or employee ID">
+    <div class="ddw"><button class="btn2 sm" data-act="colsmenu" data-t="${id}">Columns ▾</button>${S.colsOpen===id?`<div class="ddm left pp">${allCols.map(c=>`<label><input type="checkbox" data-act="colshow" data-t="${id}" data-k="${c.key}" ${ts.hidden.has(c.key)?'':'checked'} ${c.key==='_emp'?'disabled':''}>${esc(c.label)}${c.file?' <span class="badge b-file">File</span>':''}</label>`).join('')}</div>`:''}</div>
+    ${nf||ts.q||ts.sort?`<button class="btn2 sm" data-act="mclear" data-t="${id}">Clear filters${nf?` (${nf})`:''}</button>`:''}</div>
+  ${memberTable(id,ts,base,allCols,opts)}${opts.hint?`<p class="note">${esc(opts.hint)}</p>`:''}</div>`}
+function segEditor(se){const allCols=edColsAll(se);const base=edBase(se);const rows=tableRows(se,base,allCols);const keep=se.type==='static'?rows.filter(e=>!se.excluded.has(e.id)):rows;
+  const isCsv=se.type==='static'&&se.source==='csv';const f=se.file;
+  const head=`<div class="pcard" style="gap:10px"><div class="ph" style="align-items:flex-start"><div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:4px">
+      <input class="nameIn" id="se-name" data-in="sename" value="${esc(se.name)}" placeholder="Name this segment" autocomplete="off" aria-label="Segment name">
+      <input class="descIn" id="se-desc" data-in="sedesc" value="${esc(se.desc)}" placeholder="Add a description (optional)" autocomplete="off" aria-label="Description"></div>
+    <div class="pa"><button class="btn2" data-act="secancel">Cancel</button><button class="btn" data-act="segsave">Save segment</button></div></div>
+    <div class="ctl"><div>Type <span class="seg2"><button class="${se.type==='dynamic'?'on':''}" data-act="setype" data-v="dynamic" ${se.locked?'disabled':''}>Dynamic</button><button class="${se.type==='static'?'on':''}" data-act="setype" data-v="static" ${se.locked?'disabled':''}>Static</button></span></div>
+    ${se.type==='static'?`<div>Source <span class="seg2"><button class="${se.source==='conditions'?'on':''}" data-act="sesrc" data-v="conditions" ${se.locked?'disabled':''}>Conditions</button><button class="${se.source==='csv'?'on':''}" data-act="sesrc" data-v="csv" ${se.locked?'disabled':''}>File upload</button></span></div>`:''}
+    ${se.locked?'<span>Type and source are fixed after the first save.</span>':''}</div></div>`;
+  let def;
+  if(!isCsv)def=`<div class="pcard"><div class="sec-h"><h3 class="h3">Conditions</h3><span class="muted" style="font-size:13px">${se.type==='dynamic'?'Re-evaluated every time the segment is used.':'Evaluated once, when you save. The result is fixed.'}</span></div>${builder('se',se.groups)}</div>`;
+  else if(!f)def=`<div class="pcard"><h3>File</h3><div class="drop"><b>Upload a CSV of employees</b><span class="sub">Any columns you like. One column must identify the employee: Employee ID, ID or Work Email.</span><input type="file" id="seg-file" accept=".csv,text/csv" aria-label="Choose CSV file"><div style="display:flex;gap:14px"><button class="lnk" data-act="sepaste">Paste CSV instead</button><button class="lnk" data-act="sesample">Use a sample file</button></div></div>
+    ${se.pasteOpen?`<textarea class="ta" id="se-paste" data-in="sepastetxt" placeholder="Employee ID,Promo flag,Notes">${esc(se.pasteText)}</textarea><div><button class="btn sm" data-act="sepasteload">Load pasted CSV</button></div>`:''}</div>`;
+  else def=`<div class="pcard"><div class="sec-h"><h3 class="h3">File</h3>${f.raw?`<button class="btn2 sm" data-act="sereplace">Replace file</button>`:''}</div>
+    <div class="rows">${row('File',`<span><b>${esc(f.name)}</b> · ${pl(f.rowsN,'row')} · <span class="done-t">${fmtN(f.matched.length)} matched</span>${f.unmatched.length?` · <button class="lnk" data-act="seunm" style="color:var(--err)">${fmtN(f.unmatched.length)} unmatched</button>`:''}</span>${f.showUnmatched?`<div class="mapping">Not found in Rippling: ${esc(f.unmatched.join(', '))}. These rows are left out.</div>`:''}${f.raw?'':'<span class="hint">Editing filters the saved members. Upload a new file in a new segment to add people.</span>'}`)}
+    ${f.raw?row('Employee key',`<select class="sel box" data-in="sekey" aria-label="Key column">${f.header.map((h,i)=>`<option value="${i}" ${i===f.keyCol?'selected':''}>${esc(h||'Column '+(i+1))}</option>`).join('')}</select><span class="hint">The column that identifies each person. IDs, work emails and names are all accepted.</span>`):''}
+    ${row('Your columns',`<div class="coltypes">${f.cols.map(c=>`<span class="ctype">${esc(c.label)}<select data-in="secoltype" data-k="${c.key}" aria-label="Type of ${esc(c.label)}">${['text','num','date','bool','pick'].map(t=>`<option value="${t}" ${c.type===t?'selected':''}>${TYPE_LABEL[t]}</option>`).join('')}</select></span>`).join('')}</div><span class="hint">Types were detected from the values. They decide which filters each column offers.</span>`)}</div></div>`;
+  const emptyText=isCsv?'Upload a file to see who is in it.':(!se.groups.some(g=>g.conds.some(complete))?'Add a condition to see who matches.':'No one matches these conditions.');
+  const members=membersCard('seed',se,base,allCols,{editable:true,static:se.type==='static',fileName:f&&f.name,emptyText,title:se.type==='static'?'Members to save':'Who matches right now',
+    hint:se.type==='static'?'Untick a row to leave that person out. Filter and sort with the column headers, as in a spreadsheet.':"Sort with the headers. To narrow a dynamic segment, use a header's \"Add as condition\", so the rules stay the only definition."});
+  const nfil=filtersTxt(se,allCols);
+  const saved=se.type==='dynamic'?'The conditions. Membership is worked out each time the segment is used.'
+    :isCsv?`${pl(keep.length,'employee ID')} + ${pl(f?f.cols.length:0,'uploaded column')}.${nfil.length||se.excluded.size?` Your filters${se.excluded.size?' and '+pl(se.excluded.size,'exclusion'):''} are kept as a record of how you built it.`:''}`
+    :`${pl(keep.length,'employee ID')}, fixed at ${NOWL}. The conditions are kept as a record of how you built it.`;
+  const u=se.segId?usedIn(segById(se.segId)):[];
+  const rail=`<aside class="rail"><div class="pcard"><div><span class="big">${fmtN(keep.length)}</span><span class="muted"> ${se.type==='static'?'people will be saved':'people match now'}</span></div>
+    <p class="typeline">${se.type==='dynamic'?'<b>Dynamic.</b> Updates as people change. A bulk change freezes it when you submit.':'<b>Static.</b> These employee IDs stay fixed, whatever changes later.'}</p>
+    ${keep.length?`<div class="sec"><span class="h3" style="font-size:13px">By department</span><div class="bars">${topN(keep,'department').map(([k,c])=>bar(k,c,keep.length)).join('')}</div></div><div class="sec"><span class="h3" style="font-size:13px">By work location</span><div class="bars">${topN(keep,'location').map(([k,c])=>bar(k,c,keep.length)).join('')}</div></div>`:''}</div>
+    <div class="pcard"><h3>What gets saved</h3><span style="font-size:13.5px">${esc(saved)}</span>${nfil.length?`<ul style="margin:0;padding-left:18px;font-size:13px">${nfil.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</div>
+    ${se.segId?`<div class="pcard"><h3>Used in</h3><span style="font-size:13.5px">${u.length?esc(u.join(', '))+'. Saving changes who those drafts target.':'Not used in any bulk change yet.'}</span></div>`:''}</aside>`;
+  return`${head}<div class="segl"><div class="sec">${def}${members}</div>${rail}</div>`}
+
+/* ================= segments: detail ================= */
+function segDetail(){const s=segById(S.segId);if(!s){S.route='segments';return segList()}
+  const m=[...members(s.id)].map(id=>EMPI[id]).filter(Boolean);const cols=[...RCOLS,...(s.columns||[]).map(c=>({key:c.key,label:c.label,type:c.type,file:true,get:e=>s.values?.[e.id]?.[c.key]}))];const u=usedIn(s);
+  const tabs=`<div class="tabsb">${[['members','Members'],['definition','Definition'],['used','Used in']].map(([k,l])=>`<button class="tab ${S.segTab===k?'on':''}" data-act="segtab" data-k="${k}">${l}</button>`).join('')}</div>`;
+  let body='';
+  if(S.segTab==='members')body=membersCard('segv',S.sv,m,cols,{editable:false,static:s.type==='static',fileName:s.file&&s.file.name,title:'Members',hint:'Sorting and filtering here only changes your view. Edit the segment to change who is in it.'});
+  else if(S.segTab==='definition')body=`<div class="pcard"><div class="prov">${s.type==='dynamic'?`<b>Rules</b><div class="readback">${esc(groupsTxt(s.groups))}</div><span class="muted">Re-evaluated each time the segment is used. ${pl(m.length,'person','people')} match now.</span>`
+    :s.source==='csv'?`<b>Uploaded file</b><div class="rows">${row('File',esc(`${s.file.name} · ${pl(s.file.rows,'row')} · ${fmtN(s.file.matched)} matched · ${fmtN(s.file.unmatched.length)} unmatched`))}${row('Columns kept',s.columns.map(c=>`<span class="ctype">${esc(c.label)} · ${TYPE_LABEL[c.type]}</span>`).join(' '))}${row('Filters applied',esc((s.provenance.filters||[]).join('; ')||'None'))}${row('Excluded by hand',esc(s.provenance.excluded.length?names(s.provenance.excluded):'None'))}${row('Snapshot',esc(s.snapshotAt))}</div>`
+    :`<b>Snapshot of these conditions</b><div class="readback">${esc(groupsTxt(s.groups))}</div><span class="muted">Taken ${esc(s.snapshotAt)} (version ${s.version}). Use Refresh snapshot to re-run the conditions and see what changed.</span>`}</div></div>`;
+  else body=`<div class="pcard">${u.length?`<div class="tw"><table class="t"><tbody>${u.map(x=>`<tr><td><b>${esc(x)}</b></td><td class="muted">Bulk change</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Not used in any bulk change yet.</div>'}</div>`;
+  return`<div class="crumbs"><button data-act="nav" data-k="segments">Segments</button><span>/</span><span>${esc(s.name)}</span></div>
+  <div class="ph"><div><h1>${esc(s.name)} ${typeBadge(s)}</h1><p>${pl(m.length,'member')} · Owner ${esc(s.owner)} · Updated ${esc(s.updated)}${s.desc?' · '+esc(s.desc):''}</p></div>
+    <div class="pa"><button class="btn2" data-act="segedit">Edit</button><div class="ddw"><button class="btn2" data-act="segmenu" aria-label="More actions">⋯</button>${S.segMenu?`<div class="ddm pp"><button data-act="segdup"><b>Duplicate</b><span>Start a new segment from this one</span></button>${s.type==='static'&&s.source==='conditions'?`<button data-act="segrefresh"><b>Refresh snapshot</b><span>Re-run the conditions and review the difference</span></button>`:''}<button data-act="segdel"><b style="color:var(--err)">Delete</b><span>Only possible when no bulk change uses it</span></button></div>`:''}</div><button class="btn" data-act="seguse">Use in bulk change</button></div></div>
+  ${tabs}${body}`}
+
+/* ================= header menu (spreadsheet-style column menu) ================= */
+const COL2CF={_id:'empid',department:'department',title:'title',location:'location',level:'level',startDate:'startDate'};
+function renderHM(){const el=$('#pop');if(!S.hm||!MT[S.hm.t]){el.innerHTML='';return}const m=MT[S.hm.t];const col=m.allCols.find(c=>c.key===S.hm.k);if(!col){el.innerHTML='';return}
+  const h=S.hmd;const dynAdd=S.hm.t==='seed'&&S.se&&S.se.type==='dynamic'&&!col.file;const cfKey=COL2CF[col.key];const opsT=dynAdd&&cfKey?CF[cfKey].type:col.type;
+  const ops=OPS[opsT];const x=Math.max(8,Math.min(S.hm.x,window.innerWidth-312)),y=Math.min(S.hm.y,window.innerHeight-160);
+  const valInputs=()=>{if(!h.op||NOVAL.has(h.op)||LISTOP.has(h.op)||['inseg','notinseg'].includes(h.op))return'';const typ=opsT==='date'&&!/N$/.test(h.op)?'date':(opsT==='num'||/N$/.test(h.op))?'number':'text';
+    const inp=i=>opsT==='ord'?`<select class="sel box" data-in="hv" data-i="${i}"><option value="">Level</option>${LEVELS.map(l=>`<option ${h.v[i]===l?'selected':''}>${l}</option>`).join('')}</select>`:`<input class="box" type="${typ}" data-in="hv" data-i="${i}" value="${esc(h.v[i]??'')}" style="width:${TWO.has(h.op)?110:240}px">`;
+    return`<div class="row">${inp(0)}${TWO.has(h.op)?' and '+inp(1):''}</div>`};
+  const all=S.hmAll||[];const q=(h.vq||'').toLowerCase();const sel=h.vals;
+  const list=`<h6>Filter by values</h6><div class="row"><input class="box" type="search" data-in="hvq" value="${esc(h.vq||'')}" placeholder="Search values" style="flex:1"></div>
+    <div class="row"><button class="lnk" data-act="hvall">Select all</button><button class="lnk" data-act="hvnone">Clear</button><span class="muted" style="font-size:12px">${sel?fmtN(sel.length):fmtN(all.length)} of ${fmtN(all.length)}</span></div>
+    <div class="hl">${all.filter(([v])=>v.toLowerCase().includes(q)).slice(0,300).map(([v,c])=>`<label><input type="checkbox" data-act="hval" data-v="${esc(v)}" ${!sel||sel.includes(v)?'checked':''}>${esc(v)}<span>${fmtN(c)}</span></label>`).join('')}</div>`;
+  el.innerHTML=`<div class="hmenu pp" style="left:${x}px;top:${y}px" role="menu"><button class="mi" data-act="hsort" data-dir="1">Sort A → Z</button><button class="mi" data-act="hsort" data-dir="-1">Sort Z → A</button><hr>
+    ${dynAdd?(cfKey?`<h6>Add as condition</h6><div class="row"><select class="sel box" data-in="hop"><option value="">Choose an operator</option>${ops.filter(([o])=>!['inseg','notinseg','anyof','noneof'].includes(o)||opsT!=='id').map(([o,l])=>`<option value="${o}" ${h.op===o?'selected':''}>${esc(l)}</option>`).join('')}</select></div>${valInputs()}${h.op&&LISTOP.has(h.op)?list:''}<div class="ft"><button class="btn sm" data-act="haddcond">Add as condition</button></div>`
+      :`<p class="sub" style="padding:0 8px">Sort only. Use the conditions above to change who matches.</p>`)
+    :`<h6>Filter by condition</h6><div class="row"><select class="sel box" data-in="hop"><option value="">None</option>${ops.filter(([o])=>!LISTOP.has(o)).map(([o,l])=>`<option value="${o}" ${h.op===o?'selected':''}>${esc(l)}</option>`).join('')}</select></div>${valInputs()}${list}
+      <div class="ft"><button class="btn2 sm" data-act="hclear">Clear</button><button class="btn sm" data-act="happly">Apply</button></div>`}
+    ${col.key!=='_emp'?`<hr><button class="mi" data-act="hhide">Hide column</button>`:''}</div>`}
+
+/* ================= fields, values, validation, impact, status, approver ================= */
+function whatView(d){const q=S.whatQ.toLowerCase();const sel=new Set(d.fields);const auto={team:sel.has('department'),compensation:sel.has('per')};
+  const frow=k=>{const F=FIELDS[k];if(q&&!F.label.toLowerCase().includes(q))return'';const on=sel.has(k);const lk=auto[k]&&on;
+    let fx=(F.approval?'<span class="badge b-appr">Needs approval</span>':'')+(F.identity?'<span class="badge b-id">Identity field</span>':'');
+    if(on){fx+=` <span class="mode" role="group" aria-label="Value mode"><button class="${d.modes[k]==='same'?'on':''}" data-act="mode" data-f="${k}" data-m="same">Same for all</button><button class="${d.modes[k]!=='same'?'on':''}" data-act="mode" data-f="${k}" data-m="diff">Different per person</button></span>`;
+      if(lk)fx+=`<span class="note">${k==='team'?'Added because Department changes. Team ▾ is filtered by Department.':'Added because Per changes. The rate has to be re-entered in the new unit.'}</span>`}
+    return`<label class="frow ${on?'on':''}"><input type="checkbox" data-act="field" data-f="${k}" ${on?'checked':''} ${lk?'disabled':''}><span>${esc(F.label)}</span><span class="fx">${fx}</span></label>`};
+  const emp=['title','department','team','compensation','per','bonus','equity','email','manager','location'].map(frow).join(''),add=['level','rating','costCenter'].map(frow).join('');
+  const sugg=[];if(sel.has('level')){if(!sel.has('title'))sugg.push(['title','Title']);if(!sel.has('compensation'))sugg.push(['compensation','Compensation'])}
+  if((sel.has('department')||sel.has('location'))&&!sel.has('manager'))sugg.push(['manager','Manager']);
+  const lock='<svg width="11" height="12" viewBox="0 0 11 12" aria-hidden="true"><path d="M2.5 5V3.5a3 3 0 0 1 6 0V5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1" y="5" width="9" height="7" rx="1.5" fill="currentColor"/></svg>';
+  const pers=['Legal name','Date of birth','Home address','Phone number'].map(l=>`<div class="frow"><input type="checkbox" disabled aria-label="${l}"><span class="muted">${l}</span><span class="fx"><span class="badge b-lock">${lock} Locked</span> Needs the Personal information permission. Ask Dana Okuneva (People).</span></div>`).join('');
+  return`<div class="sec"><div class="sec-h"><input class="in" id="what-q" data-in="whatq" value="${esc(S.whatQ)}" placeholder="Search fields, including custom ones" style="max-width:360px;border-bottom:1px solid var(--rule)"><span class="muted">${d.fields.length?'Selected: '+d.fields.map(f=>FIELDS[f].label).join(' · '):'Nothing selected yet'}</span></div>
+  ${sugg.length?`<div class="sugg"><span class="muted">Usually changed together:</span>${sugg.map(([k,l])=>`<button data-act="suggest" data-f="${k}">+ ${l}</button>`).join('')}</div>`:''}</div>
+  <div class="fgrp"><div class="fgrp-h">Employment Information<span class="muted" style="font-weight:400">Same fields as the profile</span></div>${emp}</div>
+  <div class="fgrp"><div class="fgrp-h">Additional Information<span class="muted" style="font-weight:400">Custom fields</span></div>${add}</div>
+  <div class="fgrp"><div class="fgrp-h">Personal Information</div>${pers}</div>
+  <p class="note">Not offered here: Direct Reports (reporting lines change through Manager), Documents, Integrated Apps (they update from these fields automatically) and Two Factor Devices.</p>`}
+const RH=48;const G={items:[],cols:[],ncol:0,raf:0};
+function gridCols(d){const F=d.fields.slice().sort((a,b)=>FORDER.indexOf(a)-FORDER.indexOf(b));const cols=[];
+  if(!F.includes('department')&&!d.grid.group)cols.push({ctx:'department',label:'Department'});if(!F.includes('rating'))cols.push({ctx:'rating',label:'Rating'});
+  F.forEach(f=>{cols.push({f});if((f==='compensation'&&!F.includes('per'))||(f==='per'))if(F.includes('compensation'))cols.push({pct:true})});return cols}
+function gridItems(d){const A=analyze(d);const g=d.grid;let rows=A.rows;
+  if(g.dept)rows=rows.filter(e=>e.department===g.dept);if(g.changed)rows=rows.filter(e=>A.rowChanged.has(e.id));if(g.issue)rows=rows.filter(e=>(A.rowIss.get(e.id)||[]).includes(g.issue));
+  if(!g.group)return rows.map(e=>({e}));const by={};rows.forEach(e=>(by[e.department]=by[e.department]||[]).push(e));const items=[];
+  Object.keys(by).sort().forEach(dp=>{items.push({h:dp,n:by[dp].length,ch:by[dp].filter(e=>A.rowChanged.has(e.id)).length});if(!g.collapsed.has(dp))by[dp].forEach(e=>items.push({e}))});return items}
+function valuesView(d){const A=analyze(d);const g=d.grid;if(g.group===null)g.group=A.rows.length>300;
+  G.cols=gridCols(d);G.items=gridItems(d);G.ncol=1+G.cols.reduce((s,c)=>s+(c.f?2:1),0);
+  const diffF=d.fields.filter(f=>d.modes[f]!=='same');const ruleOk=d.fields.includes('compensation')||d.fields.includes('bonus');
+  const tb=(k,l,dis)=>`<button class="tbtn ${g.tool===k?'on':''}" data-act="tool" data-k="${k}" ${dis?'disabled title="Add Compensation or Target annual bonus on Fields to use rules"':''}>${l}</button>`;
+  const sameF=d.fields.filter(f=>d.modes[f]==='same');
+  const samebar=sameF.length?`<div class="samebar"><b>Same for everyone</b>${sameF.map(f=>`<label class="tg">${esc(FIELDS[f].label)} ${editorSame(d,f)}</label>`).join('')}</div>`:'';
+  const rules=d.rules.length?`<div class="rules">${d.rules.map((r,i)=>{const n=A.rows.filter(e=>src(d,e,r.field)&&ruleHit(d,e,r.field)===r&&!(d.manual[e.id]&&r.field in d.manual[e.id])&&!(d.csv[e.id]&&r.field in d.csv[e.id])).length;
+    return`<div class="rule ${r.ai&&!r.accepted?'ai':''}"><b>Rule ${i+1}</b><span>${ruleTxt(r)}</span><span class="muted num">· ${pl(n,'row')}</span>${r.ai&&!r.accepted?`<span class="badge b-ai">✦ AI-drafted · not accepted</span><button class="btn sm" data-act="acceptai" data-i="${i}">Accept ${fmtN(n)} cells</button>`:''}<button class="txt" data-act="rmrule" data-i="${i}">Remove</button></div>`}).join('')}</div>`:'';
+  const head1=`<tr><th class="c-emp" rowspan="2">Employee</th>${G.cols.map(c=>c.f?`<th class="grp-th" colspan="2">${esc(FIELDS[c.f].label)}${FIELDS[c.f].approval?' <span class="badge b-appr">Approval</span>':''}</th>`:c.pct?`<th rowspan="2">% change</th>`:`<th rowspan="2" class="c-ctx">${esc(c.label)}</th>`).join('')}</tr>`;
+  const head2=`<tr>${G.cols.filter(c=>c.f).map(()=>`<th style="border-left:1px solid var(--rule)">Current</th><th>New</th>`).join('')}</tr>`;
+  return`<div class="toolbar">${tb('set','Set value')}${tb('rule','Apply rule',!ruleOk)}${tb('template','Download template')}${tb('upload','Upload CSV')}${tb('ai','✦ Describe a change')}<span class="sp"></span>
+    <select class="sel" data-in="gdept" aria-label="Filter by department"><option value="">All departments</option>${DEPTS.map(x=>`<option ${g.dept===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
+    <label class="tg"><input type="checkbox" data-act="gchanged" ${g.changed?'checked':''}> Show changed only</label><label class="tg"><input type="checkbox" data-act="ggroup" ${g.group?'checked':''}> Group by department</label></div>
+  ${toolPanel(d,diffF)}${rules}${samebar}
+  ${g.issue?`<div class="issuebar"><span class="sev ${ISS[g.issue].sev}">!</span>Showing only: <b>${esc(ISS[g.issue].label)}</b> (${fmtN((A.issues[g.issue]||[]).length)})<button class="lnk" data-act="clearissue">Show all rows</button></div>`:''}
+  <div class="gwrap" id="gwrap"><table class="g"><thead class="two2">${head1}${head2}</thead><tbody id="gbody"></tbody></table></div>
+  <div class="legend"><span>Empty cell = no change (grey text is today's value)</span><span><i style="background:var(--chg);border:1px solid #D6E0FB"></i>Changed</span><span><i style="background:var(--err)"></i>Error</span><span><i style="background:#E0A43A"></i>Warning</span><span>✦ AI-drafted, needs accepting</span><span>↑ From your last upload</span><span class="num">${fmtN(G.items.filter(x=>x.e).length)} rows in view</span></div>`}
+function ruleTxt(r){const w=r.where&&r.where.v.length?` where ${CF[r.where.f]?.label||FIELDS[r.where.f]?.label||r.where.f} is ${r.where.v.join(', ')}`:' for everyone';
+  return r.field==='bonus'?`Target annual bonus = ${r.pct}% of new salary${w}`:`Compensation +${r.pct}%${w}${r.cap?`, capped at band ${r.cap==='max'?'maximum':'midpoint'}`:''}`}
+function toolPanel(d,diffF){const g=d.grid;
+  if(g.tool==='set'){const f=S.setF&&diffF.includes(S.setF)?S.setF:diffF[0];if(!f)return`<div class="tool">Every field is set to "Same for all". Use the bar below.</div>`;S.setF=f;
+    return`<div class="tool"><span>Set</span><select class="sel" data-in="setf">${diffF.map(x=>`<option value="${x}" ${x===f?'selected':''}>${esc(FIELDS[x].label)}</option>`).join('')}</select><span>to</span>${valueInput(f,'setv')}<span>for the <b class="num">${fmtN(G.items.filter(x=>x.e).length)}</b> rows in view</span><button class="btn sm" data-act="applyset">Apply</button><span class="note">Narrow the rows first with the department filter or "Show changed only".</span></div>`}
+  if(g.tool==='rule'){const tf=d.fields.includes('compensation')?'compensation':'bonus';
+    return`<div class="tool"><select class="sel" id="r-f">${['compensation','bonus'].filter(x=>d.fields.includes(x)).map(x=>`<option value="${x}" ${x===tf?'selected':''}>${x==='bonus'?'Set Target annual bonus to':'Raise Compensation by'}</option>`).join('')}</select>
+      <input class="in" id="r-pct" value="${tf==='bonus'?10:6}" inputmode="decimal" aria-label="Percent" style="max-width:60px">%<span>(bonus: of new salary)</span><span>where</span>
+      <select class="sel" id="r-wf"><option value="rating">Performance rating</option><option value="level">Level</option><option value="department">Department</option><option value="location">Work location</option></select><span>is</span>
+      <input class="in" id="r-wv" list="dl-rv" value="Exceeds" aria-label="Value" style="max-width:150px"><datalist id="dl-rv">${[...RATINGS,...LEVELS,...DEPTS,...LOCS].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+      <span>cap at</span><select class="sel" id="r-cap"><option value="max">band maximum</option><option value="mid">band midpoint</option><option value="">no cap</option></select><button class="btn sm" data-act="addrule">Add rule</button>
+      <span class="note">Rules write visible values into the grid. You can still edit any cell; your edit wins.</span></div>`}
+  if(g.tool==='ai')return`<div class="tool" style="flex-direction:column;align-items:stretch"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="badge b-ai">✦ Draft only</span><span class="note">Turns a sentence into a rule in this grid. Drafted cells stay marked until you accept them. It never submits.</span></div>
+      <textarea class="ta" id="ai-ta" style="min-height:64px;font-family:var(--font);font-size:14px" placeholder="Describe the change, for example: 6% raise for Engineering, capped at the band maximum">${esc(S.aiText||'')}</textarea>
+      <div><button class="btn sm" data-act="aigo">Draft into the grid</button></div></div>`;
+  return''}
+function valueInput(f,id){const F=FIELDS[f];if(F.type==='select')return`<select class="sel" id="${id}">${F.opts().map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
+  if(F.type==='team')return`<select class="sel" id="${id}">${ALLTEAMS.map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
+  if(F.type==='person')return`<input class="in" id="${id}" list="dl-mgr" placeholder="Type a manager's name" style="max-width:240px">`;
+  return`<input class="in" id="${id}" ${f==='title'?'list="dl-titles"':''} ${F.type!=='text'?'inputmode="decimal"':''} style="max-width:200px">`}
+function editorSame(d,f){const F=FIELDS[f];const v=d.same[f]??'';
+  if(F.type==='select'||F.type==='team'){const opts=F.type==='team'?(TEAMS[d.same.department]||ALLTEAMS):F.opts();return`<select class="sel" data-in="same" data-f="${f}"><option value="">Choose</option>${opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`}
+  if(F.type==='person')return`<input class="in" list="dl-mgr" data-in="same" data-f="${f}" value="${v&&EMPI[v]?esc(EMPI[v].name+' · '+v):''}" placeholder="Type a name" style="max-width:220px">`;
+  return`<input class="in" data-in="same" data-f="${f}" value="${esc(v)}" style="max-width:180px">`}
+function renderGridRows(){const wrap=$('#gwrap');if(!wrap||!S.d)return;const d=S.d;const A=analyze(d);const items=G.items;const h=wrap.clientHeight||560;
+  const st=Math.max(0,Math.floor(wrap.scrollTop/RH)-6),en=Math.min(items.length,st+Math.ceil(h/RH)+14);
+  let html=st?`<tr class="spacer"><td colspan="${G.ncol}" style="height:${st*RH}px"></td></tr>`:'';
+  for(let i=st;i<en;i++){const it=items[i];html+=it.h!==undefined?`<tr class="ghead"><td class="c-emp" style="background:var(--nav)"><button class="lnk" data-act="gcol" data-dept="${esc(it.h)}">${d.grid.collapsed.has(it.h)?'▸':'▾'} ${esc(it.h)}</button></td><td colspan="${G.ncol-1}"><span class="muted">${fmtN(it.n)} people · ${fmtN(it.ch)} with changes</span></td></tr>`:rowHtml(d,it.e,A.rowIss.get(it.e.id)||[])}
+  if(items.length>en)html+=`<tr class="spacer"><td colspan="${G.ncol}" style="height:${(items.length-en)*RH}px"></td></tr>`;
+  if(!items.length)html=`<tr><td colspan="${G.ncol}" style="padding:24px;text-align:center" class="muted">No rows match. Clear the filters above.</td></tr>`;
+  $('#gbody').innerHTML=html}
+function rowHtml(d,e,iss){let h=`<tr><td class="c-emp"><button class="lnk" data-act="profile" data-id="${e.id}"><span class="av">${initials(e.name)}</span><span><b>${esc(e.name)}</b><small>${esc(e.title)}</small></span></button></td>`;
+  for(const c of G.cols){if(c.ctx){h+=`<td class="c-ctx">${esc(e[c.ctx])}</td>`;continue}if(c.pct){h+=pctCell(d,e);continue}
+    const f=c.f,s=src(d,e,f),chg=changed(d,e,f);const fi=iss.filter(k=>ISS[k].f===f);const sev=fi.find(k=>ISS[k].sev==='e')?'e':fi.find(k=>ISS[k].sev==='w')?'w':'';
+    const tip=fi.map(k=>ISS[k].label);if(f==='compensation'){const b=band(e,nv(d,e,'level'),nv(d,e,'per'),nv(d,e,'department'),nv(d,e,'location'));const cu=curOf(e);tip.push(`Band ${nv(d,e,'level')}: ${cu}${fmtN(b.min)} · ${cu}${fmtN(b.mid)} · ${cu}${fmtN(b.max)}${nv(d,e,'per')==='Hour'?' per hour':''}`)}
+    const cls=['c-new','f-'+f,chg?'chg':'',sev,s==='ai'?'ai':'',d.csvHits.has(e.id+'|'+f)?'up':''].join(' ');
+    h+=`<td class="c-cur">${esc(fmtVal(e,f,e[f]))}</td><td class="${cls}" title="${esc(tip.join('\n'))}">${editor(d,e,f)}</td>`}return h+'</tr>'}
+function pctCell(d,e){if(!changed(d,e,'compensation')&&!changed(d,e,'per'))return`<td class="pct"></td>`;const np=nv(d,e,'per'),v=+nv(d,e,'compensation');if(!(v>0))return`<td class="pct">—</td>`;
+  const a1=annual(e.compensation,e.per),a2=annual(v,np);const p=(a2-a1)/a1*100;return`<td class="pct ${p>15?'hi':''}">${p>=0?'+':''}${p.toFixed(1)}%${np!==e.per?' <small>annualised</small>':''}</td>`}
+function editor(d,e,f){const F=FIELDS[f];const key=e.id+'|'+f;
+  if(d.modes[f]==='same'){const v=d.same[f];return v?`<span>${esc(fmtVal(e,f,v))}</span>`:`<span class="muted">Set above</span>`}
+  const v=val(d,e,f);const shown=(v===undefined||v===null||v===''||String(v)===String(e[f]))?'':v;
+  if(F.type==='select'||F.type==='team'){const opts=F.type==='team'?TEAMS[nv(d,e,'department')]:F.opts();
+    return`<select class="cell s ${shown?'':'ghost'}" data-cell="${key}" aria-label="New ${esc(F.label)}"><option value="">${esc(fmtVal(e,f,e[f]))}</option>${opts.filter(o=>o!==e[f]).map(o=>`<option ${o===shown?'selected':''}>${esc(o)}</option>`).join('')}</select>`}
+  if(F.type==='person')return`<input class="cell" list="dl-mgr" data-cell="${key}" value="${shown&&EMPI[shown]?esc(EMPI[shown].name):''}" placeholder="${esc(fmtVal(e,f,e[f]))}" aria-label="New manager">`;
+  const disp=shown===''?'':(F.type==='money'||F.type==='int')?(f==='compensation'&&+shown<1000?String(shown):fmtN(+shown)):shown;
+  return`<input class="cell" data-cell="${key}" value="${esc(disp)}" placeholder="${esc(fmtVal(e,f,e[f]))}" ${f==='title'?'list="dl-titles"':''} ${F.type!=='text'?'inputmode="decimal"':''} aria-label="New ${esc(F.label)}">`}
+function reviewView(d){const A=analyze(d);const keys=ISS_ORDER.filter(k=>A.issues[k]);
+  const sevs=[['e','Errors',"These can't be committed. Fix them or move the rows to a new draft."],['w','Warnings','Valid but unusual. Acknowledge each group to continue.'],['i','Info','No action needed.']];
+  const groups=sevs.map(([s,t,sub])=>{const ks=keys.filter(k=>ISS[k].sev===s);if(!ks.length)return'';return`<div class="sec"><div class="sec-h"><div><h3>${t}</h3><p class="sub">${sub}</p></div></div>${ks.map(k=>issueCard(d,A,k)).join('')}</div>`}).join('');
+  const unacked=keys.filter(k=>ISS[k].sev==='w'&&!d.ack[k]);const errRows=new Set();keys.filter(k=>ISS[k].sev==='e').forEach(k=>A.issues[k].forEach(id=>errRows.add(id)));
+  const gate=A.err?`<div class="gate"><span>${pl(errRows.size,'row')} with errors can't be submitted.</span><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn2" data-act="back">Back to Values</button><button class="btn" data-act="moveerr">Move ${fmtN(errRows.size)} to a new draft and continue with ${fmtN(A.rows.length-errRows.size)}</button></div></div>`
+    :unacked.length?`<div class="gate"><span>Acknowledge ${pl(unacked.length,'warning group')} to continue.</span><button class="btn" disabled>Continue to Impact &amp; approvals</button></div>`
+    :`<div class="gate"><span>${A.changes?'Nothing blocks this change.':'No changes to validate.'}</span><div style="display:flex;gap:10px"><button class="btn2" data-act="back">Back</button><button class="btn" data-act="next" ${A.changes?'':'disabled'}>Continue to Impact &amp; approvals</button></div></div>`;
+  return`<div class="sumchips"><span class="sumchip"><span class="sev e">!</span>${pl(A.err,'error')}</span><span class="sumchip"><span class="sev w">!</span>${pl(A.warn,'warning')}</span><span class="sumchip"><span class="sev i">i</span>${fmtN(A.info)} info</span><span class="muted" style="align-self:center">across ${pl(A.rowChanged.size,'person','people')} with changes</span></div>${groups||'<p class="sub">No issues found.</p>'}${gate}`}
+function issueCard(d,A,k){const I=ISS[k],ids=A.issues[k];const open=d.show[k];
+  const fixes=(I.fix||[]).map(([l,fx])=>`<button class="btn2 sm" data-act="fix" data-issue="${k}" data-fix="${fx}">${esc(l)} (${fmtN(ids.length)})</button>`).join('');
+  const ack=I.sev==='w'?(d.ack[k]?`<span class="acked">✓ Acknowledged${d.ackNote[k]?': '+esc(d.ackNote[k]):''}</span>`:`<input class="notein" data-in="acknote" data-issue="${k}" placeholder="Note for the audit log (optional)" value="${esc(d.ackNote[k]||'')}"><button class="btn2 sm" data-act="ack" data-issue="${k}">Acknowledge ${fmtN(ids.length)}</button>`):'';
+  const rows=open?`<div class="rowsx"><div class="tw"><table class="t">${ids.slice(0,6).map(id=>{const e=EMPI[id];const f=I.f;return`<tr><td>${person(e,e.title)}</td>${f?`<td class="muted">${esc(fmtVal(e,f,e[f]))}</td><td>→</td><td><b>${esc(fmtVal(e,f,nv(d,e,f)))}</b></td>`:'<td colspan="3"></td>'}</tr>`}).join('')}</table></div>${ids.length>6?`<button class="lnk" data-act="opengrid" data-issue="${k}">Open all ${fmtN(ids.length)} in the grid</button>`:''}</div>`:'';
+  return`<div class="icard"><div class="icard-h"><div class="t"><span class="sev ${I.sev}">${I.sev==='i'?'i':'!'}</span><div><b>${esc(I.label)} · <span class="num">${fmtN(ids.length)}</span></b><span class="muted" style="font-size:13px">${esc(I.desc)}</span></div></div>
+    <div class="icard-a">${fixes}${ack}<button class="txt" data-act="showrows" data-issue="${k}">${open?'Hide rows':'Show rows'}</button><button class="lnk" data-act="opengrid" data-issue="${k}">Filter the grid</button></div></div>${rows}</div>`}
+function impactView(d){const A=analyze(d);const I=impact(d);const pi=d.date?payInfo(d.date):null;const payNeeded=I.pay>0||I.tax>0;
+  const payCard=`<div class="icd first"><h4>Payroll <span class="badge b-appr">Highest stakes, shown first</span></h4>
+    ${payNeeded?`<div><span class="n">${fmtN(I.pay)}</span> pay changes land in the <b>${fmtD(pi.run)}</b> run${I.tax?` · ${pl(I.tax,'tax-state change')}`:''}</div>
+    <div class="muted" style="font-size:13.5px">Annual payroll ${I.delta>=0?'+':'−'}$${fmtN(Math.abs(I.delta))} (${I.base?(I.delta/I.base*100).toFixed(1):'0.0'}% of this group's base pay). Hourly pay is annualised at 2,080 hours.</div>
+    <div class="cutoff"><b>If approval lands after the ${fmtD(pi.cutoff)} cutoff:</b>
+      <label><input type="radio" name="cut" data-act="cut" value="next" ${d.cutoff.choice==='next'?'checked':''}> Pay from the effective date in the next run (${fmtD(pi.next)}), with retro pay. <span class="muted">Pre-selected.</span></label>
+      <label><input type="radio" name="cut" data-act="cut" value="offcycle" ${d.cutoff.choice==='offcycle'?'checked':''}> Run an off-cycle payroll for these changes.</label>
+      <label><input type="radio" name="cut" data-act="cut" value="date" ${d.cutoff.choice==='date'?'checked':''}> Change the effective date instead.</label>
+      ${d.cutoff.confirmed?`<span class="done-t">✓ Payroll timing confirmed</span>`:`<div><button class="btn sm" data-act="confirmcut">Confirm payroll timing</button></div>`}</div>`:`<div class="muted">No pay changes in this change.</div>`}</div>`;
+  const cards=[],zeros=[];const card=(name,n,lines)=>{if(!n){zeros.push(name);return}cards.push(`<div class="icd"><h4>${esc(name)}</h4><div><span class="n">${fmtN(n)}</span> ${n===1?'person':'people'}</div><ul>${lines.filter(Boolean).map(l=>`<li>${l}</li>`).join('')}</ul></div>`)};
+  card('Benefits',I.benSal+I.benLoc+I.benClass,[I.benSal&&`${fmtN(I.benSal)} salary-linked life and disability coverage amounts recalculate`,I.benLoc&&`${fmtN(I.benLoc)} move to a region with different plan availability, which opens an enrollment window`,I.benClass&&`${fmtN(I.benClass)} change benefits class with the pay type`]);
+  card('Time off',I.pto+I.ot,[I.pto&&`${fmtN(I.pto)} move to a different state's leave policy`,I.ot&&`${fmtN(I.ot)} change overtime eligibility`]);
+  card('Devices',I.dev,[I.dev&&`${fmtN(I.dev)} move to a different department's device policy`]);
+  card('Workflows',I.wf,[I.wf&&`${fmtN(I.wfAppr)} pending PTO and expense approvals re-route to new managers`,I.wf&&`<label class="tg"><input type="checkbox" data-act="digest" ${d.digest?'checked':''}> Send new managers one digest instead of ${fmtN(I.wf)} emails</label>`]);
+  const apps=Object.entries(I.apps).map(([k,a])=>{if(!a.total&&!a.loss)return'';const open=d.show['app-'+k];
+    return`<div class="icd"><h4>${esc(a.name)}<button class="lnk" data-act="whyapp" data-k="${k}">${open?'Hide mapping':'Why this app?'}</button></h4><ul>${a.items.filter(x=>x[0]).map(x=>`<li><b class="num">${fmtN(x[0])}</b> ${esc(x[1])}</li>`).join('')}${a.loss?`<li class="loss"><b>${esc(a.lossTxt(a.loss))}</b></li>`:''}</ul>${open?`<div class="mapping">Changed fields mapped to this app:<br>${a.items.map(x=>esc(x[2])).join('<br>')}</div>`:''}</div>`}).join('');
+  const appsZero=Object.values(I.apps).filter(a=>!a.total&&!a.loss).map(a=>a.name);
+  const decisions=[];if(payNeeded&&!d.cutoff.confirmed)decisions.push('Confirm payroll timing for a late approval');if(I.losses&&!d.accessAck)decisions.push('Acknowledge the access people will lose');
+  const n=A.rows.filter(e=>A.rowChanged.has(e.id)).length;const lbl=I.approvers.length?`Submit changes for ${pl(n,'person','people')} for approval · effective ${fmtD(d.date)}`:`Schedule changes for ${pl(n,'person','people')} · effective ${fmtD(d.date)}`;
+  return`<div class="region"><div class="region-h"><h3 class="h3">Inside Rippling</h3><span class="sub">These products read the record directly. Nothing here can block the change.</span></div>${payCard}<div class="cards">${cards.join('')}</div>${zeros.length?`<div class="zero"><b>No change:</b> ${zeros.join(' · ')}</div>`:''}</div>
+  <div class="region"><div class="region-h"><h3 class="h3">Integrated Apps</h3><span class="sub">The same apps as the profile's Integrated Apps tab, summed for this change.</span></div>
+    ${apps?`<div class="cards">${apps}</div>`:''}${appsZero.length?`<div class="zero"><b>No change:</b> ${appsZero.join(' · ')}</div>`:''}
+    ${I.losses?`<label class="tg" style="color:var(--err)"><input type="checkbox" data-act="accessack" ${d.accessAck?'checked':''}> I understand ${pl(I.losses,'access removal')} will happen on ${fmtD(d.date)}</label>`:''}
+    <div class="rows">${row('When apps update',`<label class="tg"><input type="radio" name="sync" data-act="appsync" value="effective" ${d.appSync==='effective'?'checked':''}> On the effective date (${fmtD(d.date)})</label><label class="tg"><input type="radio" name="sync" data-act="appsync" value="now" ${d.appSync==='now'?'checked':''}> As soon as it's approved</label><span class="hint">A reorg announced Monday shouldn't cut anyone's access on Friday.</span>`)}</div></div>
+  <div class="region"><h3 class="h3">Approvals</h3>${I.approvers.length?`<div class="tw"><table class="t">${I.approvers.map(a=>`<tr><td>${person({name:a.who},a.role)}</td><td>${esc(a.what)}</td><td class="muted">From your approval policy</td></tr>`).join('')}</table></div><p class="note">One request per approver for the whole change. They can reject single rows; the rest go ahead.</p>`:`<p class="sub">No approval needed. You can cancel until ${fmtD(d.date)}.</p>`}</div>
+  <div class="region"><h3 class="h3">Notifications</h3><div class="rows">
+    ${row('You','Every status change, and one digest if an app needs attention.')}${row('Approvers',I.approvers.length?'A request now, with the summary and outliers first.':'Not needed.')}
+    ${row('App owners','Only when their app needs a person to act (for example Raj Patel for Google Workspace).')}
+    ${row('Managers',`<label class="tg"><input type="checkbox" data-act="notifymgr" ${d.notifyMgr?'checked':''}> A digest of their team's changes on ${fmtD(d.date)}</label>`)}
+    ${row('Employees',`<label class="tg"><input type="checkbox" data-act="notifyemp" ${d.notifyEmp?'checked':''}> File a change letter to each person's Documents on ${fmtD(d.date)}</label><span class="hint">Off by default. A letter can't be unsent, and managers usually tell their team first.</span>${d.notifyEmp?`<div class="mapping">Preview: "Hi Virge, as of ${fmtD(d.date,true)} your compensation is … This reflects the FY26 review. Talk to your manager with any questions."</div>`:''}`)}</div></div>
+  <div class="decide"><div>${decisions.length?`<b>${pl(decisions.length,'decision')} needed before you submit</b><ul>${decisions.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<b>Ready to submit.</b> <span class="muted">Nothing changes in Rippling until it's approved and ${fmtD(d.date)} arrives.</span>`}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn2" data-act="back">Back</button><button class="btn" data-act="submit" ${decisions.length?'disabled':''}>${esc(lbl)}</button></div></div>`}
+function statusView(d){const R=d.run;const A=analyze(d);const I=impact(d);const n=A.rows.filter(e=>A.rowChanged.has(e.id)).length;
+  const phases=[['approval',I.approvers.length?`Awaiting approval · ${I.approvers.map(a=>a.who).join(', ')}`:'Submitted'],['scheduled',`Scheduled for ${fmtD(d.date,true)}`],['committed',`Committed ${fmtN(n)}/${fmtN(n)}`]];
+  const idx=phases.findIndex(p=>p[0]===R.phase);
+  const track=`<div class="track">${phases.map((p,i)=>`<span class="stp ${i<idx||R.phase==='committed'?'done':i===idx?'cur':''}"><span class="dot">${i<idx||R.phase==='committed'?'✓':i+1}</span>${esc(p[1])}</span>`).join('')}</div>`;
+  const demo=R.phase==='approval'?`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="demo-l">Demo</span><button class="btn2 sm demo" data-act="approveas">Open as Priya Shah (Finance approver)</button><button class="btn2 sm demo" data-act="approveall">Approve everything</button></div>`
+    :R.phase==='scheduled'?`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="demo-l">Demo</span><button class="btn2 sm demo" data-act="arrive">Jump to ${fmtD(d.date)}: the effective date arrives</button></div>`:'';
+  const band1=`<div class="band"><div class="sec-h"><h3>Rippling record</h3><span class="muted">${esc(d.id)} · submitted 11:20 IST · ${pl(n,'person','people')} frozen at submit</span></div>${track}
+    <p class="sub">${R.phase==='committed'?'The new values are the record. Payroll and every other Rippling product read them from here.':R.phase==='scheduled'?`Approved. Profiles show "Upcoming" until ${fmtD(d.date)}.`:'Nothing changes until approval.'}</p>${demo}</div>`;
+  let band2='';
+  if(R.phase==='committed'&&R.sync){const rows=R.sync.map(s=>{let st='',det='',act='';
+    if(s.state==='done'){st=`<span class="st done">✓ ${esc(s.doneTxt||'Synced')}</span>`;det=esc(s.detail||'')}
+    else if(s.state==='prog'){st=`<span class="st prog">In progress</span>`;det=`<div class="prog-b"><i style="width:${s.total?s.done/s.total*100:0}%"></i></div><small class="muted num">${fmtN(s.done)} of ${fmtN(s.total)}</small>`}
+    else if(s.state==='retry'){st=`<span class="st retry">↻ Retrying</span>`;det=`Rate-limited by ${esc(s.name)}. Next attempt in 0:${String(s.next).padStart(2,'0')}. Retrying automatically. Nothing for you to do.`}
+    else if(s.state==='act'){st=`<span class="st act">Needs action</span>`;det=esc(s.detail);act=`<button class="btn2 sm" data-act="retry" data-k="${s.k}">Retry now</button>`}
+    return`<div class="syn"><b>${esc(s.name)}</b>${st}<span>${det}</span>${act}</div>`}).join('');
+    const allDone=R.sync.every(s=>s.state==='done'||s.state==='act');const nAct=R.sync.filter(s=>s.state==='act');
+    band2=`<div class="band"><div class="sec-h"><h3>Rippling products and Integrated Apps</h3><span class="muted">Each one syncs on its own. None of them can undo the record.</span></div>${rows}</div>
+    ${allDone?`<div class="endstate">Rippling is updated for ${pl(n,'person','people')}.${nAct.length?` ${nAct.map(s=>s.name).join(', ')} has ${pl(nAct.reduce((a,x)=>a+(x.fail||0),0),'item')} with Raj Patel (IT); nothing for you to redo.`:' Every product and app is in sync.'}</div>`:''}`}
+  const q=(S.empQ||'').toLowerCase();let found='';
+  if(q.length>1){const e=A.rows.find(x=>x.name.toLowerCase().includes(q));found=e?`<div class="band"><div class="sec-h">${person(e,e.title)}<button class="lnk" data-act="profile" data-id="${e.id}">Open profile</button></div>${empStatus(d,e)}</div>`:`<p class="sub">No one in this change matches "${esc(S.empQ)}".</p>`}
+  return`${band1}${band2||`<div class="band"><h3 class="h3">Rippling products and Integrated Apps</h3><p class="sub">Nothing syncs before the record commits on ${fmtD(d.date)}. ${d.appSync==='effective'?'Apps update on the effective date.':'Apps update as soon as it is approved.'}</p></div>`}
+  <div class="sec"><div class="sec-h"><h3>Check one person</h3></div><input class="in" id="emp-q" data-in="empq" value="${esc(S.empQ||'')}" placeholder="Type a name, e.g. Virge" style="max-width:320px;border-bottom:1px solid var(--rule)">${found}</div>
+  <div class="gate"><span>Made a mistake? A reversal is a new bulk change pre-filled with the old values. It goes through the same validation and approvals, and lists what can't be reversed (pay already run, letters sent).</span><button class="btn2" data-act="reversal">Create reversal</button></div>`}
+function empStatus(d,e){const R=d.run;const items=[['Rippling record',R.phase==='committed'?'✓ Committed':R.phase==='scheduled'?'Scheduled':'Awaiting approval']];
+  if(R.phase==='committed'&&R.sync)R.sync.forEach(s=>{if(s.k==='google'&&R.failIds&&R.failIds.includes(e.id)&&s.state==='act')items.push([s.name,'Needs action: account suspended']);else items.push([s.name,s.state==='done'?'✓ '+(s.doneTxt||'Synced'):s.state==='retry'?'Retrying':'In progress'])});
+  return`<div class="rows">${items.map(([a,b])=>row(a,esc(b))).join('')}</div>`}
+function startSync(d){const I=impact(d);const A=analyze(d);const R=d.run;R.sync=[];
+  R.sync.push({k:'payroll',name:'Payroll',state:'done',doneTxt:`In the ${fmtD(payInfo(d.date).run)} run`,detail:`${pl(I.pay,'pay change')} picked up from the record`});
+  if(I.benSal+I.benLoc+I.benClass)R.sync.push({k:'benefits',name:'Benefits',state:'done',doneTxt:'Recalculated',detail:pl(I.benSal+I.benLoc+I.benClass,'person','people')});
+  if(I.pto+I.ot)R.sync.push({k:'time',name:'Time off',state:'done',doneTxt:'Policies reassigned',detail:''});
+  if(I.dev)R.sync.push({k:'dev',name:'Devices',state:'done',doneTxt:'Policies updated',detail:''});
+  const ap=I.apps;
+  if(ap.slack.total)R.sync.push({k:'slack',name:'Slack',state:'prog',done:0,total:ap.slack.total,doneTxt:`Synced ${fmtN(ap.slack.total)}`});
+  if(ap.google.total){const fail=Math.min(2,ap.google.total);R.failIds=A.rows.filter(e=>A.rowChanged.has(e.id)&&changed(d,e,'title')).slice(0,fail).map(e=>e.id);
+    R.sync.push({k:'google',name:'Google Workspace',state:'prog',done:0,total:ap.google.total,fail,doneTxt:`Synced ${fmtN(ap.google.total)}`,detail:`${pl(fail,'account')} suspended in Google Workspace, so the title can't be written. Raj Patel (IT) was notified. Rippling's values are unchanged.`})}
+  if(ap.github.total)R.sync.push({k:'github',name:'GitHub',state:'retry',next:9,total:ap.github.total,done:0,doneTxt:`Synced ${fmtN(ap.github.total)}`});
+  if(!ap.slack.total&&!ap.google.total&&!ap.github.total)R.sync.push({k:'none',name:'Integrated Apps',state:'done',doneTxt:'No app changes',detail:'None of the changed fields are mapped to a connected app.'});
+  clearInterval(S.timer);S.timer=setInterval(()=>tick(d),700)}
+function tick(d){const R=d.run;if(!R||!R.sync){clearInterval(S.timer);return}let live=false;
+  R.sync.forEach(s=>{if(s.state==='prog'){const step=Math.max(1,Math.ceil(s.total/5));s.done=Math.min(s.total-(s.fail||0),s.done+step);if(s.done>=s.total-(s.fail||0))s.state=s.fail?'act':'done';else live=true}
+    else if(s.state==='retry'){s.next-=1;if(s.next<=0){s.state='prog';s.done=0}live=true}});
+  if(!live)clearInterval(S.timer);if(S.route==='draft'&&S.step==='status'&&!S.approver&&!S.ov&&S.d===d){const y=window.scrollY;render();window.scrollTo(0,y)}}
+function approverView(){const d=S.d;const A=analyze(d);const fs=['compensation','per','bonus','equity'].filter(f=>d.fields.includes(f));
+  const rows=A.rows.filter(e=>fs.some(f=>changed(d,e,f)));const I=impact(d);const budget=I.base*.06;
+  const pct=e=>{const a1=annual(e.compensation,e.per),a2=annual(+nv(d,e,'compensation'),nv(d,e,'per'));return(a2-a1)/a1*100};
+  const isOut=e=>{const iss=A.rowIss.get(e.id)||[];return iss.includes('raise15')||iss.includes('above_mid')||iss.includes('unit_switch')||(changed(d,e,'equity')&&+nv(d,e,'equity')>e.equity)};
+  const outs=rows.filter(isOut).sort((a,b)=>pct(b)-pct(a));const rest=rows.filter(e=>!isOut(e));const sel=d.rejected;
+  const tr=e=>{const iss=(A.rowIss.get(e.id)||[]).filter(k=>['raise15','above_mid','unit_switch'].includes(k));
+    return`<tr><td><input type="checkbox" data-act="apsel" data-id="${e.id}" ${sel.has(e.id)?'checked':''} aria-label="Send ${esc(e.name)} back"></td><td>${person(e,e.title)}</td><td class="num">${esc(fmtVal(e,'compensation',e.compensation))} → <b>${esc(fmtVal(e,'compensation',nv(d,e,'compensation')))}</b></td><td class="num ${pct(e)>15?'loss':''}">${pct(e)>=0?'+':''}${pct(e).toFixed(1)}%</td><td>${iss.map(k=>`<span class="badge b-warn">${esc(ISS[k].label)}</span>`).join(' ')}</td>
+      <td>${sel.has(e.id)?`<input class="notein" data-in="apreason" data-id="${e.id}" value="${esc(sel.get(e.id))}" placeholder="Reason (required)">`:''}</td></tr>`};
+  return`<div class="card"><nav class="side" aria-label="Approvals"><div class="side-h">Priya Shah · Finance</div>${navBtn('Approvals',true)}<div class="side-foot">Approver view of ${esc(d.id)}</div></nav>
+  <section class="main"><header class="bar"><h2>Approve: ${esc(d.name)}</h2><div class="bar-act"><button data-act="apback">Back to submitter view</button></div></header>
+  <div class="strip">${kv('Your fields',fs.map(f=>FIELDS[f].label).join(', '))}${kv('People',fmtN(rows.length))}${kv('Annual cost',`${I.delta>=0?'+':'−'}$${fmtN(Math.abs(I.delta))}`)}${kv('Merit budget',`$${fmtN(budget)}`)}${kv('Of budget',`${budget?(I.delta/budget*100).toFixed(0):0}%`,I.delta>budget?'err':'')}${kv('Effective',fmtD(d.date,true))}</div>
+  <div class="content"><p class="sub">${I.delta<=budget?`Within budget: $${fmtN(budget-I.delta)} left`:`$${fmtN(I.delta-budget)} over budget`}. That's ${(I.delta/I.base*100).toFixed(1)}% of this group's base pay against a 6% merit budget.</p>
+    <div class="sec"><div class="sec-h"><h3>Outliers first · ${fmtN(outs.length)}</h3><span class="muted">Raises above 15%, crossing the band midpoint, pay-type switches, equity grants</span></div>
+      <div class="tw"><table class="t"><thead><tr><th>Send back</th><th>Employee</th><th>Compensation</th><th>Change</th><th>Why it's here</th><th></th></tr></thead><tbody>${outs.slice(0,60).map(tr).join('')||'<tr><td colspan="6" class="muted">No outliers.</td></tr>'}</tbody></table></div></div>
+    <div class="sec"><div class="sec-h"><h3>Within guidelines · ${fmtN(rest.length)}</h3><button class="lnk" data-act="apall">${S.apAll?'Hide':'Show'} them</button></div>
+      ${S.apAll?`<div class="tw"><table class="t"><tbody>${rest.slice(0,80).map(tr).join('')}</tbody></table></div>${rest.length>80?`<p class="note">Showing 80 of ${fmtN(rest.length)}.</p>`:''}`:''}</div>
+    <div class="gate"><span>${sel.size?`${pl(sel.size,'row')} go back to the submitter as a follow-up draft, each with a reason.`:'Approve all, or tick rows to send them back with a reason.'}</span><button class="btn" data-act="approve">Approve ${fmtN(rows.length-sel.size)}${sel.size?` · send ${fmtN(sel.size)} back`:''}</button></div>
+    <p class="note">Comp approvals open here, not as a one-tap button in Slack or email, because pay decisions need this context.</p></div></section></div>`}
+
+/* ================= overlays ================= */
+function renderOverlay(){const o=$('#overlay');if(!S.ov){o.classList.remove('on');o.innerHTML='';return}o.classList.add('on');o.innerHTML=S.ov.type==='profile'?profileModal():modal()}
+function profileModal(){const e=EMPI[S.ov.id];if(!e){S.ov=null;return''}const d=S.d;const tab=S.ov.tab;const R=d&&d.run;const inChange=R&&R.frozen&&R.frozen.includes(e.id)&&!d.moved.has(e.id);
+  const tabs=[['emp','Employment Information'],['personal','Personal Information'],['add','Additional Information'],['reports','Direct Reports'],['docs','Documents'],['apps','Integrated Apps'],['tfa','Two Factor Devices']];
+  const fv=f=>{const cur=fmtVal(e,f,e[f]);if(!inChange||!changed(d,e,f))return esc(cur);const nw=fmtVal(e,f,nv(d,e,f));
+    if(R.phase==='committed')return`${esc(nw)}<br><span class="chipnote">via ${esc(d.name)} (${esc(d.id)}) · approved by Priya Shah</span>`;return`${esc(cur)}<br><span class="chipnote up">${R.phase==='scheduled'?'Upcoming':'Pending approval'}: ${esc(nw)} on ${fmtD(d.date)}</span>`};
+  let body='';
+  if(tab==='emp')body=[['Title','title'],['Department','department'],['Team','team'],['Compensation','compensation'],['Per','per'],['Target annual bonus','bonus'],['Equity - Number of shares','equity'],['Work Email','email'],['Manager','manager'],['Work location','location']].map(([l,f])=>row(l,fv(f))).join('')+row('Start date',fmtIso(e.startDate));
+  else if(tab==='add')body=[['Level','level'],['Performance rating','rating'],['Cost center','costCenter']].map(([l,f])=>row(l,fv(f))).join('')+row('Languages spoken',esc(e.languages.join(', ')))+row('Segments',esc(SEGS.filter(s=>segHas(s.id,e.id)).map(s=>s.name).join(', ')||'None'));
+  else if(tab==='reports')body=e.reports.length?e.reports.slice(0,12).map(id=>row(EMPI[id].title,esc(EMPI[id].name))).join(''):row('Direct reports','None');
+  else if(tab==='docs')body=inChange&&R.phase==='committed'&&d.notifyEmp?row('New',`Change letter · ${esc(d.name)}`):row('Documents','No new documents');
+  else if(tab==='apps'){const apps=[['Slack',e.email],['Google Workspace',e.email]];if(['Engineering','Product'].includes(e.department))apps.push(['GitHub','@'+e.first.toLowerCase()+e.last.toLowerCase()]);
+    body=apps.map(([a,acct])=>{let s='In sync';if(inChange&&R.sync){const sy=R.sync.find(x=>x.name===a);if(sy){s=R.failIds&&R.failIds.includes(e.id)&&a==='Google Workspace'&&sy.state==='act'?'Needs action: account suspended. Raj Patel (IT) notified.':sy.state==='done'?'In sync · updated by '+d.id:sy.state==='retry'?'Update pending · retrying automatically':'Update in progress'}}else if(inChange&&R&&R.phase!=='committed')s=`Update scheduled for ${fmtD(d.date)}`;
+      return row(a,`${esc(acct)}<br><small class="muted">${esc(s)}</small>`)}).join('')}
+  else body=row('Hidden','Not shown in this prototype');
+  return`<div class="modal prof"><div class="card"><nav class="side">${tabs.map(([k,l])=>navBtn(l,k===tab,`data-act="ptab" data-k="${k}"`)).join('')}</nav><section class="main"><header class="bar"><h2>${esc(tabs.find(t=>t[0]===tab)[1])}</h2><div class="bar-act"><button data-act="closeov">Close X</button></div></header>
+    <div class="content"><div class="sec-h">${person(e,e.title)}<span class="muted">${esc(e.id)} · single-employee profile</span></div><div class="rows">${body}</div></div></section></div></div>`}
+function modal(){const o=S.ov;const d=S.d;const wrap=(t,b,f)=>`<div class="modal"><header class="bar"><h2>${esc(t)}</h2><div class="bar-act"><button data-act="closeov">Close X</button></div></header><div class="modal-b">${b}</div><div class="modal-f">${f}</div></div>`;
+  if(o.type==='discard'){const A=analyze(d);return wrap('Discard this draft?',`<p>"${esc(d.name||'Untitled')}" and its ${pl(A.changes,'change')} will be deleted. Nothing has been sent or saved to anyone's record.</p>`,`<button class="btn2" data-act="closeov">Keep the draft</button><button class="btn danger" data-act="discardyes">Discard draft</button>`)}
+  if(o.type==='text')return wrap(o.title,`<p class="sub">${esc(o.sub)}</p><textarea class="ta" id="ov-ta" readonly style="min-height:260px">${esc(o.text)}</textarea>`,`<button class="btn2" data-act="closeov">Done</button><button class="btn" data-act="copy">Copy CSV</button>`);
+  if(o.type==='refresh'){const s=segById(S.segId);return wrap('Refresh snapshot',`<p>Re-running the conditions of <b>${esc(s.name)}</b> today gives ${pl(o.next.length,'person','people')}.</p>
+    <div class="rows">${row(`Joined · ${o.add.length}`,esc(o.add.length?names(o.add):'No one'))}${row(`Left · ${o.rem.length}`,esc(o.rem.length?names(o.rem):'No one'))}</div><p class="sub">Saving creates version ${s.version+1}, snapshotted ${NOWL}. Bulk changes already submitted keep the people they froze.</p>`,
+    `<button class="btn2" data-act="closeov">Keep version ${s.version}</button><button class="btn" data-act="refreshyes">Save new snapshot</button>`)}
+  if(o.type==='segdel'){const s=segById(S.segId);const u=usedIn(s);return wrap('Delete segment?',u.length?`<p><b>${esc(s.name)}</b> is used in ${esc(u.join(', '))}. Remove it from ${u.length===1?'that bulk change':'those bulk changes'} first, so nobody's targeting silently changes.</p>`:`<p><b>${esc(s.name)}</b> will be deleted. It isn't used in any bulk change.</p>`,
+    u.length?`<button class="btn" data-act="closeov">OK</button>`:`<button class="btn2" data-act="closeov">Cancel</button><button class="btn danger" data-act="segdelyes">Delete segment</button>`)}
+  if(o.type==='upload'){const p=o.preview;return wrap('Upload CSV',`<p class="sub">Upload the template your managers filled in, or paste it. Columns can be in any order. Amounts like $92,500, 92500, 92.5k or 1,20,000 are all read correctly.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input type="file" id="up-file" accept=".csv,text/csv"><button class="txt" data-act="upsample">Use a sample file from managers</button></div>
+    <textarea class="ta" id="up-ta" data-in="uptext" placeholder="Employee ID,Compensation (new),Level (new)">${esc(o.text||'')}</textarea>
+    ${p?`<div class="cutoff" style="background:var(--nav);border-color:var(--rule)"><b>${fmtN(p.matched)} rows matched · ${fmtN(p.cells)} values to write</b><span>${p.unknown.length?`${pl(p.unknown.length,'ID')} not in this change: ${esc(p.unknown.slice(0,4).join(', '))}${p.unknown.length>4?'…':''}. `:''}${p.norm?`${pl(p.norm,'amount')} normalised (e.g. "1,20,000" → 120000). `:''}${p.ignored.length?`Ignored columns: ${esc(p.ignored.join(', '))}.`:''}${p.bad?` ${pl(p.bad,'value')} couldn't be read and were skipped.`:''}</span></div>`:''}`,
+    `<button class="btn2" data-act="uppreview">Preview</button><button class="btn" data-act="upapply" ${p&&p.cells?'':'disabled'}>Write ${p?fmtN(p.cells):''} values into the grid</button>`)}
+  return''}
+
+/* ================= CSV (values grid) ================= */
+function csvLine(a){return a.map(x=>{const s=String(x??'');return/[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}).join(',')}
+function parseCSV(t){const rows=[];let row=[],f='',q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+  else if(c==='"')q=true;else if(c===','){row.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);f='';if(row.some(x=>x.trim()))rows.push(row);row=[]}else f+=c}
+  row.push(f);if(row.some(x=>x.trim()))rows.push(row);return rows}
+const normH=s=>String(s).toLowerCase().replace(/\(new\)|new|\(current\)/g,'').replace(/[^a-z0-9]/g,'');
+const ALIAS={salary:'compensation',comp:'compensation',basepay:'compensation',pay:'compensation',paytype:'per',bonus:'bonus',targetbonus:'bonus',shares:'equity',equity:'equity',jobtitle:'title',location:'location',office:'location'};
+function previewCSV(d,text){const rows=parseCSV(text||'');if(rows.length<2)return{matched:0,cells:0,unknown:[],norm:0,ignored:[],bad:0,writes:[]};
+  const H=rows[0];let keyCol=-1,keyKind='';const cols=[];const ignored=[];
+  H.forEach((h,i)=>{const n=normH(h);if(/current/i.test(h))return;if(['employeeid','id','empid'].includes(n)){keyCol=i;keyKind='id';return}if(['workemail','email'].includes(n)&&keyCol<0){keyCol=i;keyKind='email';return}if(n==='name')return;
+    const f=Object.keys(FIELDS).find(k=>normH(FIELDS[k].label)===n)||ALIAS[n];if(f&&d.fields.includes(f))cols.push([i,f]);else ignored.push(h.trim()+(f?' (not in this change)':''))});
+  const inChange=new Set(analyze(d).rows.map(e=>e.id));const unknown=[];let matched=0,nrm=0,bad=0;const writes=[];
+  rows.slice(1).forEach(r=>{const k=(r[keyCol]||'').trim();const id=keyKind==='email'?parsePerson(k):(EMPI[k]?k:null);if(!id||!inChange.has(id)){if(k)unknown.push(k);return}matched++;const e=EMPI[id];
+    cols.forEach(([i,f])=>{const raw=(r[i]||'').trim();if(!raw)return;let v=raw;const F=FIELDS[f];
+      if(F.type==='money'||F.type==='int'){v=parseMoney(raw);if(!isFinite(v)){bad++;return}if(String(v)!==raw)nrm++;if(f==='compensation')v=roundComp(v,nv(d,e,'per'))}
+      else if(F.type==='select'){const o=F.opts().find(x=>x.toLowerCase()===raw.toLowerCase());if(!o){bad++;return}v=o}
+      else if(F.type==='person'){v=parsePerson(raw);if(!v){bad++;return}}
+      if(String(v)!==String(e[f]))writes.push([id,f,v])})});
+  return{matched,cells:writes.length,unknown,norm:nrm,ignored,bad,writes}}
+function sampleCSV(d){const r=rng(99);const A=analyze(d);const rows=A.rows.filter(e=>e.rating!=='Below').filter(()=>r()<.16).slice(0,400);const fs=d.fields.filter(f=>['compensation','level','title','bonus'].includes(f));
+  const lines=[csvLine(['Employee ID','Name',...fs.map(f=>FIELDS[f].label+' (new)'),'Manager notes'])];let k=0;
+  rows.forEach(e=>{const vals=fs.map(f=>{if(f==='compensation'){const v=roundComp(e.compensation*(1.03+r()*.07),e.per);k++;if(e.per==='Hour')return'$'+v.toFixed(2);const m=k%4;return m===0?'$'+fmtN(v):m===1?String(v):m===2?(v/1000).toFixed(1)+'k':v.toString().replace(/(\d)(?=(\d\d)+\d{3}$)/g,'$1,').replace(/(\d)(\d{3})$/,'$1,$2')}
+    if(f==='level')return r()<.2?'L'+Math.min(8,lvlN(e.level)+1):e.level;return''});lines.push(csvLine([e.id,e.name,...vals,r()<.1?'Strong year, promote next cycle':'']))});
+  lines.push(csvLine(['E9991','Former employee',...fs.map(()=>'')]),csvLine(['E9992','Typo row',...fs.map(()=>'')]));return lines.join('\n')}
+
+/* ================= notes ("Why this?") ================= */
+const NOTES={
+  shell:[['Global nav with Bulk change first',"Jakob's law","Admins already live in enterprise HRIS conventions: modules on the left, the task they came for at the top."],['Breadcrumbs on every page','Wayfinding','A deep editor never strands the admin; one click back to the list.'],['Demo controls kept apart in a dashed panel','Mental-model match',"Nothing that isn't product sits in the product chrome."]],
+  bulk:[['List of bulk changes, drafts first','Zeigarnik effect','Comp cycles run over days; an open draft stays visible until the cutoff.'],['Segments column on each change','Recognition over recall','Who a change targets is visible without opening it.'],["A colleague's overlapping draft is listed",'Error prevention (Norman: mistakes)','Two admins editing the same people gets caught before payroll, not after.']],
+  setup:[['Effective date required, nothing pre-filled','Forcing function','Pre-filling Today would make a prorated mid-period change the default.'],['"Start of next pay period" chip first','Serial position (primacy)','Steers to the clean option without choosing for them.'],['Payroll run and cutoff shown next to the date','Norman: mapping and feedback','Links the date to its money consequence at the moment of choosing.'],['Name and reason required','Mental model of an auditable object','“Who gave Sales a raise?” has an answer six months later.'],['Enterprise step names (Details, Segments, Fields…)',"Jakob's law",'They match the vocabulary of every admin tool the user already knows.']],
+  who:[['Targeting is one condition builder','Mental-model match','Segments, named people and attributes are all just conditions, so there is one thing to learn.'],["Employee ID belongs to / doesn't belong to segment",'Recognition over recall; reuse','A vetted segment is referenced, not rebuilt from memory.'],['Insert saved segment shows type and size','Recognition over recall','The admin picks by name and sees how big it is before adding it.'],['Create segment in a side sheet','Context preservation','The draft stays open behind it, so nothing has to be held in working memory.'],['Paste employee IDs, emails or names',"Postel's law",'Lists arrive from spreadsheets in any shape; be liberal in what you accept.'],['Operators match the data type','Error prevention','Only comparisons that make sense for a field are offered.'],['Live count with delta','Doherty threshold; feedback','They test one condition at a time against the number they already hold.'],['Sample with "why included"','Trust calibration','Explains a surprising inclusion, e.g. "In FY26 promotion nominees".'],['On leave, terminations, contractors shown','Norman: mistakes',"Hidden system rules create errors the admin can't see."]],
+  what:[["Groups use the profile's tab names","Jakob's law",'Fields sit where the profile trained them to look.'],['Direct Reports, Documents, 2FA not offered',"Hick's law","They aren't attributes. Reporting lines change through Manager."],['"Needs approval" badge','Von Restorff',"Fields that move money or access stand out before they're chosen."],['Department auto-adds Team, locked','Forcing function',"A new department with an old team isn't a valid record."],['Same for all / Different per person','Progressive disclosure','An office move needs one value, not 400 cells.']],
+  values:[["Cells use the profile's own controls","Jakob's law","Nothing new to learn: the profile's Edit mode, multiplied across rows."],["Empty New cell, today's value as grey text",'Default effect; von Restorff',"A filled cell is an edit and an empty one isn't."],['Current and New side by side',"Gestalt proximity; anchoring on today's value",'Reviewers judge the delta against what the person earns now.'],['% change, annualised when the unit switches','Norman: slips','Order-of-magnitude typos become obvious.'],['Rules write visible values','Trust calibration',"Admins don't trust results they can't see per row."],['AI drafts stay marked until accepted','Automation bias countermeasure','It never submits; approvers can see what a person checked.']],
+  review:[["Error = can't commit a valid, permitted record",'Forcing function','One predictable rule: an invalid record never reaches payroll.'],['Warning = valid but unusual, acknowledged per group','Habituation / alarm fatigue','300 per-row confirmations train blind clicking.'],['Move error rows to a new draft','Loss aversion; Zeigarnik',"Nobody drops rows they'd lose; the open draft keeps them visible."]],
+  impact:[['Inside Rippling vs Integrated Apps',"Gestalt common region; Jakob's law","Uses the profile's own term and sets up “these behave differently”."],['Payroll card first','Serial position (primacy)','The highest stakes go first.'],['Late-approval choice pre-selected, must be confirmed','Forcing function + default effect','Payroll timing is settled at the decision point.'],['Losses written as losses','Framing; loss aversion',"Removals phrased neutrally get underweighted, and they're hardest to undo."],['Employee letters off by default','Default effect; irreversibility',"A wrong comp letter can't be unsent."]],
+  status:[['Rippling record band on top','Mental-model match; common region','The record is done and payroll reads from it, whatever Slack does.'],['No "Retry now" while auto-retries run','Illusion of control','Avoids pointless clicks and false confidence.'],['End state names what worked and who owns the rest','Peak-end rule','The memory of the last run decides whether they use bulk change next year.']],
+  approver:[['Total against the merit budget, in $ and %','Anchoring on the right reference; framing','Finance judges against the plan, not a raw total.'],['Outliers first','Von Restorff','Limited attention goes to the exceptions.'],['Send rows back with a reason','Error recovery','Three disputes must not freeze 409 raises.']],
+  segments:[['Dynamic and Static type badges','Recognition over recall','Whether a segment moves or stays fixed is visible without opening it.'],['Static badge carries its snapshot date','Mental-model match','“Point in time” made literal, so nobody assumes it is current.'],['Used in column','Consequence visibility','Before editing a segment, the admin sees which bulk changes depend on it.']],
+  segedit:[['Type and source chosen up front, then locked','Forcing function','A segment that silently changed from fixed to live would retarget bulk changes.'],['Header bands: Rippling fields vs "From your file"','Gestalt common region','Uploaded data is never confused with the system of record.'],['Sheets-style sort and filter in every header',"Jakob's law",'Admins already slice lists this way in Excel and Google Sheets.'],["Filters offer operators for the column's type",'Recognition over recall; error prevention','Numbers get ≥ and between, dates get "in the past N days", Yes/No gets Yes and No.'],['Untick rows to exclude people','Direct manipulation','Hand-picked exceptions are explicit and visible.'],['Detected column types you can override',"Postel's law; Tesler's law",'The system does the detective work; the admin only corrects it.'],['"What gets saved" in the rail','Feedback and feedforward','The admin knows exactly what a save will store before committing.'],['Dynamic: "Add as condition" instead of filters','Single source of truth',"A dynamic segment's membership comes only from its rules."]],
+  segment:[['Use in bulk change as the primary action',"Fitts's law; task continuity",'The most common next step is the biggest, nearest target.'],['Refresh snapshot shows joined and left first','Feedback; error prevention','Nobody updates a fixed list without seeing who moves.'],['Delete blocked while a bulk change uses it','Forcing function','Deleting would silently retarget a draft.']],
+  people:[['Directory opens the single-employee profile',"Jakob's law",'Same profile the case study starts from.']]};
+function notesKey(){if(S.se&&S.se.inSheet)return'segedit';if(S.route==='draft')return S.approver?'approver':S.step;return S.route}
+function renderNotes(){const el=$('#notes');el.classList.toggle('on',S.notes);if(!S.notes){el.innerHTML='';return}const rows=[...(NOTES[notesKey()]||[]),...NOTES.shell];
+  el.innerHTML=`<div class="sec-h"><h3>Why each element is here</h3><button class="txt" data-act="notes">Close</button></div><p class="sub">Element · principle · why it holds for an HR admin.</p>${rows.map(r=>`<div class="nrow"><b>${esc(r[0])}</b><span>${esc(r[1])}</span><small class="muted">${esc(r[2])}</small></div>`).join('')}`}
+
+/* ================= actions ================= */
+function setSize(n){S.size=n;build(n);makeSeeds();const d=S.d;clearInterval(S.timer);
+  if(d){d.manual={};d.csv={};d.csvHits=new Set();d.moved=new Set();d.rejected=new Map();d.ack={};d.who.cnt=null;d.who.prev=null;d.grid.group=null;d.grid.issue=null;
+    d.who.groups.forEach(g=>g.conds.forEach(c=>{if(c.f==='empid'&&['eq','ne','anyof','noneof'].includes(c.op))c.v=c.v.filter(id=>EMPI[id]);if(c.f==='manager'&&c.v[0]&&!EMPI[c.v[0]])c.v=[];if(c.f==='empid'&&['inseg','notinseg'].includes(c.op)&&!segById(c.v[0]))c.v=[]}));
+    if(d.run){d.run=null;d.cutoff.confirmed=false;if(S.step==='status')S.step='impact'}d.visited.delete('status');if(d.name==='FY26 annual review'&&d.template==='comp')seedPromos(d)}
+  S.parked=[];S.approver=false;S.followups=0;S.ov=null;S.se=null;S.hm=null;if(S.route==='segment'||S.route==='segedit')S.route='segments';
+  toast(`Metzhand now has ${fmtN(EMP.length)} employees. Same flow, same screens.`);render()}
+function next(){const d=S.d;const i=STEPS.findIndex(s=>s.k===S.step);const k=STEPS[i+1].k;if(k==='status')return;d.visited.add(k);S.step=k;S.menu=false;S.pop=null;render();window.scrollTo(0,0)}
+function back(){const i=STEPS.findIndex(s=>s.k===S.step);if(i>0){S.step=STEPS[i-1].k;render();window.scrollTo(0,0)}}
+function setCell(id,f,v){const d=S.d;d.manual[id]=d.manual[id]||{};d.manual[id][f]=v;d.csvHits.delete(id+'|'+f);if(f==='department'&&d.fields.includes('team')){const t=nv(d,EMPI[id],'team');if(!TEAMS[v]?.includes(t)&&v)d.manual[id].team=TEAMS[v][0]}}
+function refreshGrid(){dirty();G.items=gridItems(S.d);renderGridRows();const sm=$('#summary');if(sm)sm.outerHTML=summary(S.d)}
+function afterRender(){const w=$('#gwrap');if(w&&S.d){w.scrollTop=S.d.grid.scroll||0;renderGridRows();w.addEventListener('scroll',()=>{S.d.grid.scroll=w.scrollTop;if(!G.raf)G.raf=requestAnimationFrame(()=>{G.raf=0;renderGridRows()})},{passive:true})}
+  ['seed','segv'].forEach(id=>{const m=document.getElementById(id);if(!m||!MT[id])return;const ts=MT[id].ts;m.scrollTop=ts.scroll||0;renderMemberRows(id);let raf=0;m.addEventListener('scroll',()=>{ts.scroll=m.scrollTop;if(!raf)raf=requestAnimationFrame(()=>{raf=0;renderMemberRows(id)})},{passive:true})});
+  if(S.focus){const el=document.getElementById(S.focus);if(el){el.focus();if(el.setSelectionRange&&el.type!=='date'&&el.type!=='number')try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}S.focus=null}}
+function applyFix(k,fx){const d=S.d;const A=analyze(d);const ids=A.issues[k]||[];
+  ids.forEach(id=>{const e=EMPI[id];if(fx==='capmax'){const b=band(e,nv(d,e,'level'),nv(d,e,'per'),nv(d,e,'department'),nv(d,e,'location'));setCell(id,'compensation',b.max)}
+    else if(fx==='clearcomp')setCell(id,'compensation','');else if(fx==='fixteam')setCell(id,'team',TEAMS[nv(d,e,'department')][0]);else if(fx==='clearmgr')setCell(id,'manager','');
+    else if(fx==='laddertitle')setCell(id,'title',ladder(nv(d,e,'department'),nv(d,e,'level')));else if(fx==='move')d.moved.add(id)});
+  if(fx==='move')S.followups=d.moved.size;toast(fx==='move'?`Moved ${pl(ids.length,'row')} to a follow-up draft.`:`Fixed ${pl(ids.length,'row')}.`);render()}
+function closeSheet(){S.se=null;render()}
+function openEditorFor(s,dup){const e=newEditor({segId:dup?null:s.id,name:dup?'Copy of '+s.name:s.name,desc:s.desc,type:s.type,source:s.source,groups:s.groups?clone(s.groups):undefined,excluded:dup?[]:(s.provenance?.excluded||[])});
+  if(s.source==='csv')e.file={name:s.file.name,raw:null,header:['Employee ID',...s.columns.map(c=>c.label)],keyCol:0,types:{},cols:clone(s.columns),values:clone(s.values||{}),matched:s.members.slice(),unmatched:s.file.unmatched.slice(),rowsN:s.file.rows,showUnmatched:false};
+  return e}
+const tsNew=()=>({tf:{},sort:null,q:'',hidden:new Set(),excluded:new Set(),scroll:0});
+function saveSegment(){const se=S.se;if(!se.name.trim()){toast('Name the segment first.');S.focus='se-name';render();return}
+  const allCols=edColsAll(se);const base=edBase(se);const rows=tableRows(se,base,allCols);
+  const seg=se.segId?segById(se.segId):{id:'SEG-'+(SEGN++),owner:'You',created:'20 Nov 2026',usedSeed:[],version:1};
+  if(se.type==='dynamic'){if(!se.groups.some(g=>g.conds.some(complete))){toast('Add at least one complete condition.');return}Object.assign(seg,{type:'dynamic',source:'conditions',groups:clone(se.groups),members:null,columns:null})}
+  else{const keep=rows.filter(e=>!se.excluded.has(e.id));if(!keep.length){toast('No one would be in this segment. Loosen the filters or conditions.');return}
+    Object.assign(seg,{type:'static',source:se.source,members:keep.map(e=>e.id),snapshotAt:NOWL,provenance:{filters:filtersTxt(se,allCols),excluded:[...se.excluded].filter(id=>base.some(e=>e.id===id)),search:se.q}});
+    if(se.source==='conditions'){seg.groups=clone(se.groups);seg.columns=null}else{seg.groups=null;seg.columns=clone(se.file.cols);seg.values=Object.fromEntries(keep.map(e=>[e.id,se.file.values[e.id]]));seg.file={name:se.file.name,rows:se.file.rowsN,matched:se.file.matched.length,unmatched:se.file.unmatched.slice()}}}
+  seg.name=se.name.trim();seg.desc=se.desc.trim();seg.updated='20 Nov 2026';if(!se.segId)SEGS.unshift(seg);dirty();
+  if(se.inSheet&&S.d){addTargetCond(S.d,{f:'empid',op:'inseg',v:[seg.id]});S.se=null;toast(`Saved "${seg.name}" and added it to this bulk change's targeting.`);render();return}
+  S.se=null;S.route='segment';S.segId=seg.id;S.segTab='members';S.sv=tsNew();toast(`Saved "${seg.name}".`);render();window.scrollTo(0,0)}
+function tsOf(t){return t==='seed'?S.se:S.sv}
+function openHM(a){const t=a.dataset.t,k=a.dataset.k;const r=a.getBoundingClientRect();const ts=tsOf(t);const m=MT[t];const col=m.allCols.find(c=>c.key===k);
+  const f=ts.tf[k]||{};S.hm={t,k,x:r.left-8,y:r.bottom+6};S.hmd={op:f.cond?f.cond.op:'',v:f.cond?f.cond.v.slice():[],vals:f.vals?f.vals.slice():null,vq:''};
+  const cnt={};m.base.forEach(e=>{const v=dispVal(col,col.get(e));cnt[v]=(cnt[v]||0)+1});S.hmAll=Object.entries(cnt).sort((a,b)=>a[0].localeCompare(b[0]));renderHM()}
+function act(k,a){const d=S.d;switch(k){
+  case'nav':S.route=['bulk','segments','people'].includes(a.dataset.k)?a.dataset.k:'module';S.modName=a.dataset.k;S.approver=false;S.hm=null;if(S.se&&!S.se.inSheet)S.se=null;try{history.replaceState(null,'','#'+a.dataset.k)}catch(_){}render();window.scrollTo(0,0);break;
+  case'size':setSize(+a.dataset.n);break;
+  case'notes':S.notes=!S.notes;try{localStorage.setItem('bc-notes',S.notes?'1':'0')}catch(_){}render();break;
+  case'demo':S.demo=!S.demo;renderDemo();break;
+  case'soon':toast('Not part of this prototype.');break;
+  case'q4':toast("This is Dana Okuneva's draft. Its people show a conflict warning in yours if both touch reporting lines.");break;
+  case'gsp':S.gq='';$('#gq').value='';renderSearch();S.ov={type:'profile',id:a.dataset.id,tab:'emp'};renderOverlay();break;
+  case'gss':S.gq='';$('#gq').value='';renderSearch();S.route='segment';S.segId=a.dataset.id;S.segTab='members';S.sv=tsNew();render();break;
+  case'gsd':S.gq='';$('#gq').value='';renderSearch();act('resume',a);break;
+  case'newdraft':if(d){S.parked=S.parked.filter(x=>x!==d);S.parked.unshift(d)}clearInterval(S.timer);S.d=blankDraft();S.step='setup';S.route='draft';S.approver=false;S.followups=0;render();break;
+  case'resume':{const id=a.dataset.id;if(id&&(!S.d||id!==S.d.id)){const x=S.parked.find(p=>p.id===id);if(x){S.parked=S.parked.filter(p=>p!==x);if(S.d)S.parked.unshift(S.d);S.d=x;clearInterval(S.timer);if(x.run&&x.run.sync)S.timer=setInterval(()=>tick(x),700)}}
+    if(!S.d)break;S.route='draft';S.step=S.d.run?'status':lastStep(S.d);render();window.scrollTo(0,0);break}
+  case'profile':S.ov={type:'profile',id:a.dataset.id,tab:'emp'};renderOverlay();break;
+  case'ptab':S.ov.tab=a.dataset.k;renderOverlay();break;
+  case'closeov':S.ov=null;renderOverlay();break;
+  case'step':if(a.dataset.k==='status'&&!d.run)break;S.step=a.dataset.k;S.pop=null;render();window.scrollTo(0,0);break;
+  case'next':next();break;case'back':back();break;
+  case'saveexit':S.route='bulk';S.menu=false;toast('Draft saved. Resume it from Bulk change.');render();break;
+  case'menu':S.menu=!PREV.menu;render();break;
+  case'discard':S.menu=false;S.ov={type:'discard'};render();break;
+  case'discardyes':S.d=S.parked.shift()||null;S.ov=null;S.route='bulk';clearInterval(S.timer);toast('Draft discarded.');render();break;
+  case'datechip':d.dateKind=a.dataset.k;d.date=a.dataset.k==='next'?NEXTP:a.dataset.k==='today'?TODAY:d.date;if(a.dataset.k==='custom')S.focus='f-date';render();break;
+  case'tpl':{const t=TPL[a.dataset.k];d.template=a.dataset.k;d.fields=t.f.slice();d.modes={};d.fields.forEach(f=>d.modes[f]=t.m[f]||'diff');render();break}
+  case'baddcond':{const G2=groupsOf(a.dataset.ctx);const gi=+a.dataset.g;G2[gi].conds.push({f:'department',op:'anyof',v:[]});S.pop=`${a.dataset.ctx}-${gi}-${G2[gi].conds.length-1}`;S.popQ='';render();break}
+  case'baddgroup':groupsOf(a.dataset.ctx).push({mode:'all',conds:[{f:'department',op:'anyof',v:[]}]});render();break;
+  case'bdelcond':groupsOf(a.dataset.ctx)[+a.dataset.g].conds.splice(+a.dataset.c,1);S.pop=null;render();break;
+  case'bdelgroup':groupsOf(a.dataset.ctx).splice(+a.dataset.g,1);S.pop=null;render();break;
+  case'openpop':S.pop=PREV.pop===a.dataset.key?null:a.dataset.key;S.popQ='';render();break;
+  case'bpopv':{const c=groupsOf(a.dataset.ctx)[+a.dataset.g].conds[+a.dataset.c];const v=a.dataset.v;c.v=a.checked?[...c.v,v]:c.v.filter(x=>x!==v);S.pop=`${a.dataset.ctx}-${a.dataset.g}-${a.dataset.c}`;render();break}
+  case'bpaste':{const c=groupsOf(a.dataset.ctx)[+a.dataset.g].conds[+a.dataset.c];const txt=($('#pop-ta')||{}).value||'';const toks=txt.split(/[\n,;\t]+/).map(x=>x.trim()).filter(Boolean);const miss=[];
+    toks.forEach(t=>{const id=parsePerson(t);if(id){if(!c.v.includes(id))c.v.push(id)}else miss.push(t)});S.pop=`${a.dataset.ctx}-${a.dataset.g}-${a.dataset.c}`;toast(`${pl(toks.length-miss.length,'person','people')} added${miss.length?`; not found: ${miss.slice(0,3).join(', ')}`:''}.`);render();break}
+  case'bunpick':{const c=groupsOf(a.dataset.ctx)[+a.dataset.g].conds[+a.dataset.c];c.v=c.v.filter(x=>x!==a.dataset.id);S.pop=`${a.dataset.ctx}-${a.dataset.g}-${a.dataset.c}`;render();break}
+  case'insmenu':S.insOpen=!PREV.insOpen;render();break;
+  case'insseg':{S.insOpen=false;addTargetCond(d,{f:'empid',op:'inseg',v:[a.dataset.id]});toast(`Added "${segName(a.dataset.id)}"${d.who.groups.length>1?' as an OR group: its people join the targeting':''}.`);render();break}
+  case'createseg':S.se=newEditor({type:'dynamic',inSheet:true});render();break;
+  case'saveastarget':S.se=newEditor({type:'dynamic',inSheet:true,groups:clone(d.who.groups),name:(d.name||'Bulk change')+' · targeting'});render();break;
+  case'pasteids':d.who.pasteOpen=!d.who.pasteOpen;if(d.who.pasteOpen)S.focus='paste-ta';render();break;
+  case'pastesample':{const r=rng(5);const pick=EMP.filter(()=>r()<Math.min(1,25/EMP.length)).slice(0,25);d.who.paste=pick.map((e,i)=>i%3===0?e.id:i%3===1?e.email:e.name).concat(['Hollis Nobody','E99999']).join('\n');render();break}
+  case'pasteadd':{const toks=(d.who.paste||'').split(/[\n,;\t]+/).map(x=>x.trim()).filter(Boolean);const ids=[],miss=[];toks.forEach(t=>{const id=parsePerson(t);if(id){if(!ids.includes(id))ids.push(id)}else miss.push(t)});
+    if(!ids.length){toast('None of those matched anyone.');break}addTargetCond(d,{f:'empid',op:'anyof',v:ids});d.who.paste='';d.who.pasteOpen=false;toast(`Added ${pl(ids.length,'person','people')}${miss.length?`. Not found: ${miss.slice(0,3).join(', ')}`:''}.`);render();break}
+  case'autotg':{const m={leave:'incLeave',term:'incTerm',contract:'incContract'}[a.dataset.k];d.who[m]=!d.who[m];render();break}
+  case'exportlist':{const C=cohort(d);S.ov={type:'text',title:'Export the full list',sub:`${fmtN(C.list.length)} people. Copy it into a spreadsheet to check it against your own numbers.`,text:[csvLine(['Employee ID','Name','Title','Department','Work location','Level','Work Email'])].concat(C.list.map(e=>csvLine([e.id,e.name,e.title,e.department,e.location,e.level,e.email]))).join('\n')};renderOverlay();break}
+  case'newmenu':S.newMenu=!PREV.newMenu;render();break;
+  case'newseg':S.newMenu=false;S.se=newEditor({type:a.dataset.t,source:'conditions'});S.route='segedit';S.focus='se-name';render();window.scrollTo(0,0);break;
+  case'sltype':S.slType=a.dataset.k;render();break;
+  case'slsort':{const k2=a.dataset.k;S.slSort=S.slSort&&S.slSort.k===k2?{k:k2,dir:-S.slSort.dir}:{k:k2,dir:k2==='members'?-1:1};render();break}
+  case'openseg':S.route='segment';S.segId=a.dataset.id;S.segTab='members';S.sv=tsNew();render();window.scrollTo(0,0);break;
+  case'segtab':S.segTab=a.dataset.k;render();break;
+  case'segmenu':S.segMenu=!PREV.segMenu;render();break;
+  case'segedit':{const s=segById(S.segId);S.se=openEditorFor(s,false);S.route='segedit';render();window.scrollTo(0,0);break}
+  case'segdup':{const s=segById(S.segId);S.segMenu=false;S.se=openEditorFor(s,true);S.route='segedit';render();window.scrollTo(0,0);break}
+  case'segrefresh':{const s=segById(S.segId);S.segMenu=false;const nx=EMP.filter(e=>evalGroups(s.groups,e)>=0).map(e=>e.id);const old=new Set(s.members);const ns=new Set(nx);S.ov={type:'refresh',next:nx,add:nx.filter(x=>!old.has(x)),rem:s.members.filter(x=>!ns.has(x))};renderOverlay();break}
+  case'refreshyes':{const s=segById(S.segId);s.members=S.ov.next;s.version=(s.version||1)+1;s.snapshotAt=NOWL;s.updated='20 Nov 2026';S.ov=null;toast(`Snapshot refreshed. Version ${s.version} has ${pl(s.members.length,'person','people')}.`);render();break}
+  case'segdel':S.segMenu=false;S.ov={type:'segdel'};renderOverlay();break;
+  case'segdelyes':SEGS=SEGS.filter(s=>s.id!==S.segId);S.ov=null;S.route='segments';toast('Segment deleted.');render();break;
+  case'seguse':{const id=S.segId;if(!d||d.run){if(d)S.parked.unshift(d);S.d=blankDraft()}S.d.visited.add('who');addTargetCond(S.d,{f:'empid',op:'inseg',v:[id]});S.route='draft';S.step=S.d.name?'who':'setup';
+    toast(`"${segName(id)}" added to ${S.d.name?'"'+S.d.name+'"':'a new bulk change'}.`);render();window.scrollTo(0,0);break}
+  case'setype':if(S.se.locked)break;S.se.type=a.dataset.v;if(S.se.type==='dynamic')S.se.source='conditions';S.se.tf={};S.se.excluded=new Set();render();break;
+  case'sesrc':if(S.se.locked)break;S.se.source=a.dataset.v;S.se.tf={};S.se.excluded=new Set();render();break;
+  case'secancel':if(S.se.inSheet){closeSheet();break}S.route=S.se.segId?'segment':'segments';S.se=null;render();break;
+  case'sheetclose':if(S.se&&S.se.inSheet)closeSheet();break;
+  case'segsave':saveSegment();break;
+  case'sesample':loadFile(S.se,'promotion-nominations-fy26.csv',sampleNominations());render();break;
+  case'sepaste':S.se.pasteOpen=!S.se.pasteOpen;render();break;
+  case'sepasteload':if(loadFile(S.se,'pasted.csv',S.se.pasteText))render();break;
+  case'sereplace':S.se.file=null;S.se.tf={};S.se.excluded=new Set();render();break;
+  case'seunm':S.se.file.showUnmatched=!S.se.file.showUnmatched;render();break;
+  case'hsortq':{const ts=tsOf(a.dataset.t);const k2=a.dataset.k;ts.sort=ts.sort&&ts.sort.key===k2?(ts.sort.dir>0?{key:k2,dir:-1}:null):{key:k2,dir:1};render();break}
+  case'hmenu':if(PREV.hm&&PREV.hm.k===a.dataset.k&&PREV.hm.t===a.dataset.t){S.hm=null;renderHM();break}openHM(a);break;
+  case'hsort':{const ts=tsOf(S.hm.t);ts.sort={key:S.hm.k,dir:+a.dataset.dir};S.hm=null;render();break}
+  case'hhide':{const ts=tsOf(S.hm.t);ts.hidden.add(S.hm.k);if(ts.sort&&ts.sort.key===S.hm.k)ts.sort=null;S.hm=null;render();break}
+  case'hval':{const v=a.dataset.v;if(!S.hmd.vals)S.hmd.vals=S.hmAll.map(x=>x[0]);S.hmd.vals=a.checked?[...S.hmd.vals,v]:S.hmd.vals.filter(x=>x!==v);renderHM();break}
+  case'hvall':S.hmd.vals=null;renderHM();break;
+  case'hvnone':S.hmd.vals=[];renderHM();break;
+  case'hclear':{const ts=tsOf(S.hm.t);delete ts.tf[S.hm.k];S.hm=null;render();break}
+  case'happly':{const ts=tsOf(S.hm.t);const h=S.hmd;const cond=h.op?{op:h.op,v:h.v.slice()}:null;if(cond&&!complete(cond)){toast('Fill in the value for that condition.');break}
+    const vals=h.vals&&h.vals.length<S.hmAll.length?h.vals:null;if(!cond&&!vals)delete ts.tf[S.hm.k];else ts.tf[S.hm.k]={cond,vals};S.hm=null;ts.scroll=0;render();break}
+  case'haddcond':{const h=S.hmd;const cfk=COL2CF[S.hm.k];let v=h.v.slice();if(LISTOP.has(h.op))v=(h.vals||S.hmAll.map(x=>x[0])).filter(x=>x!=='(Blanks)');const cond={f:cfk,op:h.op,v};
+    if(!h.op||!complete(cond)){toast('Choose an operator and a value.');break}S.se.groups[0].conds.push(cond);S.hm=null;toast(`Added "${condTxt(cond)}" to the conditions.`);render();break}
+  case'mexcl':{const ts=tsOf(a.dataset.t);if(a.checked)ts.excluded.delete(a.dataset.id);else ts.excluded.add(a.dataset.id);render();break}
+  case'mclear':{const ts=tsOf(a.dataset.t);ts.tf={};ts.q='';ts.sort=null;ts.scroll=0;render();break}
+  case'colsmenu':S.colsOpen=PREV.colsOpen===a.dataset.t?null:a.dataset.t;render();break;
+  case'colshow':{const ts=tsOf(a.dataset.t);if(a.checked)ts.hidden.delete(a.dataset.k);else ts.hidden.add(a.dataset.k);S.colsOpen=a.dataset.t;render();break}
+  case'field':{const f=a.dataset.f;if(a.checked){if(!d.fields.includes(f))d.fields.push(f);d.modes[f]=d.modes[f]||(f==='location'?'same':'diff');
+      if(f==='department'&&!d.fields.includes('team')){d.fields.push('team');d.modes.team=d.modes.department}if(f==='per'&&!d.fields.includes('compensation')){d.fields.push('compensation');d.modes.compensation='diff'}}
+    else{d.fields=d.fields.filter(x=>x!==f);if(f==='department')d.fields=d.fields.filter(x=>x!=='team')}render();break}
+  case'suggest':{const f=a.dataset.f;if(!d.fields.includes(f)){d.fields.push(f);d.modes[f]='diff'}render();break}
+  case'mode':d.modes[a.dataset.f]=a.dataset.m;if(a.dataset.f==='department'&&d.fields.includes('team'))d.modes.team=a.dataset.m;render();break;
+  case'tool':{const t=a.dataset.k;if(t==='template'){const A=analyze(d);const fs=d.fields;S.ov={type:'text',title:'Download template',sub:`${fmtN(A.rows.length)} rows with today's values. Fill in the "(new)" columns and upload it back. Leave a cell empty for no change.`,
+      text:[csvLine(['Employee ID','Name','Work Email',...fs.flatMap(f=>[FIELDS[f].label+' (current)',FIELDS[f].label+' (new)'])])].concat(A.rows.map(e=>csvLine([e.id,e.name,e.email,...fs.flatMap(f=>[fmtVal(e,f,e[f]),''])]))).join('\n')};renderOverlay();break}
+    if(t==='upload'){S.ov={type:'upload',text:'',preview:null};renderOverlay();break}d.grid.tool=d.grid.tool===t?null:t;if(t==='ai')S.focus='ai-ta';render();break}
+  case'gchanged':d.grid.changed=a.checked;d.grid.scroll=0;render();break;
+  case'ggroup':d.grid.group=a.checked;d.grid.scroll=0;render();break;
+  case'gcol':{const dp=a.dataset.dept;d.grid.collapsed.has(dp)?d.grid.collapsed.delete(dp):d.grid.collapsed.add(dp);refreshGrid();break}
+  case'clearissue':d.grid.issue=null;render();break;
+  case'applyset':{const f=S.setF;const el=$('#setv');let v=el?el.value:'';const F=FIELDS[f];if(F.type==='money'||F.type==='int'){v=parseMoney(v);if(!isFinite(v)){toast('Enter an amount.');break}}if(F.type==='person'){v=parsePerson(v);if(!v){toast('Pick a manager from the list.');break}}if(v===''){toast('Enter a value.');break}
+    const rows=G.items.filter(x=>x.e).map(x=>x.e);rows.forEach(e=>setCell(e.id,f,f==='compensation'?roundComp(+v,nv(d,e,'per')):v));toast(`Set ${FIELDS[f].label} for ${pl(rows.length,'row')}.`);render();break}
+  case'addrule':{const f=$('#r-f').value,pct=parseFloat($('#r-pct').value),wf=$('#r-wf').value,wv=$('#r-wv').value.trim(),cap=$('#r-cap').value;if(!isFinite(pct)){toast('Enter a percentage.');break}
+    d.rules.push({field:f,pct,where:wv?{f:wf,v:[wv]}:null,cap:cap||null,ai:false,accepted:true});d.grid.tool=null;toast('Rule added. Values are in the grid.');render();break}
+  case'rmrule':d.rules.splice(+a.dataset.i,1);render();break;
+  case'acceptai':d.rules[+a.dataset.i].accepted=true;toast('Accepted. Those cells are now yours.');render();break;
+  case'aiex':S.aiText=a.dataset.t;render();break;
+  case'aigo':{const t=($('#ai-ta')||{}).value||'';S.aiText=t;const r=parseAI(t);if(!r){toast('Try a sentence with a percentage, e.g. "5% raise for Meets".');break}
+    if(!d.fields.includes(r.field)){d.fields.push(r.field);d.modes[r.field]='diff';toast(`Added ${FIELDS[r.field].label} to this change.`)}d.rules.push(r);d.grid.tool=null;render();break}
+  case'fix':applyFix(a.dataset.issue,a.dataset.fix);break;
+  case'showrows':d.show[a.dataset.issue]=!d.show[a.dataset.issue];render();break;
+  case'ack':d.ack[a.dataset.issue]=true;render();break;
+  case'opengrid':d.grid.issue=a.dataset.issue;d.grid.changed=false;d.grid.dept='';d.grid.group=false;d.grid.scroll=0;S.step='values';render();window.scrollTo(0,0);break;
+  case'moveerr':{const A=analyze(d);const ids=new Set();Object.keys(A.issues).filter(k2=>ISS[k2].sev==='e').forEach(k2=>A.issues[k2].forEach(id=>ids.add(id)));ids.forEach(id=>d.moved.add(id));S.followups=d.moved.size;toast(`Moved ${pl(ids.size,'row')} to "${d.name} · follow-ups".`);render();break}
+  case'cut':d.cutoff.choice=a.value;d.cutoff.confirmed=false;if(a.value==='date'){toast('Change the date on Details.');S.step='setup'}render();break;
+  case'confirmcut':d.cutoff.confirmed=true;render();break;
+  case'whyapp':d.show['app-'+a.dataset.k]=!d.show['app-'+a.dataset.k];render();break;
+  case'appsync':d.appSync=a.value;render();break;
+  case'digest':d.digest=a.checked;break;case'notifymgr':d.notifyMgr=a.checked;break;
+  case'notifyemp':d.notifyEmp=a.checked;render();break;
+  case'accessack':d.accessAck=a.checked;render();break;
+  case'submit':{const I=impact(d);d.run={phase:I.approvers.length?'approval':'scheduled',frozen:analyze(d).rows.map(e=>e.id),sync:null};d.visited.add('status');S.step='status';toast(I.approvers.length?`Sent to ${I.approvers.map(x=>x.who).join(', ')}.`:'Scheduled.');render();window.scrollTo(0,0);break}
+  case'approveas':S.approver=true;S.apAll=false;render();window.scrollTo(0,0);break;
+  case'approveall':d.run.phase='scheduled';toast('Approved by Priya Shah.');render();break;
+  case'apback':S.approver=false;render();break;
+  case'apall':S.apAll=!S.apAll;render();break;
+  case'apsel':{const id=a.dataset.id;if(a.checked)d.rejected.set(id,'');else d.rejected.delete(id);render();break}
+  case'approve':{const miss=[...d.rejected.entries()].find(([,v])=>!String(v).trim());if(miss){toast('Add a reason for each row you send back.');const el=document.querySelector(`[data-in=apreason][data-id="${miss[0]}"]`);if(el)el.focus();break}
+    const n=d.rejected.size;d.rejected.forEach((_,id)=>d.moved.add(id));S.followups=d.moved.size;d.rejected=new Map();d.run.phase='scheduled';S.approver=false;toast(n?`Approved. ${pl(n,'row')} went back to a follow-up draft.`:'Approved.');render();break}
+  case'arrive':d.run.phase='committed';startSync(d);render();break;
+  case'retry':{const s=d.run.sync.find(x=>x.k===a.dataset.k);if(s){s.state='prog';s.fail=0;s.detail='';toast('Retrying after Raj Patel reactivated the accounts.');clearInterval(S.timer);S.timer=setInterval(()=>tick(d),700)}render();break}
+  case'reversal':toast('A reversal draft with the old values is ready under Bulk change (not built in this prototype).');break;
+  case'upsample':S.ov.text=sampleCSV(d);S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
+  case'uppreview':S.ov.text=($('#up-ta')||{}).value||'';S.ov.preview=previewCSV(d,S.ov.text);renderOverlay();break;
+  case'upapply':{const p=S.ov.preview;d.csvHits=new Set();p.writes.forEach(([id,f,v])=>{d.csv[id]=d.csv[id]||{};d.csv[id][f]=v;d.csvHits.add(id+'|'+f);if(d.manual[id])delete d.manual[id][f]});S.ov=null;toast(`Wrote ${pl(p.cells,'value')} into the grid. They're marked ↑.`);render();break}
+  case'copy':{const ta=$('#ov-ta');const txt=ta.value;const fb=()=>{ta.focus();ta.select();toast('Selected. Press Ctrl+C or ⌘C to copy.')};try{navigator.clipboard.writeText(txt).then(()=>toast('Copied.'),fb)}catch(_){fb()}break}
+}}
+function parseAI(t){const s=t.toLowerCase();const m=s.match(/(\d+(?:\.\d+)?)\s*%/);if(!m)return null;const pct=+m[1];const bonus=/bonus/.test(s);let where=null;
+  for(const[k,v]of[['partially','Partially meets'],['exceed','Exceeds'],['below','Below'],['meets','Meets']])if(s.includes(k)){where={f:'rating',v:[v]};break}
+  const lm=s.match(/\bl([1-8])\b/);if(!where&&lm){const n=+lm[1];where={f:'level',v:/and above|or above|\+|and up/.test(s)?LEVELS.filter(l=>lvlN(l)>=n):['L'+n]}}
+  if(!where)for(const dp of DEPTS)if(s.includes(dp.toLowerCase())){where={f:'department',v:[dp]};break}
+  if(!where)for(const lc of LOCS)if(s.includes(lc.toLowerCase())){where={f:'location',v:[lc]};break}
+  return{field:bonus?'bonus':'compensation',pct,where,cap:/band max|maximum|cap/.test(s)?'max':/mid/.test(s)?'mid':null,ai:true,accepted:false}}
+
+/* ================= events ================= */
+let PREV={};
+function closePopups(){PREV={pop:S.pop,menu:S.menu,hm:S.hm,insOpen:S.insOpen,colsOpen:S.colsOpen,segMenu:S.segMenu,newMenu:S.newMenu};const any=!!(S.pop||S.menu||S.hm||S.insOpen||S.colsOpen||S.segMenu||S.newMenu);
+  S.pop=null;S.menu=false;S.hm=null;S.insOpen=false;S.colsOpen=null;S.segMenu=false;S.newMenu=false;return any}
+document.addEventListener('click',ev=>{const t=ev.target;if(t.closest('.pp')){const a=t.closest('[data-act]');if(a&&!(a.tagName==='INPUT'&&(a.type==='checkbox'||a.type==='radio'))){PREV={};act(a.dataset.act,a)}return}
+  if(t.id==='overlay'){S.ov=null;renderOverlay();return}
+  if(S.gq&&!t.closest('.gsearch')){S.gq='';$('#gq').value='';renderSearch()}
+  const had=closePopups();const a=t.closest('[data-act]');
+  if(a&&!(a.tagName==='INPUT'&&(a.type==='checkbox'||a.type==='radio'))){act(a.dataset.act,a);return}
+  if(had)render()});
+document.addEventListener('change',ev=>{const t=ev.target;const d=S.d;
+  if(t.dataset.act&&(t.type==='checkbox'||t.type==='radio')){PREV={};act(t.dataset.act,t);return}
+  if(t.id==='up-file'&&t.files&&t.files[0]){const fr=new FileReader();fr.onload=()=>{S.ov.text=String(fr.result);S.ov.preview=previewCSV(d,S.ov.text);renderOverlay()};fr.readAsText(t.files[0]);return}
+  if(t.id==='seg-file'&&t.files&&t.files[0]){const file=t.files[0];const fr=new FileReader();fr.onload=()=>{if(loadFile(S.se,file.name,String(fr.result)))render()};fr.readAsText(file);return}
+  if(t.dataset.cell){const[id,f]=t.dataset.cell.split('|');const F=FIELDS[f];let v=t.value;
+    if(v==='')v='';else if(F.type==='money'||F.type==='int'){const n=parseMoney(v);if(!isFinite(n)){t.value='';toast(`"${v}" isn't an amount.`);return}v=f==='compensation'?roundComp(n,nv(d,EMPI[id],'per')):Math.round(n)}
+    else if(F.type==='person'){if(v){const p=parsePerson(v);if(!p){toast(`No one called "${v}". Pick from the list.`);t.value='';return}v=p}}
+    setCell(id,f,v);refreshGrid();return}
+  const k=t.dataset.in;if(!k)return;const G2=t.dataset.ctx?groupsOf(t.dataset.ctx):null;const c=G2&&t.dataset.c!==undefined?G2[+t.dataset.g].conds[+t.dataset.c]:null;
+  switch(k){
+    case'name':d.name=t.value;render();break;case'reason':d.reason=t.value;break;
+    case'date':d.date=fromIso(t.value);render();break;
+    case'bgmode':G2[+t.dataset.g].mode=t.value;render();break;
+    case'bf':{c.f=t.value;const ty=CF[c.f].type;c.op=ty==='id'?'inseg':OPS[ty][0][0];c.v=[];S.pop=LISTOP.has(c.op)?`${t.dataset.ctx}-${t.dataset.g}-${t.dataset.c}`:null;S.popQ='';render();break}
+    case'bo':{c.op=t.value;c.v=[];S.pop=LISTOP.has(c.op)?`${t.dataset.ctx}-${t.dataset.g}-${t.dataset.c}`:null;S.popQ='';render();break}
+    case'bv':{c.v=c.v||[];c.v[+t.dataset.i]=t.value;render();break}
+    case'bvp':{const id=parsePerson(t.value);c.v=id?[id]:[];if(!id&&t.value)toast('Pick someone from the list.');render();break}
+    case'bpick':{const id=parsePerson(t.value);if(id&&!c.v.includes(id))c.v.push(id);S.pop=`${t.dataset.ctx}-${t.dataset.g}-${t.dataset.c}`;render();break}
+    case'paste':d.who.paste=t.value;break;
+    case'same':{const f=t.dataset.f;let v=t.value;const F=FIELDS[f];if(F.type==='person')v=parsePerson(v)||'';else if(F.type==='money'||F.type==='int'){const n=parseMoney(v);v=isFinite(n)?n:''}d.same[f]=v;if(f==='department'&&d.modes.team==='same'&&d.same.team&&!TEAMS[v]?.includes(d.same.team))d.same.team=TEAMS[v]?.[0]||'';render();break}
+    case'setf':S.setF=t.value;render();break;
+    case'gdept':d.grid.dept=t.value;d.grid.scroll=0;render();break;
+    case'acknote':d.ackNote[t.dataset.issue]=t.value;break;
+    case'apreason':d.rejected.set(t.dataset.id,t.value);render();break;
+    case'uptext':S.ov.text=t.value;break;
+    case'sekey':S.se.file.keyCol=+t.value;if(S.se.file.raw)reparse(S.se);render();break;
+    case'secoltype':{const f=S.se.file;f.types[t.dataset.k]=t.value;if(f.raw)reparse(S.se);else{const col=f.cols.find(x=>x.key===t.dataset.k);col.type=t.value}delete S.se.tf[t.dataset.k];render();break}
+    case'hop':S.hmd.op=t.value;S.hmd.v=[];renderHM();break;
+    case'hv':S.hmd.v[+t.dataset.i]=t.value;break;
+  }});
+document.addEventListener('input',ev=>{const t=ev.target;const k=t.dataset.in;const d=S.d;
+  if(k==='popq'){S.popQ=t.value;S.focus='pop-q';const key=S.pop;render();S.pop=key}
+  else if(k==='whatq'){S.whatQ=t.value;S.focus='what-q';render()}
+  else if(k==='empq'){S.empQ=t.value;S.focus='emp-q';render()}
+  else if(k==='gq'){S.gq=t.value;renderSearch()}
+  else if(k==='slq'){S.slQ=t.value;S.focus='slq';render()}
+  else if(k==='pq'){S.pq=t.value;S.focus='pq';render()}
+  else if(k==='mq'){const ts=tsOf(t.dataset.t);ts.q=t.value;ts.scroll=0;S.focus=t.id;render()}
+  else if(k==='hvq'){S.hmd.vq=t.value;renderHM();const el=document.querySelector('[data-in=hvq]');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
+  else if(k==='hv'){S.hmd.v[+t.dataset.i]=t.value}
+  else if(k==='sename'){S.se.name=t.value}else if(k==='sedesc'){S.se.desc=t.value}else if(k==='sepastetxt'){S.se.pasteText=t.value}
+  else if(k==='name'&&d){d.name=t.value;const ok=d.name.trim()&&d.date;const b=$('#nextbtn');if(b)b.disabled=!ok;const w=$('#nextwhy');if(w)w.textContent=ok?'':(!d.name.trim()?'Name the change to continue.':'Pick an effective date. It decides which payroll run picks this up.')}
+  else if(k==='paste'&&d)d.who.paste=t.value;
+  else if(k==='acknote'&&d)d.ackNote[t.dataset.issue]=t.value;
+  else if(k==='apreason'&&d)d.rejected.set(t.dataset.id,t.value)});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(S.ov){S.ov=null;renderOverlay()}else if(S.hm){S.hm=null;renderHM()}else if(S.se&&S.se.inSheet){closeSheet()}else if(closePopups())render()}
+  if(ev.key==='Enter'&&ev.target.dataset&&(ev.target.dataset.cell||ev.target.dataset.in==='bv'||ev.target.dataset.in==='bvp'))ev.target.blur();
+  if(ev.key==='Enter'&&ev.target.dataset&&ev.target.dataset.in==='hv'){const b=document.querySelector('[data-act=happly],[data-act=haddcond]');if(b){S.hmd.v[+ev.target.dataset.i]=ev.target.value;b.click()}}});
+window.addEventListener('resize',()=>{if(S.hm){S.hm=null;renderHM()}});
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(['bulk','segments','people'].includes(h)&&S.route!==h){S.route=h;render()}});
+
+/* ================= boot ================= */
+build(S.size);makeSeeds();S.d=demoDraft();
+const h0=location.hash.slice(1);if(['bulk','segments','people'].includes(h0))S.route=h0;
+render();
+window.__app={S,act,render,SEGS:()=>SEGS,members,MT,cohort,testVal,evalGroups,EMP:()=>EMP,segById};
+})();
