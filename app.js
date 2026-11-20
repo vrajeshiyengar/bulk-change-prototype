@@ -72,7 +72,7 @@ const annual=(v,per)=>per==='Hourly'?v*2080:v;
 
 /* ================= fake company ================= */
 let EMP=[],EMPI={},CONFLICT=new Set(),NAMEIDX={};
-function gen(N){
+function* genSteps(N,out){
   const r=rng(N*7+3);const pick=a=>a[Math.floor(r()*a.length)];
   const wp=items=>{let x=r()*items.reduce((s,i)=>s+i[1],0);for(const[v,w]of items){x-=w;if(x<=0)return v}return items[0][0]};
   const E=[],used={};
@@ -98,22 +98,25 @@ function gen(N){
   mk({first:'Raj',last:'Patel',dept:'IT',level:'L6',team:'Security',start:'2020-04-13'});
   mk({first:'Jason',last:'Lee',dept:'Product',level:'L4',team:'Core HR',loc:'New York',start:'2023-02-27'});
   mk({first:'Dana',last:'Okuneva',dept:'People',level:'L6',team:'HR Ops',start:'2019-08-19'});
-  while(E.length<N){const dept=wp(DEPT_W);const level=wp(LV_W);const pr=r();
+  while(E.length<N){if(E.length%2500===0)yield E.length;const dept=wp(DEPT_W);const level=wp(LV_W);const pr=r();
     mk({first:pick(FIRST),last:pick(LAST),dept,level,loc:wp(LOC_W),rating:wp(RT_W),etype:r()<.04?'Contractor':'Full-time',
       status:r()<.02?'On leave':(r()<.012?'Scheduled termination':'Active'),languages:pr<.5?['English']:pr<.72?['English','Spanish']:pr<.9?['English','French']:['English','Spanish','French']})}
   const ceo=E[0];const byDept={};E.forEach(e=>{if(e!==ceo)(byDept[e.department]=byDept[e.department]||[]).push(e)});
   Object.values(byDept).forEach(list=>{const head=list.reduce((a,b)=>lvlN(b.level)>lvlN(a.level)?b:a,list[0]);head.manager=ceo.id;
-    list.forEach(e=>{if(e===head)return;const cands=list.filter(x=>x!==e&&lvlN(x.level)>lvlN(e.level)&&lvlN(x.level)>=5);
-      if(!cands.length){e.manager=head.id;return}const minL=Math.min(...cands.map(x=>lvlN(x.level)));const c2=cands.filter(x=>lvlN(x.level)===minL);e.manager=c2[Math.floor(r()*c2.length)].id})});
-  return E}
-function build(N){AGGC=null;EMP=gen(N);EMPI={};NAMEIDX={};EMP.forEach(e=>{EMPI[e.id]=e;e.reports=[];NAMEIDX[e.name.toLowerCase()]=NAMEIDX[e.name.toLowerCase()]||e.id});
+    const byL={};list.forEach(x=>{const n=lvlN(x.level);if(n>=5)(byL[n]=byL[n]||[]).push(x)});
+    list.forEach(e=>{if(e===head)return;const L=lvlN(e.level);let c2=null;for(let n=Math.max(L+1,5);n<=9;n++){if(byL[n]&&byL[n].length){c2=byL[n];break}}
+      if(!c2){e.manager=head.id;return}e.manager=c2[Math.floor(r()*c2.length)].id})});
+  out.E=E}
+function gen(N){const o={};for(const _ of genSteps(N,o));return o.E}
+let MAILIDX={};
+function build(N,E0){AGGC=null;EMP=E0||gen(N);EMPI={};NAMEIDX={};MAILIDX={};EMP.forEach(e=>{EMPI[e.id]=e;e.reports=[];NAMEIDX[e.name.toLowerCase()]=NAMEIDX[e.name.toLowerCase()]||e.id;MAILIDX[e.email]=e.id});
   EMP.forEach(e=>{if(e.manager)EMPI[e.manager].reports.push(e.id)});
   CONFLICT=new Set(EMP.filter(e=>e.department==='Engineering'&&e.team==='Platform').slice(0,40).map(e=>e.id));
-  $('#dl-people').innerHTML=EMP.map(e=>`<option value="${esc(e.name)} · ${e.id}"></option>`).join('');
-  $('#dl-mgr').innerHTML=EMP.filter(e=>lvlN(e.level)>=5).map(e=>`<option value="${esc(e.name)} · ${e.id}">${esc(e.title)}</option>`).join('');
+  $('#dl-people').innerHTML=EMP.slice(0,3000).map(e=>`<option value="${esc(e.name)} · ${e.id}"></option>`).join('');
+  $('#dl-mgr').innerHTML=EMP.filter(e=>lvlN(e.level)>=5).slice(0,3000).map(e=>`<option value="${esc(e.name)} · ${e.id}">${esc(e.title)}</option>`).join('');
   const ts=new Set();DEPTS.forEach(dp=>LEVELS.forEach(l=>ts.add(ladder(dp,l))));$('#dl-titles').innerHTML=[...ts].map(t=>`<option value="${esc(t)}"></option>`).join('')}
 function parsePerson(s){if(!s)return null;const m=String(s).match(/\bE\d{4,}\b/i);if(m&&EMPI[m[0].toUpperCase()])return m[0].toUpperCase();const k=String(s).trim().toLowerCase();if(NAMEIDX[k])return NAMEIDX[k];
-  const byMail=EMP.find(e=>e.email===k);return byMail?byMail.id:null}
+  return MAILIDX[k]||null}
 function under(e,mid){if(!e)return false;let x=e.manager,g=0;while(x&&g<20){if(x===mid)return true;x=EMPI[x]?.manager;g++}return false}
 
 /* ================= value fields (bulk change) ================= */
@@ -414,7 +417,7 @@ function makeSeeds(){SEGS=[];SEGN=110;SEGC.clear();
     snapshotAt:'22 Sep 2026, 16:05 IST',owner:'You',updated:'22 Sep 2026',created:'22 Sep 2026',usedSeed:['Austin office move'],version:1})}
 
 /* ================= state ================= */
-const S={fOpen:new Set(),fShut:new Set(),fAll:new Set(),fFilt:[],fSel:false,aiPicked:new Set(),whatQ:'',route:'bulk',parked:[],size:412,notes:false,step:'setup',d:null,pop:null,ov:null,menu:false,approver:false,whatQ:'',setF:null,followups:0,timer:null,
+const S={latOn:true,busy:null,fOpen:new Set(),fShut:new Set(),fAll:new Set(),fFilt:[],fSel:false,aiPicked:new Set(),whatQ:'',route:'bulk',parked:[],size:5000,notes:false,step:'setup',d:null,pop:null,ov:null,menu:false,approver:false,whatQ:'',setF:null,followups:0,timer:null,
   se:null,sv:null,segId:null,segTab:'members',slQ:'',slType:'all',slSort:null,hm:null,hmd:null,hmAll:[],gq:'',demo:false,modName:'',insOpen:false,colsOpen:null,segMenu:false,newMenu:false};
 try{S.notes=localStorage.getItem('bc-notes')==='1'}catch(_){}
 let DRAFTN=2041;
@@ -448,7 +451,8 @@ function seedPromos(d){d.csv={};const r=rng(EMP.length+11);let k=0;
     d.csv[e.id]={level:nl,title:k%13===0?e.title:ladder(e.department,nl),compensation:roundComp(c,e.per)};d.cseq=d.cseq||{};const q=++d.seq;['level','title','compensation'].forEach(f=>d.cseq[e.id+'|'+f]=q)}})}
 
 /* ================= targeting + values ================= */
-function cohort(d){const g=d.who.groups;const list=[],why=new Map(),auto={leave:0,term:0,contract:0};
+function cohort(d){const ck=wsig(d);const ch=COH.get(d);if(ch&&ch.k===ck)return ch.r;const r0=cohort0(d);COH.set(d,{k:ck,r:r0});return r0}
+function cohort0(d){const g=d.who.groups;const list=[],why=new Map(),auto={leave:0,term:0,contract:0};
   for(const e of EMP){const gi=evalGroups(g,e);if(gi<0)continue;
     const named=g[gi].conds.some(c=>c.f==='empid'&&complete(c)&&((c.op==='eq'&&c.v[0]===e.id)||(c.op==='anyof'&&c.v.includes(e.id))));
     if(!named){if(e.status==='On leave'){auto.leave++;if(!d.who.incLeave)continue}if(e.status==='Scheduled termination'){auto.term++;if(!d.who.incTerm)continue}if(e.etype==='Contractor'){auto.contract++;if(!d.who.incContract)continue}}
@@ -575,13 +579,17 @@ function rowIssues(d,e){const out=[];const has=f=>d.fields.includes(f);const ch=
   if(d.date&&d.date<TODAY)out.push('retro');
   if(CONFLICT.has(e.id)&&(has('manager')||has('department')||has('team')))out.push('conflict');
   return out}
-let A_CACHE=null;
-function analyze(d){if(A_CACHE&&A_CACHE.d===d)return A_CACHE;const rows=rowsOf(d);const rowIss=new Map(),issues={},rowChanged=new Set(),rowAppr=new Map(),apCount={finance:0,hrbp:0,it:0};let changes=0;
+let A_CACHE=null;let DV=0;let ACM=new WeakMap(),COH=new WeakMap();let LASTSEG='';
+function segSig(){return SEGS.map(s=>s.id+':'+(s.version||0)+':'+(s.updated||'')+':'+s.type+':'+(s.members?s.members.length:'')).join(',')+'|'+EMP.length}
+function wsig(d){const w=d.who;return DV+'|'+LASTSEG+'|'+JSON.stringify(w.groups)+'|'+w.incLeave+w.incTerm+w.incContract}
+function dsig(d){return[wsig(d),d.seq,d.fields.join(),JSON.stringify(d.modes),JSON.stringify(d.same),JSON.stringify(d.sameCur||{}),d.date?+d.date:0,d.rules.map(r=>(r.seq||0)+(r.accepted?'a':'')).join(),d.moved.size,d.exceptions?d.exceptions.size:0,Object.keys(d.csv).length,d.applyMode,d.run?d.run.phase+(d.run.frozen?d.run.frozen.length:''):''].join('|')}
+function syncCache(){const ss=segSig();if(ss!==LASTSEG){LASTSEG=ss;SEGC.clear()}}
+function analyze(d){const sg=dsig(d);const hit=ACM.get(d);if(hit&&hit.sg===sg)return(A_CACHE=hit.A);const rows=rowsOf(d);const rowIss=new Map(),issues={},rowChanged=new Set(),rowAppr=new Map(),apCount={finance:0,hrbp:0,it:0};let changes=0;
   for(const e of rows){let c=0;for(const f of d.fields)if(changed(d,e,f))c++;if(c){rowChanged.add(e.id);changes+=c;const ap=rowApprovals(d,e);if(ap.length){rowAppr.set(e.id,ap);ap.forEach(x=>apCount[x.k]++)}}
     const iss=rowIssues(d,e);if(iss.length){rowIss.set(e.id,iss);iss.forEach(k=>(issues[k]=issues[k]||[]).push(e.id))}}
   let err=0,warn=0,info=0;for(const k in issues){const s2=ISS[k].sev;if(s2==='e')err+=issues[k].length;else if(s2==='w')warn+=issues[k].length;else info+=issues[k].length}
-  A_CACHE={d,rows,rowIss,issues,rowChanged,changes,err,warn,info,rowAppr,apCount,needAppr:rowAppr.size,noAppr:rowChanged.size-rowAppr.size};return A_CACHE}
-const dirty=()=>{A_CACHE=null;SEGC.clear()};
+  A_CACHE={d,rows,rowIss,issues,rowChanged,changes,err,warn,info,rowAppr,apCount,needAppr:rowAppr.size,noAppr:rowChanged.size-rowAppr.size};ACM.set(d,{sg,A:A_CACHE});return A_CACHE}
+const dirty=()=>{A_CACHE=null;DV++;SEGC.clear();LASTSEG=segSig()};
 
 /* ================= impact ================= */
 function impact(d){const A=analyze(d);const R=A.rows.filter(e=>A.rowChanged.has(e.id));const ch=(e,f)=>changed(d,e,f);const N=(e,f)=>nv(d,e,f);
@@ -629,7 +637,31 @@ function renderNav(){const k=navKey();const tier=S.route==='draft'&&!!S.d;$('#fr
 function snavHtml(){const d=S.d;const locked=!!d.run;
   const steps=STEPS.map((s,i)=>{const can=locked?s.k==='status':d.visited.has(s.k)&&s.k!=='status';const on=s.k===S.step&&!S.approver;const done=d.visited.has(s.k)&&!on&&!locked;return navBtn(s.t,on,`data-act="step" data-k="${s.k}"`,!can,done?'✓':String(i+1),done?'done':'')}).join('');
   return`<div class="sh"><button class="crumbback" data-act="nav" data-k="bulk">← All bulk changes</button><b>${esc(d.name||'New bulk change')}</b><small class="muted">${esc(d.id)}${locked?' · submitted':' · draft'}</small></div>${steps}${S.approver?navBtn('Approval · Priya Shah',true,'',false,'•'):''}<div class="side-foot">${locked?'Submitted changes are read-only. Use Create reversal to change them.':'Autosaved · 11:20 IST'}</div>`}
-function render(){dirty();let h='';
+const LATP={page:900,count:1100,preview:1100,ai:1900,impact:420};
+const lat=()=>S.size>=100000&&S.latOn!==false;
+function busy(label,ms,fn,o={}){S.busy={label,sub:o.sub||'',ms,pct:null};renderBusy();setTimeout(()=>{try{fn()}finally{S.busy=null;renderBusy()}},ms)}
+function renderBusy(){const b=S.busy;document.body.classList.toggle('is-busy',!!b);const el=$('#busy');if(!el)return;if(!b){el.classList.remove('on');el.innerHTML='';return}el.classList.add('on');
+  el.innerHTML=`<span class="spin"></span><div class="bt"><b>${esc(b.label)}</b>${b.sub?`<small>${esc(b.sub)}</small>`:''}</div>${b.pct!=null?`<span class="num bp">${Math.round(b.pct)}%</span>`:''}<i class="bbar ${b.pct!=null?'det':''}" style="${b.pct!=null?`width:${b.pct}%`:`animation-duration:${b.ms}ms`}"></i>`}
+function pageSpec(k){const n=fmtN(EMP.length);return{values:{l:`Loading ${n} rows…`,ms:1400},review:{l:"Validating every row against Acme Corp's rules…",sub:`${Object.keys(ISS).length} rules · ${n} employees`,ms:2600},
+  impact:{l:'Calculating downstream impact…',sub:'Payroll, benefits, time off, devices and 4 connected apps',ms:1800},who:{l:'Loading segments…',ms:700},what:{l:'Loading the field catalogue…',ms:900},setup:{l:'Loading…',ms:500},status:{l:'Loading status…',ms:700}}[k]||{l:'Loading…',ms:600}}
+const NAVN={bulk:'bulk changes',segments:'segments',people:'people',settings:'settings'};
+const LATENT={next:()=>{const i=STEPS.findIndex(x=>x.k===S.step);return STEPS[i+1]&&STEPS[i+1].k!=='status'?pageSpec(STEPS[i+1].k):null},back:()=>{const i=STEPS.findIndex(x=>x.k===S.step);return i>0?pageSpec(STEPS[i-1].k):null},
+  step:a=>a.dataset.k===S.step?null:pageSpec(a.dataset.k),resume:()=>({l:'Opening the draft…',ms:1000}),nav:a=>({l:`Loading ${NAVN[a.dataset.k]||'page'}…`,ms:800}),openseg:()=>({l:'Loading the segment…',ms:800}),
+  execchange:()=>{const c=(S.rt&&S.rt.pvc)||0;return{l:`Writing ${fmtN(c)} ${c===1?'value':'values'}…`,sub:"Saving to Acme Corp's employee records",ms:Math.min(5000,1600+c/30)}},
+  undo:()=>({l:'Undoing the last action…',ms:1400}),redo:()=>({l:'Redoing…',ms:1400}),uppreview:()=>({pre:()=>{if(S.ov)S.ov.text=($('#up-ta')||{}).value||S.ov.text},l:`Checking the file against ${fmtN(EMP.length)} records…`,ms:2200}),
+  upapply:()=>({l:'Writing the uploaded values…',ms:2600}),submit:()=>({l:'Submitting for approval…',sub:'Freezing the target list and creating approval requests',ms:2600}),approve:()=>({l:'Recording the decision…',ms:1800}),approveas:()=>({l:'Loading the approval request…',ms:1100}),
+  segsave:()=>({l:'Saving the segment…',sub:`Computing membership across ${fmtN(EMP.length)} employees`,ms:1800}),fix:()=>({l:'Applying the fix…',ms:1600}),fixrow:()=>({l:'Applying the fix…',ms:800}),moveerr:()=>({l:'Moving rows to a follow-up draft…',ms:1600}),ack:()=>({l:'Saving the acknowledgement…',ms:700}),
+  plist:()=>({l:'Loading people…',ms:900}),issuesdrawer:()=>({l:'Loading the breakdown…',ms:800}),drawer:()=>({l:'Calculating the breakdown…',ms:1000}),exportlist:()=>({l:'Preparing the export…',ms:1800}),exportchanges:()=>({l:'Preparing the export…',ms:1800}),
+  ubgo:()=>({l:'Adding the segment…',ms:1200}),newdraft:()=>({l:'Creating a draft…',ms:800}),aigo:()=>({l:'Drafting the change…',ms:1600}),aifields:()=>({l:'Finding fields…',ms:1300}),aiwho:()=>({l:'Drafting conditions…',ms:1500}),haigen:()=>({l:'Drafting a formula…',ms:1200}),
+  segrefresh:()=>({l:'Re-running the conditions…',ms:1600}),confirmcut:()=>({l:'Saving payroll timing…',ms:700})};
+function latWrap(k,a){const L=LATENT[k];if(!L||!lat()||(a&&a._go))return false;if(S.busy)return true;const sp=L(a||{dataset:{}});if(!sp)return false;if(sp.pre)sp.pre();
+  const a2={_go:true,dataset:{...((a&&a.dataset)||{})},checked:a&&a.checked,value:a&&a.value,id:a&&a.id,getBoundingClientRect:()=>({left:0,top:0,bottom:0,width:0})};busy(sp.l,sp.ms,()=>act(k,a2),sp);return true}
+function markSaving(){if(!lat())return;const f=document.querySelector('#snav .side-foot');if(!f)return;f.innerHTML='<span class="spin sm"></span> Saving…';clearTimeout(S.savT);S.savT=setTimeout(()=>{const g=document.querySelector('#snav .side-foot');if(g)g.textContent='All changes saved · just now'},900)}
+function setSizeAsync(n){const o={};const it=genSteps(n,o);S.busy={label:`Loading Acme Corp · ${fmtN(n)} employees`,sub:'Generating employee records',pct:0};renderBusy();
+  const step=()=>{const t=performance.now();let r;while(performance.now()-t<45){r=it.next();if(r.done)break}
+    if(!r.done){S.busy.pct=(r.value/n)*70;S.busy.sub=`Generating employee records · ${fmtN(r.value)} of ${fmtN(n)}`;renderBusy();setTimeout(step,0);return}
+    S.busy.pct=75;S.busy.sub='Building indexes, segments and demo drafts';renderBusy();setTimeout(()=>{setSize(n,o.E);S.busy=null;renderBusy()},30)};setTimeout(step,30)}
+function render(){syncCache();let h='';
   switch(S.route){case'bulk':h=bulkList();break;case'draft':h=draftPage();break;case'segments':h=segList();break;case'segment':h=segDetail();break;
     case'segedit':h=`<div class="crumbs"><button data-act="nav" data-k="segments">Segments</button><span>/</span><span>${S.se.segId?'Edit segment':'New '+(S.se.type==='static'?'static':'dynamic')+' segment'}</span></div>`+segEditor(S.se);break;
     case'people':h=peoplePage();break;case'settings':h=settingsPage();break;default:h=placeholder()}
@@ -638,10 +670,10 @@ function render(){dirty();let h='';
 function renderSheet(){const on=!!(S.se&&S.se.inSheet);$('#sheet').classList.toggle('on',on);$('#sheetbg').classList.toggle('on',on);
   $('#sheet').innerHTML=on?`<div class="sheet-h"><b>Create segment</b><span class="muted" style="font-size:13px">Your bulk change stays open behind this. Saving adds the segment to its targeting.</span><span class="sp"></span><button class="btn2 sm" data-act="sheetclose">Close X</button></div><div class="sheet-b">${segEditor(S.se)}</div>`:''}
 function renderDemo(){$('#demo').innerHTML=(S.demo?`<div class="dpanel pp"><span class="demo-l">Demo controls · not part of the product</span>
-  <div><div class="muted" style="margin-bottom:4px">Company size</div><div class="seg2">${[12,412,5000].map(n=>`<button class="${S.size===n?'on':''}" data-act="size" data-n="${n}">${fmtN(n)}</button>`).join('')}</div></div>
+  <div><div class="muted" style="margin-bottom:4px">Company size</div><div class="seg2">${[12,412,5000,100000].map(n=>`<button class="${S.size===n?'on':''}" data-act="size" data-n="${n}">${fmtN(n)}</button>`).join('')}</div>${S.size>=100000?`<label class="tg" style="margin-top:6px"><input type="checkbox" data-act="lattoggle" ${S.latOn!==false?'checked':''}> Simulate API latency</label><span class="muted" style="font-size:12px">Server calls take time at this size: loaders appear and actions wait for responses.</span>`:''}</div>
   <label class="tg"><input type="checkbox" data-act="notes" ${S.notes?'checked':''}> Show "Why this?" notes</label>
   <div style="display:flex;flex-direction:column;gap:4px"><span class="muted">Presentation pages</span><a href="approach.html" target="_blank" rel="noopener">Approach ↗</a><a href="user-stories.html" target="_blank" rel="noopener">User stories ↗</a><a href="propagation.html" target="_blank" rel="noopener">Propagation ↗</a></div>
-  <div style="display:flex;flex-direction:column;gap:4px"><span class="muted">Sample CSV files (match the ${fmtN(412)}-person company)</span>${Object.keys(SAMPLES).map(f=>`<a href="samples/${f}" download>${f}</a>`).join('')}</div></div>`:'')+`<button class="fab" data-act="demo">${S.demo?'Close':'Demo controls'}</button>`}
+  <div style="display:flex;flex-direction:column;gap:4px"><span class="muted">Sample CSV files (match the ${fmtN(5000)}-person company)</span>${Object.keys(SAMPLES).map(f=>`<a href="samples/${f}" download>${f}</a>`).join('')}</div></div>`:'')+`<button class="fab" data-act="demo">${S.demo?'Close':'Demo controls'}</button>`}
 function toast(m,type){if(!type)type=/^(Name the|Add at least|No one would|Enter |Pick |Fill in|Choose an|None of|Try a|Add a reason|No one called|Give the|Fix the formula)/.test(m)||/isn't an amount/.test(m)?'error':/^(Not part|This is Dana|Change the date|Selected\.|A reversal)/.test(m)?'info':'success';
   const el=document.createElement('div');el.className='toast t-'+type;el.setAttribute('role',type==='error'?'alert':'status');
   el.innerHTML=`<span class="ti">${{success:'✓',error:'!',warning:'!',info:'i'}[type]}</span><div><b>${{success:'Done',error:"Can't continue",warning:'Check this',info:'Note'}[type]}</b><div>${esc(m)}</div></div><button class="tx" aria-label="Dismiss">×</button><i class="tbar" style="animation-duration:${type==='error'?8:5}s"></i>`;
@@ -693,7 +725,7 @@ function summary(d,A){A=A||analyze(d);const kb=(l,v,c,act,k)=>`<button class="kv
 function footer(d,A){const i=STEPS.findIndex(s=>s.k===S.step);if(['status','impact','review'].includes(S.step))return'';
   let ok=true,why='';
   if(S.step==='setup'){if(!d.name.trim()){ok=false;why='Name the change to continue.'}else if(!d.reason.trim()){ok=false;why='Add a reason. Approvers and the audit log need it.'}else if(!d.date){ok=false;why='Pick an effective date. It decides which payroll run picks this up.'}}
-  if(S.step==='who'&&!A.rows.length){ok=false;why='Target at least one employee to continue.'}
+  if(S.step==='who'&&lat()&&d.who.ck!==wsig(d)){ok=false;why='Counting the people who match…'}else if(S.step==='who'&&!A.rows.length){ok=false;why='Target at least one employee to continue.'}
   if(S.step==='what'&&!d.fields.length){ok=false;why='Choose at least one field.'}
   if(S.step==='values'&&!A.changes){ok=false;why='Enter at least one new value.'}
   return`<div class="foot"><div>${i>0?`<button class="btn2" data-act="back">Back</button>`:''}</div><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="why" id="nextwhy">${esc(why)}</span><button class="btn" id="nextbtn" data-act="next" ${ok?'':'disabled'}>Continue to ${esc(STEPS[i+1].t)}</button></div></div>`}
@@ -732,18 +764,19 @@ function valueCtl(ctx,c,gi,ci,F){const v=c.v||[];const op=c.op,t=F.type;const k=
   return TWO.has(op)?`<span class="twov">${inp(0)}<span>and</span>${inp(1)}${cur}</span>`:cur?`<span class="twov">${inp(0)}${cur}</span>`:inp(0)}
 function condPop(){return''}
 /* ================= bulk change: Segments step ================= */
-function segStepView(d){const w=d.who;const C=cohort(d);const n=C.list.length;
+function segStepView(d){const w=d.who;const gk=wsig(d);let counting=false;if(lat()&&w.ck!==gk){counting=true;if(w.pk!==gk){w.pk=gk;clearTimeout(w.ckT);w.ckT=setTimeout(()=>{w.ck=gk;if(S.route==='draft'&&S.step==='who'&&S.d===d)render()},LATP.count)}}
+  const C=cohort(d);const n=C.list.length;
   const ae=document.activeElement;const editing=(S.dd&&/^(bf|bo|bv|bseg|bppl|bpp1|brel|bvl|bm|bcur):d:/.test(S.dd.key))||(ae&&ae.dataset&&(ae.dataset.in==='bv'||ae.dataset.in==='bgn')&&ae.dataset.ctx==='d');
   if(editing&&w.snap==null&&w.cnt!=null)w.snap=w.cnt;
-  if(n!==w.cnt){if(w.cnt!=null){w.prev=editing&&w.snap!=null?w.snap:w.cnt;w.dt=Date.now()}w.cnt=n}
+  if(!counting&&n!==w.cnt){if(w.cnt!=null){w.prev=editing&&w.snap!=null?w.snap:w.cnt;w.dt=Date.now()}w.cnt=n}
   if(!editing)w.snap=null;
   const age=Date.now()-(w.dt||0);const dn=w.prev!=null?n-w.prev:0;
   const delta=w.prev!=null&&dn&&age<8000?`<span class="delta ${dn<0?'dn':'up'}" style="animation-delay:-${age}ms">${dn<0?'↓':'↑'} ${fmtN(Math.abs(dn))} (${fmtN(w.prev)} → ${fmtN(n)}) after your last edit</span>`:'';
   if(delta){clearTimeout(S.dTimer);S.dTimer=setTimeout(()=>{if(S.route==='draft'&&S.step==='who'&&!S.dd&&!S.se&&!S.ov){const el=document.querySelector('.tsum .delta');if(el)el.remove()}},8000-age)}
   const exs=[];if(!w.incTerm&&C.auto.term)exs.push(pl(C.auto.term,'scheduled termination'));if(!w.incContract&&C.auto.contract)exs.push(pl(C.auto.contract,'contractor'));if(!w.incLeave&&C.auto.leave)exs.push(pl(C.auto.leave,'person on leave','people on leave'));
-  const card=`<div class="tsum"><div class="tsum-n"><span class="big">${fmtN(n)}</span><span class="muted">${n===1?'person':'people'} targeted</span>${delta}</div>
+  const card=`<div class="tsum ${counting?'counting':''}"><div class="tsum-n">${counting?`<span class="spin"></span><span class="muted">Counting matching people…</span>`:`<span class="big">${fmtN(n)}</span><span class="muted">${n===1?'person':'people'} targeted</span>${delta}`}</div>
     <div class="tsum-r"><div class="clamp2">${esc(groupsTxt(w.groups)||'No targeting yet. Insert a saved segment or add a condition.')}</div>${exs.length?`<div class="tsum-x">Leaves out ${exs.join(', ')}.</div>`:''}</div>
-    <button class="btn2" data-act="drawer" data-k="target" ${n?'':'disabled'}>View breakdown</button></div>`;
+    <button class="btn2" data-act="drawer" data-k="target" ${n&&!counting?'':'disabled'}>View breakdown</button></div>`;
   const qa=`<div class="qa">${ddBtn('ins','','Insert saved segment','btnlike')}<button class="btn2 icb" data-act="createseg">${PLUS} Create segment</button><button class="btn2" data-act="pasteids">Paste employee IDs</button></div>`;
   const paste=w.pasteOpen?`<div class="pastecard"><b style="font-size:13.5px">Paste employee IDs, work emails or names</b><span class="sub">Any mix, one per line or comma-separated. They're added as an "Employee ID is any of" group, so they join the people you already target.</span>
     <textarea class="ta" id="paste-ta" data-in="paste">${esc(w.paste)}</textarea><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sm" data-act="pasteadd">Add people</button><button class="txt" data-act="pastesample">Paste a sample list</button><button class="txt" data-act="pasteids">Cancel</button></div></div>`:'';
@@ -1070,15 +1103,16 @@ function toolPanel(d,diffF){const g=d.grid;
     const noArg=['first','eff','skip','ladder'].includes(R.op);const two=R.op==='map'||R.op==='replace';
     const args=noArg?'':two?`${rtArg(R,'a')}<span>${R.op==='replace'?'with':'→'}</span>${rtArg(R,'b')}`:rtArg(R,'a')+(R.op==='pct'||R.op==='pctbase'?'<span>%</span>':'');
     const cur=F.type==='money'&&(R.op==='add'||R.op==='set')?ddBtn('rtc',R.cur,'','mini'):'';const cap=R.field==='compensation'&&R.op!=='set'?`<span>cap at</span>${ddBtn('rtcap',{max:'band maximum',mid:'band midpoint','':'no cap'}[R.cap||''],'','mini')}`:'';
-    const lim=viewLimit(d);const useLim=lim&&R.inView!==false;const t=rtRule(d);const pv=t.r?previewChange(d,t.r,useLim?lim:null):null;const A=analyze(d);const w=ruleWhere({where:R.groups});
-    const match=pv?pv.rows:(w.length?changeTargets(d,{where:R.groups},useLim?lim:null).length:(useLim?lim.size:A.rows.length));
+    const lim=viewLimit(d);const useLim=lim&&R.inView!==false;const t=rtRule(d);const pkey=JSON.stringify([R.field,R.op,R.a,R.b,R.cur,R.cap,R.groups,R.inView,lim?lim.size:0,d.seq]);let calc=false,pv=null;
+    if(t.r){if(R.pvKey===pkey)pv=R.pvRes;else if(lat()){calc=true;if(R.pvPend!==pkey){R.pvPend=pkey;clearTimeout(S.pvT2);S.pvT2=setTimeout(()=>{if(S.rt!==R)return;R.pvRes=previewChange(d,t.r,useLim?lim:null);R.pvKey=pkey;R.pvc=R.pvRes.writes.length;if(d.grid.tool==='change')render()},LATP.preview)}}else{pv=previewChange(d,t.r,useLim?lim:null);R.pvKey=pkey;R.pvRes=pv;R.pvc=pv.writes.length}}const A=analyze(d);const w=ruleWhere({where:R.groups});
+    const match=pv?pv.rows:(calc?0:(w.length?changeTargets(d,{where:R.groups},useLim?lim:null).length:(useLim?lim.size:A.rows.length)));
     return`<div class="tool rtool">${R.ai?`<div class="aiflag"><span class="badge b-ai">✦ Drafted from: “${esc(R.ai)}”</span><span class="muted" style="font-size:12.5px">Check it, then execute. Nothing changes until you do.</span></div>`:''}
       <div class="rrow"><span class="rl">Change</span><span style="min-width:200px">${ddBtn('rtf',F.label,'Field')}</span><span style="min-width:220px">${ddBtn('rtk',ol,'')}</span>${args}${cur}${cap}</div>
       <div class="rrow top"><span class="rl">For</span><div class="rwhere">${builder('rule',R.groups)}${w.length?'':`<span class="muted" style="font-size:13px">No conditions: everyone in this change${useLim?' who is in view':''}.</span>`}
         ${lim?`<label class="tg"><input type="checkbox" data-act="rtinview" ${useLim?'checked':''}> Only the ${pl(lim.size,'row')} in view (your grid filter)</label>`:''}</div></div>
       <div class="rrow aibox2"><span class="rl">Or</span><input class="box" id="ai-ta" data-in="aitext" value="${esc(S.aiText||'')}" placeholder="Describe it, e.g. 1,000 USD one-time bonus for the Platform team" style="flex:1;min-width:240px"><button class="btn2 sm" data-act="aigo">✦ Draft it</button></div>
-      <div class="rrow"><span class="pvline">${pv?`Will change <b class="num">${fmtN(pv.writes.length)}</b> ${pv.writes.length===1?'cell':'cells'} in the ${pl(match,'matching row')}${match-pv.writes.length>0?` (${fmtN(match-pv.writes.length)} already have that value or don't apply)`:''}.`:`<span class="muted">${fmtN(match)} matching rows. ${esc(t.err||'')}</span>`}</span>
-        <span style="margin-left:auto;display:flex;gap:10px"><button class="btn2 sm" data-act="tool" data-k="change">Cancel</button><button class="btn sm" data-act="execchange" ${pv&&pv.writes.length?'':'disabled'}>Execute changes</button></span></div></div>`}
+      <div class="rrow"><span class="pvline">${calc?`<span class="spin sm"></span> Calculating how many cells will change…`:pv?`Will change <b class="num">${fmtN(pv.writes.length)}</b> ${pv.writes.length===1?'cell':'cells'} in the ${pl(match,'matching row')}${match-pv.writes.length>0?` (${fmtN(match-pv.writes.length)} already have that value or don't apply)`:''}.`:`<span class="muted">${fmtN(match)} matching rows. ${esc(t.err||'')}</span>`}</span>
+        <span style="margin-left:auto;display:flex;gap:10px"><button class="btn2 sm" data-act="tool" data-k="change">Cancel</button><button class="btn sm" data-act="execchange" ${pv&&pv.writes.length&&!calc?'':'disabled'}>Execute changes</button></span></div></div>`}
   if(g.tool==='filter'){if(!g.fg)g.fg=[{mode:'all',conds:[]}];return`<div class="tool rtool"><div class="rrow top"><span class="rl">Show rows where</span><div class="rwhere">${builder('gf',g.fg)}</div></div>
       <div class="rrow"><span class="muted" style="font-size:13px">Change values can be limited to the rows in view.</span><span style="margin-left:auto;display:flex;gap:10px"><button class="btn2 sm" data-act="gfclear">Clear filter</button><button class="btn sm" data-act="tool" data-k="filter">Done</button></span></div></div>`}
   return''}
@@ -1173,11 +1207,11 @@ function plistModal(){const d=S.d;const[title,list]=plistOf(d,S.ov.k);const A=an
     {key:'flags',label:'Flags',type:'text',get:e=>(A.rowIss.get(e.id)||[]).map(x=>ISS[x].label).join('; '),wrap:true}];
   return`<div class="modal wide"><header class="bar"><h2>${esc(title)} · ${fmtN(list.length)}</h2><div class="bar-act"><button data-act="closeov">Close X</button></div></header><div class="modal-b">${dataTable('plist',tsOf('plist'),list.filter(Boolean),cols,{bare:true,searchPh:'Search name or employee ID'})}</div></div>`}
 function confirmSig(d,A){return[A.changes,A.rowChanged.size,A.err,A.warn,d.fields.join(),d.date?iso(d.date):''].join('|')}
-function summaryBlock(d,A){const L=changeList(d,A);const ai=aiSummary(d,A,L);const cite=t=>esc(t).replace(/\[(\d+)\]/g,'<button class="cite" data-act="cite" data-n="$1" aria-label="Go to line $1">$1</button>');
+function summaryBlock(d,A){const L=changeList(d,A);const sigA=confirmSig(d,A);const aiWait=lat()&&d.aiK!==sigA;if(aiWait&&d.aiP!==sigA){d.aiP=sigA;setTimeout(()=>{d.aiK=sigA;if(S.step==='review'&&S.d===d)render()},LATP.ai)}const ai=aiWait?[]:aiSummary(d,A,L);const cite=t=>esc(t).replace(/\[(\d+)\]/g,'<button class="cite" data-act="cite" data-n="$1" aria-label="Go to line $1">$1</button>');
   const samp=spread(A.rows.filter(e=>A.rowChanged.has(e.id)),5);const F=d.fields.slice().sort((a,b)=>fo(a)-fo(b));
   return`<div class="sec"><div class="sec-h"><h3 class="h3">Summary of changes</h3><span class="muted" style="font-size:13px">Read this before you confirm. The change list is exactly what will be submitted.</span></div>
-  <div class="aisum"><div class="aisum-h"><span class="badge b-ai">✦ AI summary</span><span class="muted" style="font-size:12.5px">Written from the change list below. Numbers link to the line they come from.</span><span style="margin-left:auto;display:flex;gap:12px"><button class="lnk" data-act="aicopy">Copy</button><button class="lnk" data-act="airegen">Regenerate</button></span></div>
-    <ul>${ai.map(t=>`<li>${cite(t)}</li>`).join('')}</ul></div>
+  <div class="aisum"><div class="aisum-h"><span class="badge b-ai">✦ AI summary</span><span class="muted" style="font-size:12.5px">Written from the change list below. Numbers link to the line they come from.</span><span style="margin-left:auto;display:flex;gap:12px"><button class="lnk" data-act="aicopy" ${aiWait?'disabled':''}>Copy</button><button class="lnk" data-act="airegen" ${aiWait?'disabled':''}>Regenerate</button></span></div>
+    ${aiWait?`<div class="skel"><span class="spin sm"></span> Writing the summary from the change list…<i></i><i></i><i style="width:60%"></i></div>`:`<ul>${ai.map(t=>`<li>${cite(t)}</li>`).join('')}</ul>`}</div>
   <div class="pcard" style="padding:0"><div class="sec-h" style="padding:12px 14px 0"><h3 class="h3" style="font-size:14px">Change list</h3><span style="display:flex;gap:14px"><button class="lnk" data-act="step" data-k="values">Open in the grid</button><button class="lnk" data-act="exportchanges">Download every row (CSV)</button></span></div>
     <div class="tw"><table class="t clist"><thead><tr><th>#</th><th>What</th><th class="num">People</th><th>Total</th><th>Detail</th><th>Where the values came from</th></tr></thead><tbody>
     ${L.map(x=>`<tr id="cl-${x.n}"><td class="muted num">${x.n}</td><td><b>${esc(x.label)}</b></td><td class="num">${nl(x.people,x.pkey)}</td><td>${esc(x.totals)}</td><td><small>${x.detail}</small></td><td><small class="muted">${x.srcHtml||''}</small></td></tr>`).join('')}</tbody></table></div></div>
@@ -1204,8 +1238,9 @@ function impactFlow(d,A,I,pi,payNeeded){const n=A.rowChanged.size;const P=(x,w)=
     {k:'wf',name:'Approval workflows',n:I.wf,v:'Pending time off and expense approvals re-route to the new managers.'}];
   const owners={slack:'Raj Patel (IT)',google:'Raj Patel (IT)',github:'Eng managers',pagerduty:'Eng managers'};
   const ap=Object.entries(I.apps).map(([k,a])=>({k:'app-'+k,name:a.name,n:a.total+a.loss,v:`Profile and group changes sync on ${d.appSync==='now'?'approval':fmtD(d.date)}. ${owners[k]} reviews them${a.loss?`; ${a.lossTxt(a.loss)}`:''}.`,dec:a.loss&&!d.accessAck?'Acknowledge access removal':''}));
-  const node=x=>`<a class="fnode on ${x.dec?'dec':''}" href="#${x.k==='payroll'?'imp-payroll':x.k.startsWith('app-')?'imp-apps':'imp-rippling'}"><div class="fn-top"><b>${esc(x.name)}</b><span class="fn-n">${P(x.n)}</span></div><small>${esc(x.v)}</small>${x.dec?`<span class="badge b-warn">${esc(x.dec)}</span>`:''}</a>`;
-  const grp=(t,xs)=>{const on=xs.filter(x=>x.n),off=xs.filter(x=>!x.n);return`<div class="fgl">${t}</div>${on.map(node).join('')}${off.length?`<div class="fnode off"><span class="muted" style="font-size:12.5px">Not affected, no re-verification:</span> ${off.map(x=>`<span class="offchip">${esc(x.name)}</span>`).join('')}</div>`:''}`};
+  const sigI=confirmSig(d,A);const chk=lat()&&d.impK!==sigI;let ni=0;if(chk&&d.impP!==sigI){d.impP=sigI;setTimeout(()=>{d.impK=sigI;if(S.step==='impact'&&S.d===d)render()},LATP.impact*9+600)}
+  const node=x=>`<a class="fnode on ${x.dec?'dec':''} ${chk?'chk':''}" style="--d:${chk?(ni++)*LATP.impact:0}ms" href="#${x.k==='payroll'?'imp-payroll':x.k.startsWith('app-')?'imp-apps':'imp-rippling'}"><div class="fn-top"><b>${esc(x.name)}</b><span class="fn-n">${P(x.n)}</span></div><small>${esc(x.v)}</small>${x.dec?`<span class="badge b-warn">${esc(x.dec)}</span>`:''}</a>`;
+  const grp=(t,xs)=>{const on=xs.filter(x=>x.n),off=xs.filter(x=>!x.n);return`<div class="fgl">${t}</div>${on.map(node).join('')}${off.length?`<div class="fnode off ${chk?'chk':''}" style="--d:${chk?(ni++)*LATP.impact:0}ms"><span class="muted" style="font-size:12.5px">Not affected, no re-verification:</span> ${off.map(x=>`<span class="offchip">${esc(x.name)}</span>`).join('')}</div>`:''}`};
   return`<div class="region"><div class="region-h"><h3 class="h3">What this change sets off</h3><span class="sub">Each system that reads a changed field re-verifies it. Click a system for the detail.</span></div>
   <div class="flow"><div class="fsrc"><span class="muted" style="font-size:12px">This bulk change</span><b>${esc(d.name||'Untitled')}</b><span>${P(n)} · ${esc(d.fields.map(f=>FIELDS[f].label).join(', '))}</span><span class="muted" style="font-size:12.5px">Effective ${fmtD(d.date,true)}</span></div>
     <div class="fbus">${grp('Rippling products at Acme Corp',rp)}${grp('Connected apps',ap)}</div></div>
@@ -1229,7 +1264,7 @@ function impactView(d){const A=analyze(d);const I=impact(d);const pi=d.date?payI
   const apps=Object.entries(I.apps).map(([k,a])=>{if(!a.total&&!a.loss)return'';const open=d.show['app-'+k];
     return`<div class="icd"><h4>${esc(a.name)}<button class="lnk" data-act="whyapp" data-k="${k}">${open?'Hide mapping':'Why this app?'}</button></h4><ul>${a.items.filter(x=>x[0]).map(x=>`<li><b class="num">${fmtN(x[0])}</b> ${esc(x[1])}</li>`).join('')}${a.loss?`<li class="loss"><b>${esc(a.lossTxt(a.loss))}</b></li>`:''}</ul>${open?`<div class="mapping">Changed fields mapped to this app:<br>${a.items.map(x=>esc(x[2])).join('<br>')}</div>`:''}</div>`}).join('');
   const appsZero=Object.values(I.apps).filter(a=>!a.total&&!a.loss).map(a=>a.name);
-  const decisions=[];if(payNeeded&&!d.cutoff.confirmed)decisions.push('Confirm payroll timing for a late approval');if(I.losses&&!d.accessAck)decisions.push('Acknowledge the access people will lose');
+  const decisions=[];if(lat()&&d.impK!==confirmSig(d,A))decisions.push('Wait for the downstream checks to finish');if(payNeeded&&!d.cutoff.confirmed)decisions.push('Confirm payroll timing for a late approval');if(I.losses&&!d.accessAck)decisions.push('Acknowledge the access people will lose');
   const n=A.rows.filter(e=>A.rowChanged.has(e.id)).length;const lbl=I.approvers.length?`Submit changes for ${pl(n,'person','people')} for approval · effective ${fmtD(d.date)}`:`Schedule changes for ${pl(n,'person','people')} · effective ${fmtD(d.date)}`;
   return`${impactFlow(d,A,I,pi,payNeeded)}
   <div class="region" id="imp-rippling"><div class="region-h"><h3 class="h3">Rippling products at Acme Corp</h3><span class="sub">They read Acme Corp's employee record directly and update on ${fmtD(d.date)}.</span></div>${payCard}<div class="cards">${cards.join('')}</div>${zeros.length?`<div class="zero"><b>Not affected:</b> ${zeros.join(' · ')}</div>`:''}</div>
@@ -1408,7 +1443,7 @@ function renderNotes(){const el=$('#notes');el.classList.toggle('on',S.notes);if
   el.innerHTML=`<div class="sec-h"><h3>Why each element is here</h3><button class="txt" data-act="notes">Close</button></div><p class="sub">Element · principle · why it holds for an HR admin.</p>${rows.map(r=>`<div class="nrow"><b>${esc(r[0])}</b><span>${esc(r[1])}</span><small class="muted">${esc(r[2])}</small></div>`).join('')}`}
 
 /* ================= actions ================= */
-function setSize(n){S.size=n;build(n);makeSeeds();clearInterval(S.timer);S.d=demoDraft();dirty();if(S.step==='status')S.step='impact';
+function setSize(n,E0){S.size=n;build(n,E0);TS.people&&(TS.people.page=1);makeSeeds();clearInterval(S.timer);S.d=demoDraft();dirty();if(S.step==='status')S.step='impact';
   S.parked=extraDrafts();S.approver=false;S.followups=0;S.ov=null;S.se=null;S.hm=null;S.drawer=null;S.rt=null;if(S.route==='segment'||S.route==='segedit')S.route='segments';
   toast(`Acme Corp now has ${fmtN(EMP.length)} employees. Same flow, same screens.`);render()}
 function next(){const d=S.d;const i=STEPS.findIndex(s=>s.k===S.step);const k=STEPS[i+1].k;if(k==='status')return;d.visited.add(k);S.step=k;S.menu=false;S.pop=null;render();window.scrollTo(0,0)}
@@ -1456,9 +1491,10 @@ function tsOf(t){return t==='seed'?S.se:t==='segv'?S.sv:(TS[t]=TS[t]||tsNew(t===
 function openHM(a){const t=a.dataset.t,k=a.dataset.k;const r=a.getBoundingClientRect();const ts=tsOf(t);const m=MT[t];const col=m.allCols.find(c=>c.key===k);
   const f=ts.tf[k]||{};S.hm={t,k,x:r.left-8,y:r.bottom+6};S.hmd={op:f.cond?f.cond.op:'',v:f.cond?f.cond.v.slice():[],vals:f.vals?f.vals.slice():null,vq:'',ai:''};
   const cnt={};m.base.forEach(e=>{const v=dispVal(col,col.get(e));cnt[v]=(cnt[v]||0)+1});S.hmAll=Object.entries(cnt).sort((a2,b)=>a2[0].localeCompare(b[0]));renderHM()}
-function act(k,a){const d=S.d;switch(k){
+function act(k,a){if(latWrap(k,a))return;const d=S.d;switch(k){
   case'nav':S.drawer=null;S.route=['bulk','segments','people','settings'].includes(a.dataset.k)?a.dataset.k:'module';S.modName=a.dataset.k;S.approver=false;S.hm=null;if(S.se&&!S.se.inSheet)S.se=null;try{history.replaceState(null,'','#'+a.dataset.k)}catch(_){}render();window.scrollTo(0,0);break;
-  case'size':setSize(+a.dataset.n);break;
+  case'size':{const n=+a.dataset.n;if(n>=50000||S.size>=50000)setSizeAsync(n);else setSize(n);break}
+  case'lattoggle':S.latOn=a.checked;renderDemo();break;
   case'notes':S.notes=!S.notes;try{localStorage.setItem('bc-notes',S.notes?'1':'0')}catch(_){}render();break;
   case'demo':S.demo=!S.demo;renderDemo();break;
   case'soon':toast('Not part of this prototype.');break;
@@ -1615,7 +1651,7 @@ function act(k,a){const d=S.d;switch(k){
   case'apm':d.applyMode=a.value;render();break;
   case'confirmchg':{const A=analyze(d);d.confirmed=a.checked?confirmSig(d,A):null;render();break}
   case'cite':{const el=document.getElementById('cl-'+a.dataset.n);if(el){el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash')}break}
-  case'airegen':toast('Summary regenerated from the current change list.','info');render();break;
+  case'airegen':if(lat()){d.aiK=null;d.aiP=null;render();break}toast('Summary regenerated from the current change list.','info');render();break;
   case'aicopy':{const A=analyze(d);const t=aiSummary(d,A,changeList(d,A)).map(x=>'• '+x.replace(/\s*\[\d+\]/g,'')).join('\n');try{navigator.clipboard.writeText(t).then(()=>toast('Summary copied.'),()=>toast('Summary copied.'))}catch(_){toast('Summary copied.')}break}
   case'exportchanges':{const A=analyze(d);const fs=d.fields;const rows=A.rows.filter(e=>A.rowChanged.has(e.id));
     S.ov={type:'text',title:'Every changed row',sub:`${pl(rows.length,'row')} · the same data the change list summarises`,text:[csvLine(['Employee ID','Name',...fs.flatMap(f=>[FIELDS[f].label+' (current)',FIELDS[f].label+' (new)']),'Approval']),...rows.map(e=>csvLine([e.id,e.name,...fs.flatMap(f=>[fmtVal(e,f,e[f]),fmtVal(e,f,nv(d,e,f))]),(A.rowAppr.get(e.id)||[]).map(x=>APPROVERS[x.k].short).join(' + ')||'None']))].join('\n')};renderOverlay();break}
@@ -1761,7 +1797,7 @@ function ddSpec(key){const p=key.split(':');const t=p[0];
     else if(F.type==='team')groups=[{label:nv(d,e,'department'),items:(TEAMS[nv(d,e,'department')]||[]).map(x=>({v:x,label:x}))}];else groups=[{label:'',items:F.opts().map(x=>({v:x,label:x}))}];
     groups=[{label:'',items:[{v:'__keep',label:`Keep “${fmtVal(e,f,e[f])||'blank'}”`,sub:'No change'}]},...groups.map(g=>({label:g.label,items:g.items.filter(it=>it.v!==e[f])}))];
     const v0=val(d,e,f);return{kind:'single',ph:f==='title'?'Search titles':'Search values',w:300,groups,value:v0&&String(v0)!==String(e[f])?v0:'__keep',
-      apply:v=>{rec(`Edited ${e.name} · ${F.label}`);setCell(id,f,v==='__keep'?'':v)},footer:f==='title'?{act:'reqtitle',label:'Request a new title'}:null}}
+      apply:v=>{rec(`Edited ${e.name} · ${F.label}`);setCell(id,f,v==='__keep'?'':v);setTimeout(markSaving,0)},footer:f==='title'?{act:'reqtitle',label:'Request a new title'}:null}}
   if(t==='sample')return{kind:'single',search:false,w:300,groups:[{label:'',items:[['promotion-nominations-fy26.csv','Promotion nominations','Employee ID key · Yes/No, number, date and picklist columns'],['austin-office-movers.csv','Austin office movers','Work Email key · move date, relocation and parking columns']].map(([v,l,sb])=>({v,label:l,sub:sb}))}],value:null,apply:v=>{loadFile(S.se,v,SAMPLES[v]())}};
   return null}
 function renderDD(){const el=$('#pop2');if(!S.dd){el.innerHTML='';return}const sp=ddSpec(S.dd.key);if(!sp){S.dd=null;el.innerHTML='';return}
@@ -1793,7 +1829,7 @@ document.addEventListener('change',ev=>{const t=ev.target;const d=S.d;
   if(t.dataset.cell){const[id,f]=t.dataset.cell.split('|');const F=FIELDS[f];let v=t.value;
     if(v==='')v='';else if(F.type==='money'||F.type==='int'){const n=parseMoney(v);if(!isFinite(n)){t.value='';toast(`"${v}" isn't an amount.`);return}v=f==='compensation'?roundComp(n,nv(d,EMPI[id],'per')):Math.round(n)}
     else if(F.type==='person'){if(v){const p=parsePerson(v);if(!p){toast(`No one called "${v}". Pick from the list.`);t.value='';return}v=p}}
-    rec(`Edited ${EMPI[id]?.name||id} · ${F.label}`);setCell(id,f,v);refreshGrid();return}
+    rec(`Edited ${EMPI[id]?.name||id} · ${F.label}`);setCell(id,f,v);refreshGrid();markSaving();return}
   const k=t.dataset.in;if(!k)return;const G2=t.dataset.ctx?groupsOf(t.dataset.ctx):null;const c=G2&&t.dataset.c!==undefined?G2[+t.dataset.g].conds[+t.dataset.c]:null;
   switch(k){
     case'name':d.name=t.value;render();break;case'reason':d.reason=t.value;break;

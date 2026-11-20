@@ -1,24 +1,253 @@
 Work email,Employee name,Desk,Move date,Relocation package,Parking needed,Notes
-fleda.pfannerstill@acmecorp.com,Fleda Pfannerstill,A-41,12/01/2027,Yes,N,Needs a standing desk
-anneliese.wehner@acmecorp.com,Anneliese Wehner,B-11,19/01/2027,Yes,Y,
- OTIS.MAYER@ACMECORP.COM ,Otis Mayer,C-33,08/01/2027,Yes,Y,
-lavonne.heller@acmecorp.com,Lavonne Heller,A-33,04/01/2027,No,Y,
-petra.mayer@acmecorp.com,Petra Mayer,B-15,06/01/2027,Yes,N,Needs a standing desk
-silas.abernathy@acmecorp.com,Silas Abernathy,C-26,07/01/2027,Yes,N,
-arjun.lind@acmecorp.com,Arjun Lind,A-26,14/01/2027,Yes,N,
- ZELDA.CORMIER@ACMECORP.COM ,Zelda Cormier,B-28,20/01/2027,Yes,Y,
-zelda.oberbrunner@acmecorp.com,Zelda Oberbrunner,C-26,17/01/2027,No,N,Needs a standing desk
-zelda.mayer@acmecorp.com,Zelda Mayer,A-35,04/01/2027,Yes,Y,
-maverick.collier@acmecorp.com,Maverick Collier,B-47,25/01/2027,Yes,N,
-hollis.bechtelar@acmecorp.com,Hollis Bechtelar,C-36,11/01/2027,Yes,Y,
- MAFALDA.CONSIDINE@ACMECORP.COM ,Mafalda Considine,A-15,08/01/2027,Yes,Y,Needs a standing desk
-anneliese.rempel@acmecorp.com,Anneliese Rempel,B-39,06/01/2027,Yes,N,
-reva.ondricka@acmecorp.com,Reva Ondricka,C-26,05/01/2027,No,N,
-nadia.stiedemann@acmecorp.com,Nadia Stiedemann,A-43,18/01/2027,Yes,N,
-ulrich.hilpert@acmecorp.com,Ulrich Hilpert,B-45,22/01/2027,Yes,Y,Needs a standing desk
- QUINCY.COLLIER@ACMECORP.COM ,Quincy Collier,C-39,08/01/2027,No,N,
-garnet.upton@acmecorp.com,Garnet Upton,A-20,25/01/2027,No,Y,
-elva.quigley@acmecorp.com,Elva Quigley,B-42,07/01/2027,No,Y,
-ezekiel.gerlach@acmecorp.com,Ezekiel Gerlach,C-21,24/01/2027,Yes,N,Needs a standing desk
+ayla.upton@acmecorp.com,Ayla Upton,A-46,15/01/2027,Yes,N,Needs a standing desk
+silas.considine@acmecorp.com,Silas Considine,B-40,22/01/2027,Yes,N,
+ FLORENCE.FUNK1@ACMECORP.COM ,Florence Funk,C-40,17/01/2027,No,N,
+ines.considine@acmecorp.com,Ines Considine,A-11,09/01/2027,No,N,
+nadia.jacobi@acmecorp.com,Nadia Jacobi,B-32,19/01/2027,Yes,Y,Needs a standing desk
+mei.rau@acmecorp.com,Mei Rau,C-11,15/01/2027,Yes,N,
+ayla.gerlach@acmecorp.com,Ayla Gerlach,A-34,05/01/2027,Yes,Y,
+ KOFI.ONDRICKA@ACMECORP.COM ,Kofi Ondricka,B-37,07/01/2027,No,Y,
+quincy.koepp@acmecorp.com,Quincy Koepp,C-38,12/01/2027,Yes,N,Needs a standing desk
+kofi.bergstrom@acmecorp.com,Kofi Bergstrom,A-41,12/01/2027,No,N,
+verna.daugherty@acmecorp.com,Verna Daugherty,B-21,21/01/2027,Yes,Y,
+harriet.prosacco@acmecorp.com,Harriet Prosacco,C-30,21/01/2027,No,N,
+ CYRUS.ZIEME@ACMECORP.COM ,Cyrus Zieme,A-39,20/01/2027,Yes,N,Needs a standing desk
+rhett.yost@acmecorp.com,Rhett Yost,B-42,10/01/2027,Yes,N,
+kenji.koepp@acmecorp.com,Kenji Koepp,C-46,23/01/2027,No,N,
+reva.bergstrom@acmecorp.com,Reva Bergstrom,A-29,04/01/2027,Yes,N,
+garnet.jacobi@acmecorp.com,Garnet Jacobi,B-47,15/01/2027,No,N,Needs a standing desk
+ AYLA.VOLKMAN@ACMECORP.COM ,Ayla Volkman,C-23,22/01/2027,No,Y,
+zelda.yost@acmecorp.com,Zelda Yost,A-22,17/01/2027,No,Y,
+gideon.larkin@acmecorp.com,Gideon Larkin,B-29,04/01/2027,Yes,N,
+ines.runolfsdottir@acmecorp.com,Ines Runolfsdottir,C-47,20/01/2027,No,Y,Needs a standing desk
+elva.stiedemann@acmecorp.com,Elva Stiedemann,A-24,07/01/2027,Yes,Y,
+ LEONTINE.CORMIER1@ACMECORP.COM ,Leontine Cormier,B-33,10/01/2027,Yes,Y,
+ayla.rau@acmecorp.com,Ayla Rau,C-18,07/01/2027,Yes,N,
+celeste.schaden@acmecorp.com,Celeste Schaden,A-37,21/01/2027,Yes,Y,Needs a standing desk
+elva.larkin@acmecorp.com,Elva Larkin,B-38,18/01/2027,No,N,
+ulrich.zieme@acmecorp.com,Ulrich Zieme,C-45,20/01/2027,Yes,Y,
+ THEODORA.ZIEME@ACMECORP.COM ,Theodora Zieme,A-46,25/01/2027,Yes,Y,
+wendell.abernathy@acmecorp.com,Wendell Abernathy,B-27,24/01/2027,No,Y,Needs a standing desk
+yusuf.upton@acmecorp.com,Yusuf Upton,C-20,07/01/2027,Yes,Y,
+dario.bode@acmecorp.com,Dario Bode,A-37,05/01/2027,Yes,N,
+cyrus.yost@acmecorp.com,Cyrus Yost,B-48,24/01/2027,Yes,Y,
+ GIDEON.ONDRICKA2@ACMECORP.COM ,Gideon Ondricka,C-46,19/01/2027,Yes,N,Needs a standing desk
+celeste.prosacco@acmecorp.com,Celeste Prosacco,A-22,09/01/2027,No,Y,
+ezekiel.schaden@acmecorp.com,Ezekiel Schaden,B-12,16/01/2027,Yes,Y,
+verna.nader@acmecorp.com,Verna Nader,C-31,21/01/2027,No,N,
+hollis.hilpert@acmecorp.com,Hollis Hilpert,A-36,12/01/2027,Yes,N,Needs a standing desk
+ XIMENA.ABERNATHY@ACMECORP.COM ,Ximena Abernathy,B-25,24/01/2027,No,N,
+osvaldo.bechtelar1@acmecorp.com,Osvaldo Bechtelar,C-16,20/01/2027,Yes,N,
+mei.rempel@acmecorp.com,Mei Rempel,A-46,23/01/2027,No,Y,
+juniper.funk@acmecorp.com,Juniper Funk,B-19,25/01/2027,Yes,Y,Needs a standing desk
+delphine.cormier@acmecorp.com,Delphine Cormier,C-12,16/01/2027,No,Y,
+ WENDELL.ZIEME@ACMECORP.COM ,Wendell Zieme,A-33,04/01/2027,Yes,N,
+garnet.bergstrom1@acmecorp.com,Garnet Bergstrom,B-19,14/01/2027,No,Y,
+reva.rau@acmecorp.com,Reva Rau,C-44,09/01/2027,Yes,N,Needs a standing desk
+nadia.nader1@acmecorp.com,Nadia Nader,A-13,09/01/2027,Yes,Y,
+florence.dicki@acmecorp.com,Florence Dicki,B-49,14/01/2027,No,N,
+ INES.DICKI@ACMECORP.COM ,Ines Dicki,C-41,23/01/2027,Yes,Y,
+hollis.wehner@acmecorp.com,Hollis Wehner,A-14,04/01/2027,Yes,Y,Needs a standing desk
+ismael.tromp@acmecorp.com,Ismael Tromp,B-46,25/01/2027,No,N,
+sanna.haley@acmecorp.com,Sanna Haley,C-46,06/01/2027,Yes,N,
+dario.considine1@acmecorp.com,Dario Considine,A-33,14/01/2027,Yes,N,
+ ISMAEL.RUNOLFSDOTTIR@ACMECORP.COM ,Ismael Runolfsdottir,B-41,18/01/2027,Yes,N,Needs a standing desk
+kasimir.upton@acmecorp.com,Kasimir Upton,C-36,17/01/2027,No,Y,
+osvaldo.runolfsdottir@acmecorp.com,Osvaldo Runolfsdottir,A-45,12/01/2027,Yes,Y,
+quincy.oberbrunner@acmecorp.com,Quincy Oberbrunner,B-40,17/01/2027,No,Y,
+harriet.tromp@acmecorp.com,Harriet Tromp,C-35,25/01/2027,Yes,Y,Needs a standing desk
+ TOBIAS.ZIEME@ACMECORP.COM ,Tobias Zieme,A-12,12/01/2027,Yes,Y,
+yusuf.upton1@acmecorp.com,Yusuf Upton,B-29,18/01/2027,No,N,
+silas.ondricka@acmecorp.com,Silas Ondricka,C-10,16/01/2027,Yes,Y,
+cyrus.lind@acmecorp.com,Cyrus Lind,A-13,21/01/2027,Yes,Y,Needs a standing desk
+celeste.prosacco1@acmecorp.com,Celeste Prosacco,B-47,17/01/2027,No,N,
+ KOFI.VOLKMAN@ACMECORP.COM ,Kofi Volkman,C-42,15/01/2027,No,Y,
+petra.rempel@acmecorp.com,Petra Rempel,A-24,07/01/2027,No,Y,
+emmitt.lind@acmecorp.com,Emmitt Lind,B-34,04/01/2027,No,N,Needs a standing desk
+verna.collier@acmecorp.com,Verna Collier,C-35,26/01/2027,Yes,N,
+emmitt.rau@acmecorp.com,Emmitt Rau,A-42,16/01/2027,No,N,
+ LAVONNE.KUB@ACMECORP.COM ,Lavonne Kub,B-47,08/01/2027,No,Y,
+tomas.hilpert@acmecorp.com,Tomas Hilpert,C-38,10/01/2027,Yes,N,Needs a standing desk
+kenji.gerlach@acmecorp.com,Kenji Gerlach,A-36,27/01/2027,Yes,Y,
+hollis.larkin2@acmecorp.com,Hollis Larkin,B-44,13/01/2027,Yes,N,
+cyrus.yost1@acmecorp.com,Cyrus Yost,C-37,14/01/2027,No,Y,
+ SILAS.FUNK1@ACMECORP.COM ,Silas Funk,A-45,09/01/2027,Yes,N,Needs a standing desk
+ismael.schaden3@acmecorp.com,Ismael Schaden,B-29,27/01/2027,No,N,
+mei.dicki@acmecorp.com,Mei Dicki,C-11,08/01/2027,Yes,Y,
+delphine.abernathy1@acmecorp.com,Delphine Abernathy,A-26,22/01/2027,No,N,
+silas.larkin@acmecorp.com,Silas Larkin,B-17,07/01/2027,No,N,Needs a standing desk
+ DARIO.KUB1@ACMECORP.COM ,Dario Kub,C-36,16/01/2027,No,Y,
+juniper.jacobi@acmecorp.com,Juniper Jacobi,A-32,25/01/2027,No,N,
+quincy.bechtelar2@acmecorp.com,Quincy Bechtelar,B-34,25/01/2027,No,N,
+tobias.stiedemann@acmecorp.com,Tobias Stiedemann,C-28,19/01/2027,No,N,Needs a standing desk
+juniper.mraz1@acmecorp.com,Juniper Mraz,A-26,24/01/2027,Yes,Y,
+ ANNELIESE.KOEPP@ACMECORP.COM ,Anneliese Koepp,B-44,08/01/2027,No,N,
+yusuf.funk@acmecorp.com,Yusuf Funk,C-41,17/01/2027,No,N,
+nadia.funk@acmecorp.com,Nadia Funk,A-21,06/01/2027,Yes,N,Needs a standing desk
+bram.hilpert@acmecorp.com,Bram Hilpert,B-17,08/01/2027,Yes,N,
+theodora.heller@acmecorp.com,Theodora Heller,C-42,24/01/2027,Yes,N,
+ AYLA.COLLIER@ACMECORP.COM ,Ayla Collier,A-18,07/01/2027,Yes,N,
+ayla.yost@acmecorp.com,Ayla Yost,B-33,25/01/2027,Yes,N,Needs a standing desk
+ines.bergstrom1@acmecorp.com,Ines Bergstrom,C-41,21/01/2027,No,N,
+ulrich.abernathy@acmecorp.com,Ulrich Abernathy,A-25,27/01/2027,Yes,Y,
+ezekiel.abernathy1@acmecorp.com,Ezekiel Abernathy,B-44,14/01/2027,No,N,
+ HOLLIS.OBERBRUNNER@ACMECORP.COM ,Hollis Oberbrunner,C-12,12/01/2027,Yes,Y,Needs a standing desk
+kasimir.kub2@acmecorp.com,Kasimir Kub,A-22,06/01/2027,Yes,Y,
+ximena.wehner1@acmecorp.com,Ximena Wehner,B-32,12/01/2027,Yes,N,
+cyrus.tromp@acmecorp.com,Cyrus Tromp,C-41,05/01/2027,No,N,
+yusuf.daugherty@acmecorp.com,Yusuf Daugherty,A-27,11/01/2027,No,Y,Needs a standing desk
+ VERNA.SCHADEN1@ACMECORP.COM ,Verna Schaden,B-45,10/01/2027,Yes,Y,
+theodora.koepp2@acmecorp.com,Theodora Koepp,C-26,08/01/2027,Yes,N,
+celeste.gerlach1@acmecorp.com,Celeste Gerlach,A-48,11/01/2027,No,N,
+reva.wehner1@acmecorp.com,Reva Wehner,B-31,06/01/2027,Yes,Y,Needs a standing desk
+bram.runolfsdottir@acmecorp.com,Bram Runolfsdottir,C-22,04/01/2027,No,N,
+ ROSALIND.LIND@ACMECORP.COM ,Rosalind Lind,A-22,11/01/2027,No,Y,
+verna.wehner1@acmecorp.com,Verna Wehner,B-43,27/01/2027,No,Y,
+anneliese.volkman@acmecorp.com,Anneliese Volkman,C-47,09/01/2027,Yes,N,Needs a standing desk
+ximena.larkin2@acmecorp.com,Ximena Larkin,A-11,24/01/2027,Yes,Y,
+dario.bergstrom1@acmecorp.com,Dario Bergstrom,B-48,24/01/2027,Yes,N,
+ KASIMIR.BODE@ACMECORP.COM ,Kasimir Bode,C-27,22/01/2027,Yes,N,
+wendell.larkin2@acmecorp.com,Wendell Larkin,A-39,19/01/2027,No,Y,Needs a standing desk
+rhett.ebert1@acmecorp.com,Rhett Ebert,B-17,24/01/2027,No,Y,
+hollis.tromp1@acmecorp.com,Hollis Tromp,C-20,14/01/2027,Yes,Y,
+gideon.considine@acmecorp.com,Gideon Considine,A-27,24/01/2027,Yes,N,
+ DELPHINE.NADER1@ACMECORP.COM ,Delphine Nader,B-16,14/01/2027,Yes,Y,Needs a standing desk
+ulrich.ondricka2@acmecorp.com,Ulrich Ondricka,C-33,25/01/2027,Yes,N,
+reva.volkman@acmecorp.com,Reva Volkman,A-16,05/01/2027,No,Y,
+harriet.larkin@acmecorp.com,Harriet Larkin,B-19,12/01/2027,No,N,
+petra.wehner1@acmecorp.com,Petra Wehner,C-43,22/01/2027,No,N,Needs a standing desk
+ SANNA.SCHADEN@ACMECORP.COM ,Sanna Schaden,A-43,09/01/2027,Yes,Y,
+gideon.kshlerin1@acmecorp.com,Gideon Kshlerin,B-23,13/01/2027,Yes,N,
+bram.rempel2@acmecorp.com,Bram Rempel,C-14,04/01/2027,Yes,N,
+yusuf.upton2@acmecorp.com,Yusuf Upton,A-21,23/01/2027,Yes,N,Needs a standing desk
+osvaldo.hilpert1@acmecorp.com,Osvaldo Hilpert,B-25,04/01/2027,Yes,N,
+ ROSALIND.UPTON@ACMECORP.COM ,Rosalind Upton,C-34,04/01/2027,No,N,
+delphine.turcotte@acmecorp.com,Delphine Turcotte,A-13,27/01/2027,Yes,Y,
+zelda.yost1@acmecorp.com,Zelda Yost,B-22,27/01/2027,Yes,Y,Needs a standing desk
+florence.kub@acmecorp.com,Florence Kub,C-20,21/01/2027,Yes,Y,
+ines.heller@acmecorp.com,Ines Heller,A-14,18/01/2027,Yes,Y,
+ CELESTE.BODE1@ACMECORP.COM ,Celeste Bode,B-19,15/01/2027,No,N,
+quincy.wuckert1@acmecorp.com,Quincy Wuckert,C-42,07/01/2027,No,N,Needs a standing desk
+celeste.turcotte1@acmecorp.com,Celeste Turcotte,A-35,11/01/2027,Yes,Y,
+rhett.cormier1@acmecorp.com,Rhett Cormier,B-39,15/01/2027,No,Y,
+osvaldo.wehner1@acmecorp.com,Osvaldo Wehner,C-13,27/01/2027,No,N,
+ HOLLIS.LIND@ACMECORP.COM ,Hollis Lind,A-16,22/01/2027,No,Y,Needs a standing desk
+anneliese.considine1@acmecorp.com,Anneliese Considine,B-17,12/01/2027,No,Y,
+delphine.daugherty@acmecorp.com,Delphine Daugherty,C-33,20/01/2027,Yes,Y,
+verna.kub@acmecorp.com,Verna Kub,A-42,07/01/2027,Yes,Y,
+dario.koepp1@acmecorp.com,Dario Koepp,B-22,04/01/2027,No,Y,Needs a standing desk
+ EZEKIEL.CORMIER1@ACMECORP.COM ,Ezekiel Cormier,C-31,15/01/2027,No,N,
+ayla.koepp2@acmecorp.com,Ayla Koepp,A-23,26/01/2027,Yes,N,
+petra.daugherty1@acmecorp.com,Petra Daugherty,B-17,23/01/2027,Yes,N,
+rosalind.upton1@acmecorp.com,Rosalind Upton,C-13,11/01/2027,No,Y,Needs a standing desk
+nadia.bergstrom@acmecorp.com,Nadia Bergstrom,A-12,25/01/2027,No,N,
+ XIMENA.OBERBRUNNER2@ACMECORP.COM ,Ximena Oberbrunner,B-35,05/01/2027,Yes,N,
+gideon.koepp1@acmecorp.com,Gideon Koepp,C-27,11/01/2027,Yes,N,
+delphine.bode1@acmecorp.com,Delphine Bode,A-13,24/01/2027,Yes,N,Needs a standing desk
+ayla.hackett1@acmecorp.com,Ayla Hackett,B-25,14/01/2027,No,N,
+lorine.gutkowski2@acmecorp.com,Lorine Gutkowski,C-47,19/01/2027,Yes,Y,
+ VERNA.JACOBI1@ACMECORP.COM ,Verna Jacobi,A-20,08/01/2027,Yes,Y,
+kenji.rempel@acmecorp.com,Kenji Rempel,B-16,04/01/2027,Yes,N,Needs a standing desk
+mafalda.haley@acmecorp.com,Mafalda Haley,C-48,10/01/2027,No,N,
+quincy.zieme1@acmecorp.com,Quincy Zieme,A-49,11/01/2027,Yes,N,
+osvaldo.daugherty@acmecorp.com,Osvaldo Daugherty,B-44,23/01/2027,Yes,N,
+ TOBIAS.MAYER@ACMECORP.COM ,Tobias Mayer,C-36,18/01/2027,Yes,N,Needs a standing desk
+petra.kshlerin2@acmecorp.com,Petra Kshlerin,A-15,26/01/2027,No,N,
+marisol.larkin@acmecorp.com,Marisol Larkin,B-39,17/01/2027,No,N,
+rosalind.gutkowski@acmecorp.com,Rosalind Gutkowski,C-49,23/01/2027,Yes,Y,
+kenji.schaden@acmecorp.com,Kenji Schaden,A-47,16/01/2027,No,Y,Needs a standing desk
+ AYLA.DICKI1@ACMECORP.COM ,Ayla Dicki,B-13,20/01/2027,Yes,Y,
+rhett.runolfsdottir2@acmecorp.com,Rhett Runolfsdottir,C-10,07/01/2027,Yes,N,
+juniper.bechtelar1@acmecorp.com,Juniper Bechtelar,A-36,24/01/2027,No,N,
+tomas.rau1@acmecorp.com,Tomas Rau,B-38,22/01/2027,Yes,Y,Needs a standing desk
+rosalind.nader@acmecorp.com,Rosalind Nader,C-14,16/01/2027,No,Y,
+ DARIO.PROSACCO2@ACMECORP.COM ,Dario Prosacco,A-29,18/01/2027,Yes,N,
+reva.turcotte@acmecorp.com,Reva Turcotte,B-15,05/01/2027,Yes,N,
+rhett.heller1@acmecorp.com,Rhett Heller,C-13,20/01/2027,No,N,Needs a standing desk
+garnet.jacobi2@acmecorp.com,Garnet Jacobi,A-13,27/01/2027,No,Y,
+mei.ondricka2@acmecorp.com,Mei Ondricka,B-45,24/01/2027,Yes,N,
+ PETRA.COLLIER1@ACMECORP.COM ,Petra Collier,C-38,22/01/2027,No,N,
+florence.bechtelar2@acmecorp.com,Florence Bechtelar,A-10,07/01/2027,No,N,Needs a standing desk
+leontine.kub1@acmecorp.com,Leontine Kub,B-15,09/01/2027,Yes,N,
+yusuf.kshlerin1@acmecorp.com,Yusuf Kshlerin,C-41,25/01/2027,Yes,Y,
+ezekiel.collier@acmecorp.com,Ezekiel Collier,A-34,24/01/2027,No,N,
+ THEODORA.ABERNATHY3@ACMECORP.COM ,Theodora Abernathy,B-27,25/01/2027,Yes,Y,Needs a standing desk
+sanna.ondricka1@acmecorp.com,Sanna Ondricka,C-25,19/01/2027,Yes,N,
+petra.yost1@acmecorp.com,Petra Yost,A-16,21/01/2027,Yes,Y,
+anneliese.hilpert1@acmecorp.com,Anneliese Hilpert,B-36,13/01/2027,No,N,
+wendell.upton@acmecorp.com,Wendell Upton,C-20,07/01/2027,Yes,N,Needs a standing desk
+ LORINE.RAU@ACMECORP.COM ,Lorine Rau,A-41,21/01/2027,Yes,Y,
+kenji.funk1@acmecorp.com,Kenji Funk,B-27,22/01/2027,No,Y,
+lorine.ondricka@acmecorp.com,Lorine Ondricka,C-38,19/01/2027,No,N,
+tomas.kshlerin@acmecorp.com,Tomas Kshlerin,A-48,22/01/2027,Yes,Y,Needs a standing desk
+elva.gerlach1@acmecorp.com,Elva Gerlach,B-28,25/01/2027,Yes,Y,
+ ISMAEL.KOEPP1@ACMECORP.COM ,Ismael Koepp,C-39,17/01/2027,Yes,N,
+mei.hilpert4@acmecorp.com,Mei Hilpert,A-20,24/01/2027,No,N,
+ximena.wehner3@acmecorp.com,Ximena Wehner,B-49,15/01/2027,Yes,Y,Needs a standing desk
+osvaldo.wuckert1@acmecorp.com,Osvaldo Wuckert,C-45,26/01/2027,Yes,N,
+juniper.turcotte@acmecorp.com,Juniper Turcotte,A-23,09/01/2027,No,N,
+ ANNELIESE.ABERNATHY1@ACMECORP.COM ,Anneliese Abernathy,B-26,26/01/2027,Yes,N,
+hollis.heller1@acmecorp.com,Hollis Heller,C-11,05/01/2027,Yes,N,Needs a standing desk
+ezekiel.upton1@acmecorp.com,Ezekiel Upton,A-48,24/01/2027,Yes,Y,
+petra.considine1@acmecorp.com,Petra Considine,B-30,23/01/2027,No,Y,
+delphine.mraz@acmecorp.com,Delphine Mraz,C-42,13/01/2027,Yes,N,
+ WENDELL.JACOBI1@ACMECORP.COM ,Wendell Jacobi,A-29,23/01/2027,No,N,Needs a standing desk
+mafalda.hackett@acmecorp.com,Mafalda Hackett,B-41,19/01/2027,Yes,Y,
+kasimir.koepp@acmecorp.com,Kasimir Koepp,C-44,27/01/2027,Yes,Y,
+osvaldo.lind1@acmecorp.com,Osvaldo Lind,A-22,24/01/2027,No,N,
+reva.schaden2@acmecorp.com,Reva Schaden,B-23,25/01/2027,Yes,N,Needs a standing desk
+ MAFALDA.WUCKERT1@ACMECORP.COM ,Mafalda Wuckert,C-34,12/01/2027,Yes,N,
+ines.rempel@acmecorp.com,Ines Rempel,A-33,15/01/2027,No,N,
+kasimir.dicki1@acmecorp.com,Kasimir Dicki,B-22,14/01/2027,Yes,N,
+ines.rempel1@acmecorp.com,Ines Rempel,C-32,11/01/2027,Yes,N,Needs a standing desk
+elva.runolfsdottir3@acmecorp.com,Elva Runolfsdottir,A-35,06/01/2027,Yes,Y,
+ ROSALIND.DICKI2@ACMECORP.COM ,Rosalind Dicki,B-29,26/01/2027,Yes,N,
+celeste.hackett@acmecorp.com,Celeste Hackett,C-26,26/01/2027,Yes,Y,
+yusuf.collier1@acmecorp.com,Yusuf Collier,A-25,06/01/2027,Yes,Y,Needs a standing desk
+hollis.volkman1@acmecorp.com,Hollis Volkman,B-44,26/01/2027,No,N,
+arjun.collier@acmecorp.com,Arjun Collier,C-21,13/01/2027,Yes,N,
+ LORINE.TURCOTTE1@ACMECORP.COM ,Lorine Turcotte,A-27,16/01/2027,No,Y,
+ines.kub@acmecorp.com,Ines Kub,B-43,26/01/2027,Yes,Y,Needs a standing desk
+kofi.mayer2@acmecorp.com,Kofi Mayer,C-42,07/01/2027,Yes,N,
+florence.oberbrunner@acmecorp.com,Florence Oberbrunner,A-26,12/01/2027,Yes,Y,
+cyrus.bode2@acmecorp.com,Cyrus Bode,B-12,25/01/2027,Yes,N,
+ ISMAEL.LIND@ACMECORP.COM ,Ismael Lind,C-42,05/01/2027,Yes,N,Needs a standing desk
+ximena.ebert1@acmecorp.com,Ximena Ebert,A-26,19/01/2027,Yes,N,
+cyrus.mayer1@acmecorp.com,Cyrus Mayer,B-42,10/01/2027,Yes,N,
+ezekiel.bechtelar3@acmecorp.com,Ezekiel Bechtelar,C-44,07/01/2027,No,Y,
+hollis.rau@acmecorp.com,Hollis Rau,A-32,10/01/2027,No,N,Needs a standing desk
+ TOBIAS.OBERBRUNNER1@ACMECORP.COM ,Tobias Oberbrunner,B-39,16/01/2027,Yes,N,
+celeste.kshlerin1@acmecorp.com,Celeste Kshlerin,C-45,18/01/2027,No,N,
+nadia.hilpert3@acmecorp.com,Nadia Hilpert,A-22,12/01/2027,Yes,Y,
+lorine.nader1@acmecorp.com,Lorine Nader,B-13,16/01/2027,Yes,Y,Needs a standing desk
+lorine.mraz2@acmecorp.com,Lorine Mraz,C-28,20/01/2027,No,N,
+ FLORENCE.DAUGHERTY@ACMECORP.COM ,Florence Daugherty,A-10,11/01/2027,No,N,
+theodora.considine3@acmecorp.com,Theodora Considine,B-27,25/01/2027,No,N,
+mafalda.daugherty3@acmecorp.com,Mafalda Daugherty,C-23,13/01/2027,No,N,Needs a standing desk
+nadia.heller@acmecorp.com,Nadia Heller,A-35,08/01/2027,Yes,N,
+ismael.considine1@acmecorp.com,Ismael Considine,B-36,09/01/2027,Yes,Y,
+ GARNET.ZIEME1@ACMECORP.COM ,Garnet Zieme,C-25,06/01/2027,No,Y,
+verna.reichert3@acmecorp.com,Verna Reichert,A-28,27/01/2027,Yes,N,Needs a standing desk
+yusuf.jacobi2@acmecorp.com,Yusuf Jacobi,B-18,25/01/2027,Yes,N,
+florence.dicki1@acmecorp.com,Florence Dicki,C-40,13/01/2027,Yes,Y,
+lavonne.gutkowski@acmecorp.com,Lavonne Gutkowski,A-17,04/01/2027,Yes,N,
+ CYRUS.BERGSTROM1@ACMECORP.COM ,Cyrus Bergstrom,B-17,13/01/2027,No,N,Needs a standing desk
+anneliese.kub1@acmecorp.com,Anneliese Kub,C-23,13/01/2027,Yes,N,
+mei.collier3@acmecorp.com,Mei Collier,A-43,23/01/2027,Yes,N,
+lavonne.koepp@acmecorp.com,Lavonne Koepp,B-22,24/01/2027,Yes,N,
+ayla.kub@acmecorp.com,Ayla Kub,C-21,19/01/2027,Yes,N,Needs a standing desk
+ GIDEON.QUIGLEY3@ACMECORP.COM ,Gideon Quigley,A-26,22/01/2027,Yes,N,
+ezekiel.ondricka1@acmecorp.com,Ezekiel Ondricka,B-35,27/01/2027,Yes,N,
+petra.abernathy1@acmecorp.com,Petra Abernathy,C-15,26/01/2027,No,Y,
+delphine.stiedemann1@acmecorp.com,Delphine Stiedemann,A-44,06/01/2027,Yes,N,Needs a standing desk
+harriet.rau@acmecorp.com,Harriet Rau,B-14,26/01/2027,No,N,
+ EZEKIEL.TURCOTTE1@ACMECORP.COM ,Ezekiel Turcotte,C-14,07/01/2027,Yes,N,
+cyrus.kub1@acmecorp.com,Cyrus Kub,A-17,11/01/2027,No,Y,
+rosalind.funk3@acmecorp.com,Rosalind Funk,B-36,07/01/2027,No,N,Needs a standing desk
+yusuf.rau@acmecorp.com,Yusuf Rau,C-39,20/01/2027,Yes,Y,
+theodora.koepp3@acmecorp.com,Theodora Koepp,A-20,11/01/2027,Yes,N,
+ AYLA.BECHTELAR1@ACMECORP.COM ,Ayla Bechtelar,B-27,22/01/2027,No,Y,
+wendell.jacobi2@acmecorp.com,Wendell Jacobi,C-18,23/01/2027,Yes,N,Needs a standing desk
+ines.cormier5@acmecorp.com,Ines Cormier,A-32,20/01/2027,Yes,N,
 casey.nguyen@acmecorp.com,Not in Rippling,B-11,11/01/2027,Yes,N,
 old.contractor@agency.com,External,C-02,18/01/2027,No,N,

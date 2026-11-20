@@ -1,52 +1,203 @@
 Work email,Name,One-time bonus (new),Currency,Reason
-elva.koepp@acmecorp.com,Elva Koepp,500,USD,Launch support
-bram.rempel@acmecorp.com,Bram Rempel,500,USD,Launch support
-ulrich.abernathy@acmecorp.com,Ulrich Abernathy,500,USD,Launch support
-cyrus.heller@acmecorp.com,Cyrus Heller,1000,USD,Q4 platform launch
-cyrus.bode@acmecorp.com,Cyrus Bode,1000,USD,Q4 platform launch
-ximena.prosacco@acmecorp.com,Ximena Prosacco,500,USD,Launch support
-ezekiel.bechtelar@acmecorp.com,Ezekiel Bechtelar,500,USD,Launch support
-kofi.yost@acmecorp.com,Kofi Yost,1000,USD,Q4 platform launch
-delphine.gerlach@acmecorp.com,Delphine Gerlach,1000,USD,Q4 platform launch
-rhett.kub@acmecorp.com,Rhett Kub,1000,USD,Q4 platform launch
-tomas.mayer@acmecorp.com,Tomas Mayer,1000,USD,Q4 platform launch
-juniper.considine@acmecorp.com,Juniper Considine,500,USD,Launch support
-ayla.collier@acmecorp.com,Ayla Collier,500,USD,Launch support
-kofi.gerlach@acmecorp.com,Kofi Gerlach,500,USD,Launch support
-ximena.bergstrom@acmecorp.com,Ximena Bergstrom,500,USD,Launch support
-elva.cormier@acmecorp.com,Elva Cormier,500,USD,Launch support
-rhett.wuckert@acmecorp.com,Rhett Wuckert,1000,USD,Q4 platform launch
-hollis.abernathy@acmecorp.com,Hollis Abernathy,500,USD,Launch support
-anneliese.dicki1@acmecorp.com,Anneliese Dicki,500,USD,Launch support
-rosalind.upton@acmecorp.com,Rosalind Upton,1000,USD,Q4 platform launch
-verna.bode1@acmecorp.com,Verna Bode,500,USD,Launch support
-silas.bergstrom@acmecorp.com,Silas Bergstrom,500,USD,Launch support
-kenji.schaden1@acmecorp.com,Kenji Schaden,500,USD,Launch support
-ines.cormier@acmecorp.com,Ines Cormier,500,USD,Launch support
-hollis.dicki@acmecorp.com,Hollis Dicki,1000,USD,Q4 platform launch
-petra.larkin1@acmecorp.com,Petra Larkin,500,USD,Launch support
-petra.stiedemann@acmecorp.com,Petra Stiedemann,1000,USD,Q4 platform launch
-emmitt.schaden@acmecorp.com,Emmitt Schaden,500,USD,Launch support
-bram.funk@acmecorp.com,Bram Funk,1000,USD,Q4 platform launch
-lorine.oberbrunner@acmecorp.com,Lorine Oberbrunner,500,USD,Launch support
-marisol.mraz@acmecorp.com,Marisol Mraz,1000,USD,Q4 platform launch
-kasimir.volkman@acmecorp.com,Kasimir Volkman,1000,USD,Q4 platform launch
-osvaldo.hackett@acmecorp.com,Osvaldo Hackett,1000,USD,Q4 platform launch
-nadia.ebert@acmecorp.com,Nadia Ebert,500,USD,Launch support
-yusuf.wuckert@acmecorp.com,Yusuf Wuckert,1000,USD,Q4 platform launch
-celeste.cormier@acmecorp.com,Celeste Cormier,500,USD,Launch support
-mei.nader@acmecorp.com,Mei Nader,1000,USD,Q4 platform launch
-mei.collier@acmecorp.com,Mei Collier,1370,CAD,Q4 platform launch
-ines.ebert@acmecorp.com,Ines Ebert,500,USD,Launch support
-ulrich.rau1@acmecorp.com,Ulrich Rau,1000,USD,Q4 platform launch
-juniper.turcotte@acmecorp.com,Juniper Turcotte,1000,USD,Q4 platform launch
-osvaldo.heller@acmecorp.com,Osvaldo Heller,1000,USD,Q4 platform launch
-mei.dicki@acmecorp.com,Mei Dicki,1000,USD,Q4 platform launch
-bram.dicki1@acmecorp.com,Bram Dicki,500,USD,Launch support
+celeste.bode@acmecorp.com,Celeste Bode,500,USD,Launch support
+juniper.haley@acmecorp.com,Juniper Haley,1000,USD,Q4 platform launch
+mafalda.funk@acmecorp.com,Mafalda Funk,1000,USD,Q4 platform launch
+delphine.ebert@acmecorp.com,Delphine Ebert,500,USD,Launch support
+emmitt.heller@acmecorp.com,Emmitt Heller,500,USD,Launch support
+garnet.lind@acmecorp.com,Garnet Lind,500,USD,Launch support
+ines.larkin@acmecorp.com,Ines Larkin,1000,USD,Q4 platform launch
 silas.hilpert@acmecorp.com,Silas Hilpert,500,USD,Launch support
+kofi.ebert@acmecorp.com,Kofi Ebert,500,USD,Launch support
+garnet.upton@acmecorp.com,Garnet Upton,1000,USD,Q4 platform launch
+harriet.ondricka@acmecorp.com,Harriet Ondricka,1000,USD,Q4 platform launch
+juniper.bechtelar@acmecorp.com,Juniper Bechtelar,1000,USD,Q4 platform launch
+rhett.volkman@acmecorp.com,Rhett Volkman,500,USD,Launch support
+petra.cormier@acmecorp.com,Petra Cormier,1000,USD,Q4 platform launch
+florence.hilpert@acmecorp.com,Florence Hilpert,1000,USD,Q4 platform launch
+tobias.rempel@acmecorp.com,Tobias Rempel,500,USD,Launch support
+kasimir.kub@acmecorp.com,Kasimir Kub,500,USD,Launch support
+otis.heller@acmecorp.com,Otis Heller,500,USD,Launch support
+florence.bode@acmecorp.com,Florence Bode,1000,USD,Q4 platform launch
+harriet.bergstrom@acmecorp.com,Harriet Bergstrom,1000,USD,Q4 platform launch
+maverick.ondricka@acmecorp.com,Maverick Ondricka,1000,USD,Q4 platform launch
+cyrus.hilpert@acmecorp.com,Cyrus Hilpert,1000,USD,Q4 platform launch
+reva.kshlerin@acmecorp.com,Reva Kshlerin,1000,USD,Q4 platform launch
+mafalda.daugherty@acmecorp.com,Mafalda Daugherty,1000,USD,Q4 platform launch
+rhett.upton@acmecorp.com,Rhett Upton,1000,USD,Q4 platform launch
 garnet.prosacco@acmecorp.com,Garnet Prosacco,500,USD,Launch support
-juniper.heller@acmecorp.com,Juniper Heller,500,USD,Launch support
-otis.ondricka@acmecorp.com,Otis Ondricka,1000,USD,Q4 platform launch
-rhett.volkman@acmecorp.com,Rhett Volkman,1000,USD,Q4 platform launch
+mei.ebert@acmecorp.com,Mei Ebert,1000,USD,Q4 platform launch
+delphine.heller@acmecorp.com,Delphine Heller,500,USD,Launch support
+emmitt.bergstrom1@acmecorp.com,Emmitt Bergstrom,1000,USD,Q4 platform launch
+silas.lind@acmecorp.com,Silas Lind,500,USD,Launch support
+osvaldo.hackett@acmecorp.com,Osvaldo Hackett,1000,USD,Q4 platform launch
+anneliese.funk@acmecorp.com,Anneliese Funk,1000,USD,Q4 platform launch
+otis.mraz@acmecorp.com,Otis Mraz,500,USD,Launch support
+emmitt.considine@acmecorp.com,Emmitt Considine,1370,CAD,Q4 platform launch
+zelda.larkin@acmecorp.com,Zelda Larkin,1000,USD,Q4 platform launch
+harriet.collier@acmecorp.com,Harriet Collier,1000,USD,Q4 platform launch
+wendell.reichert@acmecorp.com,Wendell Reichert,500,USD,Launch support
+leontine.ondricka@acmecorp.com,Leontine Ondricka,1000,USD,Q4 platform launch
+lorine.quigley@acmecorp.com,Lorine Quigley,500,USD,Launch support
+elva.mayer@acmecorp.com,Elva Mayer,500,USD,Launch support
+rhett.hackett1@acmecorp.com,Rhett Hackett,500,USD,Launch support
+emmitt.funk@acmecorp.com,Emmitt Funk,1000,USD,Q4 platform launch
+ezekiel.rau@acmecorp.com,Ezekiel Rau,500,USD,Launch support
+sanna.mayer@acmecorp.com,Sanna Mayer,1000,USD,Q4 platform launch
+rosalind.rempel@acmecorp.com,Rosalind Rempel,500,USD,Launch support
+delphine.rempel@acmecorp.com,Delphine Rempel,500,USD,Launch support
+tomas.considine@acmecorp.com,Tomas Considine,500,USD,Launch support
+quincy.rempel@acmecorp.com,Quincy Rempel,1000,USD,Q4 platform launch
+harriet.bechtelar@acmecorp.com,Harriet Bechtelar,500,USD,Launch support
+garnet.runolfsdottir@acmecorp.com,Garnet Runolfsdottir,1000,USD,Q4 platform launch
+garnet.nader@acmecorp.com,Garnet Nader,500,USD,Launch support
+rosalind.mayer@acmecorp.com,Rosalind Mayer,500,USD,Launch support
+cyrus.gutkowski@acmecorp.com,Cyrus Gutkowski,500,USD,Launch support
+ulrich.schaden@acmecorp.com,Ulrich Schaden,1370,CAD,Q4 platform launch
+bram.rempel@acmecorp.com,Bram Rempel,1000,USD,Q4 platform launch
+silas.bode@acmecorp.com,Silas Bode,500,USD,Launch support
+silas.bergstrom1@acmecorp.com,Silas Bergstrom,500,USD,Launch support
+florence.schaden@acmecorp.com,Florence Schaden,500,USD,Launch support
+petra.yost@acmecorp.com,Petra Yost,1000,USD,Q4 platform launch
+ximena.mraz@acmecorp.com,Ximena Mraz,500,USD,Launch support
+reva.bode1@acmecorp.com,Reva Bode,1000,USD,Q4 platform launch
+ulrich.hackett@acmecorp.com,Ulrich Hackett,1000,USD,Q4 platform launch
+kasimir.reichert1@acmecorp.com,Kasimir Reichert,500,USD,Launch support
+ines.cormier@acmecorp.com,Ines Cormier,1370,CAD,Q4 platform launch
+mei.volkman@acmecorp.com,Mei Volkman,1000,USD,Q4 platform launch
+anneliese.nader@acmecorp.com,Anneliese Nader,1000,USD,Q4 platform launch
+yusuf.runolfsdottir@acmecorp.com,Yusuf Runolfsdottir,500,USD,Launch support
+kasimir.ondricka1@acmecorp.com,Kasimir Ondricka,500,USD,Launch support
+tobias.ondricka2@acmecorp.com,Tobias Ondricka,500,USD,Launch support
+maverick.hilpert2@acmecorp.com,Maverick Hilpert,1000,USD,Q4 platform launch
+hollis.mraz@acmecorp.com,Hollis Mraz,1000,USD,Q4 platform launch
+ezekiel.mayer@acmecorp.com,Ezekiel Mayer,500,USD,Launch support
+otis.hackett@acmecorp.com,Otis Hackett,500,USD,Launch support
+garnet.abernathy1@acmecorp.com,Garnet Abernathy,500,USD,Launch support
+lorine.oberbrunner@acmecorp.com,Lorine Oberbrunner,1000,USD,Q4 platform launch
+ayla.dicki@acmecorp.com,Ayla Dicki,1000,USD,Q4 platform launch
+gideon.quigley@acmecorp.com,Gideon Quigley,1000,USD,Q4 platform launch
+ines.zieme@acmecorp.com,Ines Zieme,500,USD,Launch support
+ximena.haley@acmecorp.com,Ximena Haley,500,USD,Launch support
+ines.quigley@acmecorp.com,Ines Quigley,1000,USD,Q4 platform launch
+cyrus.jacobi@acmecorp.com,Cyrus Jacobi,1000,USD,Q4 platform launch
+tobias.collier@acmecorp.com,Tobias Collier,500,USD,Launch support
+sanna.quigley@acmecorp.com,Sanna Quigley,1000,USD,Q4 platform launch
+garnet.schaden@acmecorp.com,Garnet Schaden,1000,USD,Q4 platform launch
+celeste.gutkowski@acmecorp.com,Celeste Gutkowski,1000,USD,Q4 platform launch
+ines.cormier1@acmecorp.com,Ines Cormier,500,USD,Launch support
+ximena.schaden@acmecorp.com,Ximena Schaden,500,USD,Launch support
+osvaldo.jacobi1@acmecorp.com,Osvaldo Jacobi,500,USD,Launch support
+verna.wehner@acmecorp.com,Verna Wehner,500,USD,Launch support
+mei.hilpert1@acmecorp.com,Mei Hilpert,500,USD,Launch support
+theodora.wehner@acmecorp.com,Theodora Wehner,500,USD,Launch support
+wendell.funk@acmecorp.com,Wendell Funk,1000,USD,Q4 platform launch
+dario.prosacco@acmecorp.com,Dario Prosacco,1000,USD,Q4 platform launch
+reva.jacobi@acmecorp.com,Reva Jacobi,500,USD,Launch support
+mafalda.funk1@acmecorp.com,Mafalda Funk,1000,USD,Q4 platform launch
+silas.stiedemann1@acmecorp.com,Silas Stiedemann,500,USD,Launch support
+elva.bode@acmecorp.com,Elva Bode,1000,USD,Q4 platform launch
+garnet.jacobi1@acmecorp.com,Garnet Jacobi,500,USD,Launch support
+petra.tromp1@acmecorp.com,Petra Tromp,1000,USD,Q4 platform launch
+tomas.upton1@acmecorp.com,Tomas Upton,1000,USD,Q4 platform launch
+quincy.schaden1@acmecorp.com,Quincy Schaden,1000,USD,Q4 platform launch
+tomas.tromp1@acmecorp.com,Tomas Tromp,1000,USD,Q4 platform launch
+garnet.nader1@acmecorp.com,Garnet Nader,1000,USD,Q4 platform launch
+florence.rempel@acmecorp.com,Florence Rempel,500,USD,Launch support
+ximena.oberbrunner1@acmecorp.com,Ximena Oberbrunner,500,USD,Launch support
+yusuf.mraz1@acmecorp.com,Yusuf Mraz,1000,USD,Q4 platform launch
+delphine.upton@acmecorp.com,Delphine Upton,1000,USD,Q4 platform launch
+ulrich.kshlerin@acmecorp.com,Ulrich Kshlerin,500,USD,Launch support
+kenji.jacobi@acmecorp.com,Kenji Jacobi,500,USD,Launch support
+elva.cormier2@acmecorp.com,Elva Cormier,500,USD,Launch support
+ezekiel.rau1@acmecorp.com,Ezekiel Rau,1000,USD,Q4 platform launch
+ines.runolfsdottir1@acmecorp.com,Ines Runolfsdottir,1000,USD,Q4 platform launch
+garnet.daugherty@acmecorp.com,Garnet Daugherty,500,USD,Launch support
+leontine.gutkowski@acmecorp.com,Leontine Gutkowski,1000,USD,Q4 platform launch
+celeste.cormier@acmecorp.com,Celeste Cormier,500,USD,Launch support
+tobias.bode@acmecorp.com,Tobias Bode,1000,USD,Q4 platform launch
+ximena.collier@acmecorp.com,Ximena Collier,500,USD,Launch support
+garnet.mayer@acmecorp.com,Garnet Mayer,500,USD,Launch support
+reva.runolfsdottir@acmecorp.com,Reva Runolfsdottir,500,USD,Launch support
+anneliese.reichert@acmecorp.com,Anneliese Reichert,500,USD,Launch support
+delphine.upton2@acmecorp.com,Delphine Upton,500,USD,Launch support
+quincy.gerlach@acmecorp.com,Quincy Gerlach,1000,USD,Q4 platform launch
+quincy.bode1@acmecorp.com,Quincy Bode,500,USD,Launch support
+tobias.funk1@acmecorp.com,Tobias Funk,500,USD,Launch support
+cyrus.haley@acmecorp.com,Cyrus Haley,1000,USD,Q4 platform launch
+ulrich.daugherty2@acmecorp.com,Ulrich Daugherty,500,USD,Launch support
+quincy.upton@acmecorp.com,Quincy Upton,1000,USD,Q4 platform launch
+otis.daugherty@acmecorp.com,Otis Daugherty,500,USD,Launch support
+tomas.runolfsdottir@acmecorp.com,Tomas Runolfsdottir,500,USD,Launch support
+garnet.bechtelar@acmecorp.com,Garnet Bechtelar,1000,USD,Q4 platform launch
+reva.haley@acmecorp.com,Reva Haley,1000,USD,Q4 platform launch
+verna.bechtelar@acmecorp.com,Verna Bechtelar,1000,USD,Q4 platform launch
+sanna.rempel@acmecorp.com,Sanna Rempel,1000,USD,Q4 platform launch
+otis.turcotte1@acmecorp.com,Otis Turcotte,1000,USD,Q4 platform launch
+kenji.jacobi1@acmecorp.com,Kenji Jacobi,1000,USD,Q4 platform launch
+elva.hackett@acmecorp.com,Elva Hackett,500,USD,Launch support
+reva.heller@acmecorp.com,Reva Heller,1000,USD,Q4 platform launch
+bram.collier@acmecorp.com,Bram Collier,1000,USD,Q4 platform launch
+rhett.mraz3@acmecorp.com,Rhett Mraz,1000,USD,Q4 platform launch
+anneliese.wuckert@acmecorp.com,Anneliese Wuckert,500,USD,Launch support
+ezekiel.turcotte@acmecorp.com,Ezekiel Turcotte,500,USD,Launch support
+reva.kub@acmecorp.com,Reva Kub,1000,USD,Q4 platform launch
+reva.heller1@acmecorp.com,Reva Heller,500,USD,Launch support
+harriet.prosacco2@acmecorp.com,Harriet Prosacco,500,USD,Launch support
+florence.schaden1@acmecorp.com,Florence Schaden,1000,USD,Q4 platform launch
+verna.ondricka@acmecorp.com,Verna Ondricka,500,USD,Launch support
+quincy.bechtelar3@acmecorp.com,Quincy Bechtelar,500,USD,Launch support
+silas.gerlach1@acmecorp.com,Silas Gerlach,1000,USD,Q4 platform launch
+emmitt.prosacco@acmecorp.com,Emmitt Prosacco,500,USD,Launch support
+sanna.larkin@acmecorp.com,Sanna Larkin,1000,USD,Q4 platform launch
+lorine.gutkowski1@acmecorp.com,Lorine Gutkowski,1000,USD,Q4 platform launch
+tobias.oberbrunner@acmecorp.com,Tobias Oberbrunner,1000,USD,Q4 platform launch
+elva.considine@acmecorp.com,Elva Considine,1000,USD,Q4 platform launch
+anneliese.haley@acmecorp.com,Anneliese Haley,500,USD,Launch support
+harriet.ondricka1@acmecorp.com,Harriet Ondricka,1000,USD,Q4 platform launch
+harriet.haley@acmecorp.com,Harriet Haley,500,USD,Launch support
+leontine.schaden@acmecorp.com,Leontine Schaden,500,USD,Launch support
+delphine.cormier1@acmecorp.com,Delphine Cormier,500,USD,Launch support
+leontine.jacobi1@acmecorp.com,Leontine Jacobi,1000,USD,Q4 platform launch
+zelda.gerlach@acmecorp.com,Zelda Gerlach,1000,USD,Q4 platform launch
+otis.abernathy3@acmecorp.com,Otis Abernathy,1000,USD,Q4 platform launch
+kasimir.dicki@acmecorp.com,Kasimir Dicki,500,USD,Launch support
+theodora.turcotte@acmecorp.com,Theodora Turcotte,500,USD,Launch support
+ulrich.hilpert@acmecorp.com,Ulrich Hilpert,1000,USD,Q4 platform launch
+ayla.haley@acmecorp.com,Ayla Haley,500,USD,Launch support
+lavonne.abernathy@acmecorp.com,Lavonne Abernathy,500,USD,Launch support
+nadia.considine@acmecorp.com,Nadia Considine,1000,USD,Q4 platform launch
+yusuf.cormier1@acmecorp.com,Yusuf Cormier,500,USD,Launch support
+juniper.kshlerin@acmecorp.com,Juniper Kshlerin,500,USD,Launch support
+emmitt.considine2@acmecorp.com,Emmitt Considine,1370,CAD,Q4 platform launch
+florence.tromp@acmecorp.com,Florence Tromp,500,USD,Launch support
+emmitt.gutkowski1@acmecorp.com,Emmitt Gutkowski,500,USD,Launch support
+mei.cormier@acmecorp.com,Mei Cormier,1000,USD,Q4 platform launch
+cyrus.lind1@acmecorp.com,Cyrus Lind,1000,USD,Q4 platform launch
+celeste.volkman@acmecorp.com,Celeste Volkman,500,USD,Launch support
+garnet.rau@acmecorp.com,Garnet Rau,500,USD,Launch support
+garnet.lind2@acmecorp.com,Garnet Lind,1000,USD,Q4 platform launch
+zelda.bechtelar@acmecorp.com,Zelda Bechtelar,1000,USD,Q4 platform launch
+theodora.kub@acmecorp.com,Theodora Kub,1000,USD,Q4 platform launch
+delphine.funk@acmecorp.com,Delphine Funk,1000,USD,Q4 platform launch
+lavonne.jacobi1@acmecorp.com,Lavonne Jacobi,1000,USD,Q4 platform launch
+nadia.daugherty@acmecorp.com,Nadia Daugherty,1000,USD,Q4 platform launch
+petra.rempel1@acmecorp.com,Petra Rempel,500,USD,Launch support
+lavonne.ondricka@acmecorp.com,Lavonne Ondricka,500,USD,Launch support
+arjun.ebert@acmecorp.com,Arjun Ebert,1000,USD,Q4 platform launch
+arjun.lind1@acmecorp.com,Arjun Lind,1000,USD,Q4 platform launch
+emmitt.heller1@acmecorp.com,Emmitt Heller,500,USD,Launch support
+theodora.heller1@acmecorp.com,Theodora Heller,500,USD,Launch support
+marisol.zieme2@acmecorp.com,Marisol Zieme,500,USD,Launch support
+celeste.daugherty@acmecorp.com,Celeste Daugherty,1000,USD,Q4 platform launch
+emmitt.oberbrunner@acmecorp.com,Emmitt Oberbrunner,500,USD,Launch support
+delphine.rau@acmecorp.com,Delphine Rau,500,USD,Launch support
+theodora.collier1@acmecorp.com,Theodora Collier,500,USD,Launch support
+hollis.heller@acmecorp.com,Hollis Heller,500,USD,Launch support
+mafalda.bergstrom1@acmecorp.com,Mafalda Bergstrom,1000,USD,Q4 platform launch
+tomas.tromp2@acmecorp.com,Tomas Tromp,500,USD,Launch support
+hollis.jacobi@acmecorp.com,Hollis Jacobi,1000,USD,Q4 platform launch
+juniper.gerlach1@acmecorp.com,Juniper Gerlach,1000,USD,Q4 platform launch
+verna.cormier@acmecorp.com,Verna Cormier,1000,USD,Q4 platform launch
+ines.rau@acmecorp.com,Ines Rau,500,USD,Launch support
 ana.contractor@agency.com,External,1000,USD,Not in Rippling
-elva.koepp@acmecorp.com,Duplicate currency typo,900,EUR,Unsupported currency
+celeste.bode@acmecorp.com,Duplicate currency typo,900,EUR,Unsupported currency
